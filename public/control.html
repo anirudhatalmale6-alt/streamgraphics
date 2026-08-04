@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics — Control</title>
+<link rel="stylesheet" href="/control.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="dot"></span> StreamGraphics <small>Control</small></div>
+    <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
+  </header>
+
+  <main>
+    <!-- LIVE PREVIEW of the value + on-air toggle -->
+    <section class="panel hero">
+      <div class="preview">
+        <div class="pv-label" id="pvLabel"></div>
+        <div class="pv-time" id="pvTime">00:00</div>
+      </div>
+      <div class="onair">
+        <button class="btn big show" id="btnShow">Take to air ▸</button>
+        <button class="btn big hide" id="btnHide">◂ Off air</button>
+        <div class="airstate" id="airState">OFF AIR</div>
+      </div>
+    </section>
+
+    <div class="cols">
+      <!-- TIMER CONTROLS -->
+      <section class="panel">
+        <h3>Timer</h3>
+
+        <div class="modes" id="modes">
+          <button class="chip" data-mode="down">Countdown</button>
+          <button class="chip" data-mode="up">Count&nbsp;up</button>
+          <button class="chip" data-mode="tod">To a time</button>
+        </div>
+
+        <!-- countdown duration -->
+        <div class="row modeblock" data-for="down">
+          <label>Duration</label>
+          <input class="inp t" id="durMin" type="number" min="0" max="999" value="5"> :
+          <input class="inp t" id="durSec" type="number" min="0" max="59" value="00">
+          <button class="btn ghost" id="setDur">Set</button>
+        </div>
+
+        <!-- countdown-to-time -->
+        <div class="row modeblock" data-for="tod" style="display:none">
+          <label>Count down to</label>
+          <input class="inp" id="todTime" type="time" step="1" value="12:00:00">
+          <button class="btn ghost" id="setTod">Set</button>
+        </div>
+
+        <div class="transport">
+          <button class="btn go" id="btnStart">Start</button>
+          <button class="btn" id="btnPause">Pause</button>
+          <button class="btn" id="btnReset">Reset</button>
+        </div>
+
+        <div class="adjust">
+          <span>Nudge</span>
+          <button class="btn ghost" data-adj="-60000">−1:00</button>
+          <button class="btn ghost" data-adj="-10000">−0:10</button>
+          <button class="btn ghost" data-adj="10000">+0:10</button>
+          <button class="btn ghost" data-adj="60000">+1:00</button>
+        </div>
+
+        <div class="row">
+          <label>Label</label>
+          <input class="inp" id="label" type="text" maxlength="120" placeholder="e.g. STARTING SOON">
+        </div>
+      </section>
+
+      <!-- LOOK -->
+      <section class="panel">
+        <h3>Look</h3>
+        <div class="row"><label>Time colour</label><input type="color" id="stColor" value="#ffffff"></div>
+        <div class="row"><label>Accent</label><input type="color" id="stAccent" value="#12b886"></div>
+        <div class="row"><label>Background</label><input type="color" id="stBg" value="#0b1f3a"><input class="inp s" id="stBgA" type="number" min="0" max="100" value="90" title="opacity %"> %</div>
+        <div class="row"><label>Size</label><input class="range" id="stSize" type="range" min="48" max="240" value="120"><span id="stSizeV" class="mono">120</span></div>
+        <div class="row"><label>Font</label>
+          <select class="inp" id="stFont">
+            <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Segoe / Helvetica (clean)</option>
+            <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
+            <option value="Georgia, 'Times New Roman', serif">Serif</option>
+            <option value="'Courier New', ui-monospace, monospace">Mono</option>
+            <option value="Impact, Haettenschweiler, sans-serif">Impact</option>
+          </select>
+        </div>
+        <div class="row"><label>Position</label>
+          <div class="posgrid" id="posGrid">
+            <button data-pos="top-left"></button><button data-pos="top-center"></button><button data-pos="top-right"></button>
+            <button data-pos="mid-left"></button><button data-pos="mid-center"></button><button data-pos="mid-right"></button>
+            <button data-pos="bottom-left"></button><button data-pos="bottom-center" class="on"></button><button data-pos="bottom-right"></button>
+          </div>
+        </div>
+        <div class="row"><label>Animation</label>
+          <select class="inp" id="stAnim">
+            <option value="slide-up">Slide up</option>
+            <option value="fade">Fade</option>
+            <option value="scale">Scale</option>
+          </select>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot">
+    Output URL for OBS/vMix: <code id="outUrl">http://THIS-PC-IP:PORT/output</code>
+    <span class="hint">— add it as a Browser Source (1920×1080, transparent).</span>
+  </footer>
+
+  <script src="/control.js"></script>
+</body>
+</html>

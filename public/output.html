@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics — Output</title>
+<link rel="stylesheet" href="/output.css">
+</head>
+<body>
+  <!-- The stage fills the whole browser-source canvas; background stays transparent. -->
+  <div id="stage">
+    <div id="timerCard" class="card pos-bottom-center is-out" data-anim="slide-up">
+      <!-- .anim carries the enter/exit transform so it never fights the position transform on .card -->
+      <div class="anim">
+        <div class="label" id="label"></div>
+        <div class="time" id="time">00:00</div>
+        <div class="accentbar" id="accentbar"></div>
+      </div>
+    </div>
+  </div>
+  <script src="/output.js"></script>
+</body>
+</html>
