@@ -103,16 +103,19 @@ function applyAction(action) {
       break;
 
     case 'setDuration': // countdown length, in ms
-      t.durationMs = Math.max(0, action.ms | 0);
+      t.durationMs = Math.max(0, Number(action.ms) || 0);
       t.baseMs = t.durationMs;
       t.running = false;
       t.showHours = t.durationMs >= 3600000;
       break;
 
     case 'setTarget': // 'tod' target clock time; action.epoch is absolute ms
-      t.targetEpoch = action.epoch | 0 || action.epoch;
+      // NB: epoch is a ~1.78e12 ms value — never use bitwise ops on it (they
+      // truncate to 32-bit and corrupt the time). Keep it as a plain Number.
+      t.targetEpoch = Number(action.epoch) || 0;
       t.mode = 'tod';
       t.running = true;
+      t.showHours = (t.targetEpoch - now) >= 3600000;
       break;
 
     case 'start':
