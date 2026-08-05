@@ -90,6 +90,33 @@ function defaultState() {
 let state = defaultState();
 
 /* ------------------------------------------------------------------ *
+ *  Team Library — the operator's saved teams (names, colours, logo, roster).
+ *  Loaded from data/library.json if present, otherwise seeded from the sheet
+ *  the client sent (data/teams.seed.json). Persisted on import so it survives
+ *  restarts. This is the "mail-merge" list: pick a team to fill a match side.
+ * ------------------------------------------------------------------ */
+const DATA_DIR = path.join(__dirname, 'data');
+const LIB_FILE = path.join(DATA_DIR, 'library.json');
+const SEED_FILE = path.join(DATA_DIR, 'teams.seed.json');
+try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+
+function loadLibrary() {
+  for (const f of [LIB_FILE, SEED_FILE]) {
+    try {
+      if (fs.existsSync(f)) {
+        const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+        if (j && Array.isArray(j.teams)) return j.teams;
+      }
+    } catch (e) {}
+  }
+  return [];
+}
+function saveLibrary() {
+  try { fs.writeFileSync(LIB_FILE, JSON.stringify({ teams: state.library.teams }, null, 2)); } catch (e) {}
+}
+state.library = { teams: loadLibrary() };
+
+/* ------------------------------------------------------------------ *
  *  SSE client registry
  * ------------------------------------------------------------------ */
 const clients = new Set();
@@ -262,6 +289,23 @@ function applyAction(action) {
       break;
 
     case 'sb_style': Object.assign(state.scoreboard.style, action.style || {}); break;
+
+    /* -------- team library (mail-merge) -------- */
+    case 'lib_import': { // replace the library with an imported list of teams
+      if (!Array.isArray(action.teams)) return false;
+      state.library.teams = action.teams.slice(0, 500).map(function (t) {
+        return {
+          name: String(t.name || '').slice(0, 80),
+          logo: String(t.logo || '').slice(0, 300),
+          rowColor: String(t.rowColor || '').slice(0, 30),
+          textColor: String(t.textColor || '').slice(0, 30),
+          players: (Array.isArray(t.players) ? t.players : []).slice(0, 12).map(function (p) { return String(p || '').slice(0, 60); }).filter(Boolean)
+        };
+      });
+      saveLibrary();
+      break;
+    }
+    case 'lib_clear': state.library.teams = []; saveLibrary(); break;
 
     default:
       return false;

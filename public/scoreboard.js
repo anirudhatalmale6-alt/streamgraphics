@@ -134,6 +134,87 @@
     };
   });
 
+  /* ---- Team Library (mail-merge): pick a team to fill a match side ---- */
+  var lib = [], libSig = '';
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function resolveLogo(logo) {
+    logo = String(logo || '').trim();
+    if (!logo) return '';
+    if (/^(https?:)?\/\//i.test(logo) || logo.charAt(0) === '/' || /^data:/.test(logo)) return logo;
+    return '/logos/' + logo; // bare filename from the sheet -> the logos folder
+  }
+  function reflectLibrary(library) {
+    lib = (library && library.teams) || [];
+    $('libCount').textContent = lib.length ? '· ' + lib.length + ' teams' : '· empty';
+    var sig = lib.length + '#' + lib.map(function (t) { return t.name; }).join('|');
+    if (sig === libSig) return;
+    libSig = sig;
+    document.querySelectorAll('.libteam').forEach(function (sel) {
+      sel.innerHTML = '<option value="">— load team from library —</option>' +
+        lib.map(function (t, i) { return '<option value="' + i + '">' + esc(t.name) + '</option>'; }).join('');
+    });
+  }
+  document.querySelectorAll('.libteam').forEach(function (sel) {
+    sel.onchange = function () {
+      var ti = +sel.dataset.team, t = lib[+sel.value];
+      if (!t) return;
+      send({ type: 'sb_team', team: ti, rowColor: t.rowColor || '', textColor: t.textColor || '',
+             logoUrl: resolveLogo(t.logo), p1: t.players[0] || '', p2: t.players[1] || '' });
+      var card = document.querySelector('.teamcard[data-team="' + ti + '"]');
+      card.querySelectorAll('.libplayer').forEach(function (ps) {
+        ps.disabled = false;
+        var want = ps.dataset.slot === 'p2' ? 1 : 0;
+        ps.innerHTML = t.players.map(function (p, j) { return '<option' + (j === want ? ' selected' : '') + '>' + esc(p) + '</option>'; }).join('');
+      });
+    };
+  });
+  document.querySelectorAll('.libplayer').forEach(function (ps) {
+    ps.onchange = function () { var a = { type: 'sb_team', team: +ps.dataset.team }; a[ps.dataset.slot] = ps.value; send(a); };
+  });
+  // CSV import (his columns: TeamName, TeamLogo, TeamColor, TeamHex, TextColor, Player1..6)
+  function parseCSV(text) {
+    var rows = [], row = [], cur = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === ',') { row.push(cur); cur = ''; }
+      else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (c !== '\r') cur += c;
+    }
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+  function csvToTeams(text) {
+    var rows = parseCSV(text).filter(function (r) { return r.some(function (c) { return String(c).trim() !== ''; }); });
+    if (rows.length < 2) return [];
+    var hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+    var idx = function (names) { for (var n = 0; n < names.length; n++) { var k = hdr.indexOf(names[n]); if (k >= 0) return k; } return -1; };
+    var iName = idx(['teamname', 'name', 'team']), iLogo = idx(['teamlogo', 'logo']),
+        iHex = idx(['teamhex', 'hex', 'rowcolor', 'color']), iText = idx(['textcolor', 'text']);
+    var pcols = []; hdr.forEach(function (h, k) { if (/^player/.test(h)) pcols.push(k); });
+    var clean = function (v) { return String(v == null ? '' : v).replace(/\u00a0/g, ' ').trim(); };
+    var out = [];
+    for (var r = 1; r < rows.length; r++) {
+      var row = rows[r], name = iName >= 0 ? clean(row[iName]) : '';
+      if (!name) continue;
+      out.push({ name: name, logo: iLogo >= 0 ? clean(row[iLogo]) : '', rowColor: iHex >= 0 ? clean(row[iHex]) : '',
+                 textColor: iText >= 0 ? clean(row[iText]) : '', players: pcols.map(function (k) { return clean(row[k]); }).filter(Boolean) });
+    }
+    return out;
+  }
+  $('libImport').onchange = function () {
+    var f = $('libImport').files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var teams = csvToTeams(r.result);
+      if (!teams.length) { alert('No teams found in that CSV — expected a header row with TeamName, TeamHex, TextColor, TeamLogo, Player1…'); return; }
+      send({ type: 'lib_import', teams: teams });
+    };
+    r.readAsText(f); $('libImport').value = '';
+  };
+  $('libClear').onclick = function () { if (confirm('Clear the whole team library?')) send({ type: 'lib_clear' }); };
+
   /* ---- reflect server state ---- */
   function reflect(s) {
     sb = s;
@@ -199,7 +280,7 @@
   function connect() {
     var es = new EventSource('/events');
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
-    es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state && m.state.scoreboard) reflect(m.state.scoreboard); } catch (x) {} };
+    es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state && m.state.scoreboard) reflect(m.state.scoreboard); if (m.state && m.state.library) reflectLibrary(m.state.library); } catch (x) {} };
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();

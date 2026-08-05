@@ -28,6 +28,20 @@ but reusable for any two-side match:
   colour, label-strip colour, position, animation).
 - Optional **backdrop image**: paste a URL to your own Photoshop art and the coded
   frame steps aside so only the live fields sit on top.
+
+### Team Library (your roster, mail-merge style)
+The Scoreboard control panel has a **Team Library** loaded from your spreadsheet.
+- In each team card there's a **"load team from library"** dropdown — pick a team
+  and its row colour, text colour, and logo fill in, and the two player dropdowns
+  populate from that team's roster. Choose the two who are playing and you're set.
+- **Logos:** your sheet lists filenames (e.g. `ucla.png`). Drop those PNG files into
+  `public/logos/` and they resolve automatically.
+- **Update the list:** export your spreadsheet as CSV and use **Import CSV** in the
+  Team Library panel. Recognised columns: `TeamName, TeamLogo, TeamHex, TextColor,
+  Player1…Player6` (extra `Player#` columns are picked up automatically).
+- The library persists in `data/library.json`; the starter list ships in
+  `data/teams.seed.json`.
+- Browse buttons let you pick a local image for any logo/backdrop instead of URLs.
 - **Chroma key**: add `?bg=green` (or magenta / blue / any hex) to the output URL
   to render on a solid key colour for a hardware switcher instead of transparency.
 
