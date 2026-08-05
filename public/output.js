@@ -92,7 +92,8 @@
         lastState = st;
         var base = (timer.style && timer.style.bg) || '#0b1f3ae6';
         card.style.background = st === 'over' ? '#c81028' : (st === 'warn' ? '#d98a12' : base);
-        card.classList.toggle('pulse', st === 'over');
+        card.classList.toggle('pulse', st === 'over' && !timer.flash);
+        card.classList.toggle('flashing', st !== 'normal' && !!timer.flash);
       }
     }
     requestAnimationFrame(tick);

@@ -77,6 +77,7 @@
   };
   $('warnOff').onclick = function () { send({ type: 'setWarn', ms: 0 }); };
   $('overtime').onchange = function () { send({ type: 'setOvertime', value: $('overtime').checked }); };
+  $('flash').onchange = function () { send({ type: 'setFlash', value: $('flash').checked }); };
 
   $('btnShow').onclick = function () { send({ type: 'show' }); };
   $('btnHide').onclick = function () { send({ type: 'hide' }); };
@@ -114,6 +115,7 @@
     $('airState').classList.toggle('live', live);
     // speaker timer reflect
     if (document.activeElement !== $('overtime')) $('overtime').checked = !!t.overtime;
+    if (document.activeElement !== $('flash')) $('flash').checked = !!t.flash;
     $('pvLabel').textContent = t.label || '';
     // look controls (only when the user isn't actively editing them)
     if (!editingLook && t.style) {

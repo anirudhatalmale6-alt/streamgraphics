@@ -39,6 +39,7 @@
     layers.forEach(function (l) {
       LMAP[l.id] = l;
       var box = 'left:' + (l.x || 0) + 'px;top:' + (l.y || 0) + 'px;width:' + (l.w || 0) + 'px;height:' + (l.h || 0) + 'px;z-index:' + (l.z || 0) + ';';
+      if (l.rot) box += 'transform:rotate(' + l.rot + 'deg);transform-origin:center;';
       var inner = '';
       if (l.type === 'box') inner = '<div class="li ly-box" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>';
       else if (l.type === 'text') {

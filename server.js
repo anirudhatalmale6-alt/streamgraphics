@@ -49,6 +49,7 @@ function defaultState() {
       // Speaker / confidence-monitor mode: a warning threshold + optional overtime.
       warnMs: 0,           // 0 = off; >0 = go amber when remaining <= this, red at/under 0
       overtime: false,     // when true, a countdown keeps going NEGATIVE past zero (overtime)
+      flash: false,        // flash the background in warning/over (to really get attention)
       visible: false,      // drives the in/out animation on the output
       // Look — all live-editable from the panel.
       style: {
@@ -256,6 +257,7 @@ function applyAction(action) {
     case 'setShowHours': t.showHours = !!action.value; break;
     case 'setWarn':     t.warnMs = Math.max(0, Number(action.ms) || 0); break;
     case 'setOvertime': t.overtime = !!action.value; break;
+    case 'setFlash':    t.flash = !!action.value; break;
 
     case 'setStyle':
       Object.assign(t.style, action.style || {});

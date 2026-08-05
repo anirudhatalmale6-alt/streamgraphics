@@ -40,9 +40,11 @@
   function renderCanvas() {
     var byZ = layers.slice().sort(function (a, b) { return (a.z || 0) - (b.z || 0); });
     cstage.innerHTML = byZ.map(function (l) {
-      return '<div class="ly' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + '">' + innerHtml(l) + '</div>';
+      var t = l.rot ? ';transform:rotate(' + l.rot + 'deg);transform-origin:center' : '';
+      return '<div class="ly' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + '">' + innerHtml(l) + '</div>';
     }).join('');
     cstage.querySelectorAll('.ly').forEach(function (el) { el.addEventListener('mousedown', startDrag); });
+    renderHandles();
   }
   function renderList() {
     var byZ = layers.slice().sort(function (a, b) { return (b.z || 0) - (a.z || 0); }); // top layer first
@@ -75,7 +77,7 @@
   function select(id) {
     selId = id;
     cstage.querySelectorAll('.ly').forEach(function (el) { el.classList.toggle('sel', el.dataset.id === id); });
-    renderList(); syncProps();
+    renderList(); syncProps(); renderHandles();
   }
   function show(sel, on) { document.querySelectorAll(sel).forEach(function (e) { e.style.display = on ? '' : 'none'; }); }
   function syncProps() {
@@ -150,8 +152,108 @@
     l.y = Math.round(drag.oy + (e.clientY - drag.sy) / SCALE);
     drag.el.style.left = l.x + 'px'; drag.el.style.top = l.y + 'px';
     if (selId === l.id) { $('pX').value = l.x; $('pY').value = l.y; }
+    renderHandles();
   });
   document.addEventListener('mouseup', function () { if (drag) { drag = null; push(); } });
+
+  /* ---- select / resize / rotate handles on the canvas ---- */
+  var canvasEl = $('canvas');
+  var handles = document.createElement('div');
+  handles.id = 'handles';
+  handles.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:9999';
+  canvasEl.appendChild(handles);
+  var DIRS = [[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0]]; // nw,n,ne,e,se,s,sw,w
+  function rot2(x, y, rad) { var c = Math.cos(rad), s = Math.sin(rad); return { x: x * c - y * s, y: x * s + y * c }; }
+
+  function renderHandles() {
+    handles.innerHTML = '';
+    var l = selected(); if (!l) return;
+    var rad = (l.rot || 0) * Math.PI / 180;
+    var Cx = l.x + l.w / 2, Cy = l.y + l.h / 2;
+    function scr(wx, wy) { return { x: wx * SCALE, y: wy * SCALE }; }
+    function handleAt(wx, wy, cls, cursor) {
+      var s = scr(wx, wy);
+      var h = document.createElement('div');
+      h.className = 'gh ' + cls;
+      h.style.cssText = 'position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;left:' + s.x + 'px;top:' + s.y + 'px;background:#fff;border:2px solid #3b82f6;border-radius:2px;pointer-events:auto;cursor:' + cursor + '';
+      return h;
+    }
+    // outline
+    var corners = [[-1,-1],[1,-1],[1,1],[-1,1]].map(function (d) { var p = rot2(d[0]*l.w/2, d[1]*l.h/2, rad); return scr(Cx+p.x, Cy+p.y); });
+    var svgns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgns, 'svg'); svg.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible');
+    var poly = document.createElementNS(svgns, 'polygon');
+    poly.setAttribute('points', corners.map(function (c) { return c.x + ',' + c.y; }).join(' '));
+    poly.setAttribute('fill', 'none'); poly.setAttribute('stroke', '#3b82f6'); poly.setAttribute('stroke-width', '1.5'); poly.setAttribute('stroke-dasharray', '4 3');
+    // rotate connector
+    var topC = rot2(0, -l.h/2, rad); var tcS = scr(Cx+topC.x, Cy+topC.y);
+    var up = rot2(0, -1, rad); var rotS = { x: tcS.x + up.x * 26, y: tcS.y + up.y * 26 };
+    var line = document.createElementNS(svgns, 'line'); line.setAttribute('x1', tcS.x); line.setAttribute('y1', tcS.y); line.setAttribute('x2', rotS.x); line.setAttribute('y2', rotS.y);
+    line.setAttribute('stroke', '#3b82f6'); line.setAttribute('stroke-width', '1.5');
+    svg.appendChild(poly); svg.appendChild(line); handles.appendChild(svg);
+    // resize handles
+    var CURS = ['nwse-resize','ns-resize','nesw-resize','ew-resize','nwse-resize','ns-resize','nesw-resize','ew-resize'];
+    DIRS.forEach(function (d, i) {
+      var p = rot2(d[0]*l.w/2, d[1]*l.h/2, rad);
+      var h = handleAt(Cx+p.x, Cy+p.y, 'rs', CURS[i]);
+      h.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); startResize(l.id, d, e); });
+      handles.appendChild(h);
+    });
+    // rotate handle
+    var rh = document.createElement('div');
+    rh.className = 'gh-rot';
+    rh.style.cssText = 'position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;left:' + rotS.x + 'px;top:' + rotS.y + 'px;background:#3b82f6;border:2px solid #fff;border-radius:50%;pointer-events:auto;cursor:grab';
+    rh.addEventListener('mousedown', function (e) { e.stopPropagation(); e.preventDefault(); startRotate(l.id, e); });
+    handles.appendChild(rh);
+  }
+
+  var hop = null;
+  function canvasPoint(e) { var r = canvasEl.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  function startResize(id, dir, e) {
+    var l = byId(id); var rad = (l.rot || 0) * Math.PI / 180;
+    var Cx = l.x + l.w / 2, Cy = l.y + l.h / 2;
+    var aLocal = { x: -dir[0]*l.w/2, y: -dir[1]*l.h/2 };            // opposite handle (stays fixed)
+    var aWorld = rot2(aLocal.x, aLocal.y, rad); aWorld = { x: Cx + aWorld.x, y: Cy + aWorld.y };
+    hop = { kind: 'resize', id: id, dir: dir, rad: rad, aWorld: aWorld, startW: l.w, startH: l.h, start: canvasPoint(e) };
+  }
+  function startRotate(id, e) {
+    var l = byId(id); var Cx = (l.x + l.w / 2) * SCALE, Cy = (l.y + l.h / 2) * SCALE; var p = canvasPoint(e);
+    var a0 = Math.atan2(p.y - Cy, p.x - Cx);
+    hop = { kind: 'rotate', id: id, cx: Cx, cy: Cy, a0: a0, startRot: l.rot || 0 };
+  }
+  document.addEventListener('mousemove', function (e) {
+    if (!hop) return; var l = byId(hop.id); if (!l) return;
+    var p = canvasPoint(e);
+    if (hop.kind === 'resize') {
+      var dsx = (p.x - hop.start.x) / SCALE, dsy = (p.y - hop.start.y) / SCALE;
+      var ld = rot2(dsx, dsy, -hop.rad);                          // delta in the layer's local frame
+      var nw = Math.max(10, Math.round(hop.startW + hop.dir[0] * ld.x));
+      var nh = Math.max(10, Math.round(hop.startH + hop.dir[1] * ld.y));
+      var naLocal = { x: -hop.dir[0]*nw/2, y: -hop.dir[1]*nh/2 };
+      var naW = rot2(naLocal.x, naLocal.y, hop.rad);
+      var nc = { x: hop.aWorld.x - naW.x, y: hop.aWorld.y - naW.y };
+      l.w = nw; l.h = nh; l.x = Math.round(nc.x - nw/2); l.y = Math.round(nc.y - nh/2);
+    } else {
+      var ang = Math.atan2(p.y - hop.cy, p.x - hop.cx);
+      l.rot = Math.round((hop.startRot + (ang - hop.a0) * 180 / Math.PI) % 360);
+    }
+    var el = cstage.querySelector('.ly[data-id="' + l.id + '"]');
+    if (el) { el.style.left = l.x + 'px'; el.style.top = l.y + 'px'; el.style.width = l.w + 'px'; el.style.height = l.h + 'px'; el.style.transform = l.rot ? 'rotate(' + l.rot + 'deg)' : ''; }
+    syncNum(l); renderHandles();
+  });
+  document.addEventListener('mouseup', function () { if (hop) { hop = null; push(); } });
+  function syncNum(l) { if (selId === l.id) { $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h; } }
+
+  // Delete key removes the selected layer (when not typing in a field)
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selId) {
+      var t = document.activeElement && document.activeElement.tagName;
+      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+      e.preventDefault();
+      layers = layers.filter(function (x) { return x.id !== selId; }); selId = null;
+      renderCanvas(); renderList(); syncProps(); push();
+    }
+  });
 
   /* ---- air / chroma / copy ---- */
   $('btnShow').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_show' }) }); };
