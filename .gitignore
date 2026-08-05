@@ -6,3 +6,5 @@ data/library.json
 data/lowerthird.json
 public/logos/*
 !public/logos/README.txt
+public/media/*
+!public/media/README.txt

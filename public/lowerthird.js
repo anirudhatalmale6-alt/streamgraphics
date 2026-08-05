@@ -151,7 +151,12 @@
   $('pVPause').onclick = function () { vcmd('pause'); };
   $('pVRestart').onclick = function () { vcmd('restart'); };
   $('pVFile').onchange = function () {
-    var f = $('pVFile').files[0]; if (!f) return; var r = new FileReader();
+    var f = $('pVFile').files[0]; if (!f) return;
+    if (f.size > 50 * 1024 * 1024) {   // guard: reading a huge file into memory crashes the tab
+      alert('That video is ' + Math.round(f.size / 1048576) + ' MB. Browser upload is capped at ~50 MB, because it has to load the whole file into memory (that\'s what crashed the tab before).\n\nFor a clip this big, drop the file into the "media" folder next to the app and reference it in the Video field by URL - for example:  /media/' + f.name + '\n\nThat streams straight from the app with no size limit.');
+      $('pVFile').value = ''; return;
+    }
+    var r = new FileReader();
     r.onload = function () { fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result }) }).then(function (x) { return x.json(); }).then(function (res) { if (res && res.ok) mutate(function (l) { l.src = res.url; $('pVSrc').value = res.url; }); else alert('Upload failed. Use a web-friendly video (mp4/H.264 or webm) under ~150 MB.'); }).catch(function () { alert('Upload failed.'); }); };
     r.readAsDataURL(f); $('pVFile').value = '';
   };
@@ -184,8 +189,9 @@
   $('btnGroup').onclick = function () { if (selIds.length < 2) { alert('Shift-click two or more layers first, then Group.'); return; } var gid = uid(); selIds.forEach(function (id) { var l = byId(id); if (l) l.group = gid; }); renderList(); syncProps(); push(); };
   $('btnUngroup').onclick = function () { (selIds.length ? selIds : (selId ? [selId] : [])).forEach(function (id) { var l = byId(id); if (l) delete l.group; }); renderList(); syncProps(); push(); };
 
+  function tooBigImage(f) { if (f.size > 25 * 1024 * 1024) { alert('That image is ' + Math.round(f.size / 1048576) + ' MB - too large to load in the browser. Use one under 25 MB, or drop it in the "media" folder and reference it by URL (/media/' + f.name + ').'); return true; } return false; }
   $('pFile').onchange = function () {
-    var f = $('pFile').files[0]; if (!f) return; var r = new FileReader();
+    var f = $('pFile').files[0]; if (!f) return; if (tooBigImage(f)) { $('pFile').value = ''; return; } var r = new FileReader();
     r.onload = function () {
       fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result }) })
         .then(function (x) { return x.json(); }).then(function (res) { if (res && res.ok) mutate(function (l) { l.src = res.url; $('pSrc').value = res.url; }); else alert('Upload failed.'); });
@@ -215,7 +221,7 @@
   function loadRef() { try { var r = JSON.parse(localStorage.getItem('lt_ref') || '{}'); if (r.url) { refimg.src = r.url; refimg.style.display = 'block'; } refimg.style.opacity = (r.opacity == null ? 50 : r.opacity) / 100; $('refOpacity').value = r.opacity == null ? 50 : r.opacity; } catch (e) {} }
   function saveRef(o) { try { localStorage.setItem('lt_ref', JSON.stringify(o)); } catch (e) {} }
   $('refFile').onchange = function () {
-    var f = $('refFile').files[0]; if (!f) return; var r = new FileReader();
+    var f = $('refFile').files[0]; if (!f) return; if (tooBigImage(f)) { $('refFile').value = ''; return; } var r = new FileReader();
     r.onload = function () {
       fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result }) })
         .then(function (x) { return x.json(); }).then(function (res) { if (res && res.ok) { refimg.src = res.url; refimg.style.display = 'block'; saveRef({ url: res.url, opacity: +$('refOpacity').value }); } });

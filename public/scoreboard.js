@@ -106,6 +106,7 @@
 
   /* ---- Browse for a local image: upload it, then use the returned URL ---- */
   function uploadFile(file, done) {
+    if (file.size > 25 * 1024 * 1024) { alert('That image is ' + Math.round(file.size / 1048576) + ' MB - too large. Use one under 25 MB, or drop it in the "media" folder and reference it by URL.'); return; }
     var r = new FileReader();
     r.onload = function () {
       fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, data: r.result }) })

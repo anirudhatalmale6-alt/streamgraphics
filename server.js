@@ -441,7 +441,7 @@ const server = http.createServer((req, res) => {
   //     (so the operator can "Browse" for a file instead of typing a URL)
   if (pathname === '/upload' && req.method === 'POST') {
     let body = '';
-    req.on('data', c => { body += c; if (body.length > 200e6) req.destroy(); }); // ~200MB body (~150MB file)
+    req.on('data', c => { body += c; if (body.length > 90e6) req.destroy(); }); // ~90MB body (~65MB file); big files go in /media instead
     req.on('end', () => {
       try {
         const j = JSON.parse(body || '{}');
