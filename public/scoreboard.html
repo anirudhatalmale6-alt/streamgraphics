@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics — Scoreboard Control</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .teamcard{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;background:var(--panel2)}
+  .teamcard h4{font-size:13px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .swatch{width:16px;height:16px;border-radius:4px;border:1px solid #0006}
+  .names{display:grid;grid-template-columns:1fr 1fr 64px;gap:8px;margin-bottom:10px}
+  .games-ctl{display:flex;gap:10px}
+  .gamebox{flex:1;text-align:center;border:1px solid var(--line);border-radius:9px;padding:8px 4px}
+  .gamebox .gl{font-size:11px;color:var(--muted);margin-bottom:4px}
+  .gamebox .gv{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;margin:2px 0}
+  .gamebox.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .gamebox .pm{display:flex;gap:5px;justify-content:center;margin-top:5px}
+  .gamebox .pm button{width:30px;height:28px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-weight:800;cursor:pointer}
+  .gamebox .pm button:hover{border-color:var(--muted2)}
+  .matchbtns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .mini{font-size:12px;color:var(--muted2)}
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="dot"></span> StreamGraphics <small>Scoreboard</small></div>
+    <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
+  </header>
+
+  <main>
+    <section class="panel hero">
+      <div class="preview" style="align-items:flex-start;justify-content:center">
+        <div style="width:100%;max-width:520px">
+          <div id="pvRows" style="font-family:Arial"></div>
+        </div>
+      </div>
+      <div class="onair">
+        <button class="btn big show" id="btnShow">Take to air ▸</button>
+        <button class="btn big hide" id="btnHide">◂ Off air</button>
+        <div class="airstate" id="airState">OFF AIR</div>
+      </div>
+    </section>
+
+    <div class="matchbtns">
+      <button class="btn go" id="btnRestart">⟲ Restart Match (0 / -- / --)</button>
+      <button class="btn" id="btnNextGame">Start Next Game ▸</button>
+    </div>
+    <p class="mini" style="margin-bottom:14px">Restart sets game 1 to 0 and the rest to "--". Start Next Game brings the next "--" to 0 and makes it the active (highlighted) game.</p>
+
+    <div class="cols">
+      <section class="teamcard" data-team="0">
+        <h4><span class="swatch" id="sw0"></span> Team 1</h4>
+        <div class="names">
+          <input class="inp" data-f="p1" placeholder="Player 1">
+          <input class="inp" data-f="p2" placeholder="Player 2">
+          <input class="inp" data-f="seed" placeholder="Seed">
+        </div>
+        <div class="row" style="margin-bottom:10px"><label style="width:60px">Colour</label><input type="color" data-f="color" value="#f5c518"></div>
+        <div class="games-ctl" id="games0"></div>
+      </section>
+
+      <section class="teamcard" data-team="1">
+        <h4><span class="swatch" id="sw1"></span> Team 2</h4>
+        <div class="names">
+          <input class="inp" data-f="p1" placeholder="Player 1">
+          <input class="inp" data-f="p2" placeholder="Player 2">
+          <input class="inp" data-f="seed" placeholder="Seed">
+        </div>
+        <div class="row" style="margin-bottom:10px"><label style="width:60px">Colour</label><input type="color" data-f="color" value="#1f7a8c"></div>
+        <div class="games-ctl" id="games1"></div>
+      </section>
+    </div>
+
+    <div class="cols">
+      <section class="panel">
+        <h3>Match info</h3>
+        <div class="row"><label>Presenter</label><input class="inp" id="mPresenter" placeholder="WEDBUSH"></div>
+        <div class="row"><label>Title</label><input class="inp" id="mTitle" placeholder="HERMOSA BEACH OPEN 2025"></div>
+        <div class="row"><label>Round/label</label><input class="inp" id="mBracket" placeholder="MEN'S CONTENDER'S BRACKET"></div>
+      </section>
+
+      <section class="panel">
+        <h3>Look &amp; output</h3>
+        <div class="row"><label>Active hi-lite</label><input type="color" id="stAccent" value="#1e64d2"></div>
+        <div class="row"><label>Label strip</label><input type="color" id="stBracket" value="#7a1420"></div>
+        <div class="row"><label>Position</label>
+          <div class="posgrid" id="posGrid">
+            <button data-pos="top-left"></button><button data-pos="top-center"></button><button data-pos="top-right"></button>
+            <button data-pos="mid-left"></button><button data-pos="mid-center"></button><button data-pos="mid-right"></button>
+            <button data-pos="bottom-left" class="on"></button><button data-pos="bottom-center"></button><button data-pos="bottom-right"></button>
+          </div>
+        </div>
+        <div class="row"><label>Animation</label>
+          <select class="inp" id="stAnim"><option value="slide-up">Slide up</option><option value="fade">Fade</option><option value="scale">Scale</option></select>
+        </div>
+        <div class="row"><label>Backdrop</label><input class="inp" id="stBackdrop" placeholder="optional image URL (your Photoshop art)"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot">
+    Output URL for OBS/vMix: <code id="outUrl">…/scoreboard-output</code>
+    <span class="hint">— Browser Source, 1920×1080. Add <code>?bg=green</code> for a chroma key on a hardware switcher.</span>
+  </footer>
+
+  <script src="/scoreboard.js"></script>
+</body>
+</html>

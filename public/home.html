@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .wrap{max-width:760px;margin:0 auto;padding:40px 20px}
+  .g{display:block;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px;text-decoration:none;color:var(--txt)}
+  .g:hover{border-color:var(--accent)}
+  .g h3{font-size:19px;margin-bottom:4px}
+  .g p{color:var(--muted);font-size:14px}
+  .g .links{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
+  .g .links a{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);text-decoration:none;font-size:13px;font-weight:700}
+  .g .links a:hover{border-color:var(--muted2)}
+  h1{margin:6px 0 4px}.sub{color:var(--muted);margin-bottom:26px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 style="display:flex;align-items:center;gap:10px"><span class="dot"></span> StreamGraphics</h1>
+    <div class="sub">Open a control panel to drive a graphic. Add its OUTPUT url to OBS/vMix as a Browser Source (1920×1080).</div>
+
+    <div class="g">
+      <h3>⏱ Timer</h3>
+      <p>Countdown, count-up, and countdown-to-a-clock-time.</p>
+      <div class="links"><a href="/control">Open control ▸</a><a href="/output" target="_blank">Output (OBS)</a></div>
+    </div>
+
+    <div class="g">
+      <h3>🏐 Scoreboard</h3>
+      <p>Two-team match board — names, seeds, per-game scoring, active-game highlight, score-change flash.</p>
+      <div class="links"><a href="/scoreboard">Open control ▸</a><a href="/scoreboard-output" target="_blank">Output (OBS)</a></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,4 +1,32 @@
-# StreamGraphics — Milestone 1 (Timer engine)
+# StreamGraphics
+
+A realtime livestream graphics engine. Open the URLs below and you'll see a home
+page listing each graphic. Each has a CONTROL panel (drive it from any browser on
+your network) and an OUTPUT page (add to OBS/vMix as a Browser Source, 1920×1080).
+
+Run it with `node server.js` (Node 16+, no install step), then open:
+- Home:               http://localhost:4000/
+- Timer control:      http://localhost:4000/control       · output: /output
+- Scoreboard control: http://localhost:4000/scoreboard     · output: /scoreboard-output
+
+## Scoreboard (Milestone 2)
+A two-team match board, shipped configured for the beach-volley Center Court look
+but reusable for any two-side match:
+- Player names, seed, and a team colour per side.
+- Per-game scoring with +/- buttons; a game shows "--" until it starts.
+- **Restart Match** sets game 1 to 0 and the rest to "--". **Start Next Game**
+  brings the next "--" up to 0 and makes it the active (highlighted) game.
+- The active game's cell is highlighted, and any score flashes when it changes.
+- Editable match info (presenter, title, round/bracket label) and look (highlight
+  colour, label-strip colour, position, animation).
+- Optional **backdrop image**: paste a URL to your own Photoshop art and the coded
+  frame steps aside so only the live fields sit on top.
+- **Chroma key**: add `?bg=green` (or magenta / blue / any hex) to the output URL
+  to render on a solid key colour for a hardware switcher instead of transparency.
+
+---
+
+## Milestone 1 (Timer engine)
 
 A realtime livestream graphics engine. You drive graphics from a **browser control
 panel**, and they animate on a transparent **output page** that OBS or vMix pulls in

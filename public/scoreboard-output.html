@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics — Scoreboard Output</title>
+<link rel="stylesheet" href="/scoreboard-output.css">
+</head>
+<body>
+  <div id="stage">
+    <div id="sbCard" class="sb pos-bottom-left is-out" data-anim="slide-up">
+      <div class="anim">
+        <!-- optional Photoshop backdrop image sits behind the coded frame -->
+        <img id="backdrop" class="backdrop" alt="">
+        <div class="frame" id="frame">
+          <div class="sb-top">
+            <div class="brand">
+              <div class="hb"><span class="hb-sun"></span><span class="hb-wave"></span><span class="hb-hb">Hb</span></div>
+              <div class="brandtxt">
+                <div class="pres"><b id="presenter">WEDBUSH</b> PRESENTS THE</div>
+                <div class="ttl" id="title">HERMOSA BEACH OPEN 2025</div>
+              </div>
+            </div>
+            <div class="games">
+              <div class="gh">GAME</div>
+              <div class="cols"><span>1</span><span>2</span><span>3</span></div>
+            </div>
+          </div>
+          <div class="rows" id="rows"><!-- team rows injected --></div>
+          <div class="bracket" id="bracket">MEN'S CONTENDER'S BRACKET</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/scoreboard-output.js"></script>
+</body>
+</html>

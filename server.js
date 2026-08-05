@@ -54,6 +54,29 @@ function defaultState() {
         position: 'bottom-center', // one of 9 anchor points
         animation: 'slide-up'    // 'slide-up' | 'fade' | 'scale'
       }
+    },
+
+    // The scoreboard graphic. General-purpose (any 2-side match with up to 3 games),
+    // shipped configured for the beach-volley board but reusable. Each game score is
+    // either a number or null (null renders as "--", i.e. that game hasn't started).
+    scoreboard: {
+      visible: false,
+      title: 'HERMOSA BEACH OPEN 2025',
+      presenter: 'WEDBUSH',
+      bracketLabel: "MEN'S CONTENDER'S BRACKET",
+      gamesCount: 3,
+      activeGame: 0,           // which game column is "current" (highlighted)
+      teams: [
+        { p1: 'Terese Cannon', p2: 'Megan Kraft', seed: '1', color: '#f5c518', games: [0, null, null] },
+        { p1: 'Kelly Cheng',   p2: 'Molly Shaw',  seed: '2', color: '#1f7a8c', games: [0, null, null] }
+      ],
+      style: {
+        position: 'bottom-left',
+        animation: 'slide-up',
+        accent: '#1e64d2',       // active-cell highlight
+        bracketColor: '#7a1420', // the round-label strip
+        backdropUrl: ''          // optional Photoshop backdrop image (replaces the coded frame)
+      }
     }
   };
 }
@@ -162,11 +185,67 @@ function applyAction(action) {
       Object.assign(t, action.timer || {});
       break;
 
+    /* -------- scoreboard graphic -------- */
+    case 'sb_show': state.scoreboard.visible = true;  break;
+    case 'sb_hide': state.scoreboard.visible = false; break;
+
+    case 'sb_restart': // "Restart Match": game 1 -> 0, later games -> "--"
+      state.scoreboard.teams.forEach(function (tm) {
+        tm.games = [0, null, null].slice(0, state.scoreboard.gamesCount);
+      });
+      state.scoreboard.activeGame = 0;
+      break;
+
+    case 'sb_startGame': { // bring a "--" game to 0 for both teams and make it active
+      const g = clampGame(action.game);
+      state.scoreboard.teams.forEach(function (tm) { if (tm.games[g] == null) tm.games[g] = 0; });
+      state.scoreboard.activeGame = g;
+      break;
+    }
+
+    case 'sb_score': { // +/- a started game's score (null games ignored)
+      const g = clampGame(action.game);
+      const tm = state.scoreboard.teams[action.team === 1 ? 1 : 0];
+      if (tm.games[g] == null) tm.games[g] = 0;
+      let v = tm.games[g] + (Number(action.delta) || 0);
+      if (v < 0) v = 0;
+      tm.games[g] = v;
+      break;
+    }
+
+    case 'sb_setScore': { // direct set; value '' or '--' clears to null
+      const g = clampGame(action.game);
+      const tm = state.scoreboard.teams[action.team === 1 ? 1 : 0];
+      const raw = String(action.value).trim();
+      tm.games[g] = (raw === '' || raw === '--') ? null : Math.max(0, parseInt(raw, 10) || 0);
+      break;
+    }
+
+    case 'sb_setActive': state.scoreboard.activeGame = clampGame(action.game); break;
+
+    case 'sb_team': { // edit a team's name/seed/color fields
+      const tm = state.scoreboard.teams[action.team === 1 ? 1 : 0];
+      ['p1', 'p2', 'seed', 'color'].forEach(function (k) {
+        if (action[k] != null) tm[k] = String(action[k]).slice(0, 60);
+      });
+      break;
+    }
+
+    case 'sb_meta': // title / presenter / bracket label
+      if (action.title != null)     state.scoreboard.title = String(action.title).slice(0, 80);
+      if (action.presenter != null) state.scoreboard.presenter = String(action.presenter).slice(0, 40);
+      if (action.bracketLabel != null) state.scoreboard.bracketLabel = String(action.bracketLabel).slice(0, 80);
+      break;
+
+    case 'sb_style': Object.assign(state.scoreboard.style, action.style || {}); break;
+
     default:
       return false;
   }
   return true;
 }
+
+function clampGame(g) { g = parseInt(g, 10) || 0; return g < 0 ? 0 : (g > 2 ? 2 : g); }
 
 /* ------------------------------------------------------------------ *
  *  HTTP
@@ -229,9 +308,11 @@ const server = http.createServer((req, res) => {
   }
 
   // --- static pages ---
-  let rel = pathname === '/' ? '/control.html'
+  let rel = pathname === '/' ? '/home.html'
           : pathname === '/output' ? '/output.html'
           : pathname === '/control' ? '/control.html'
+          : pathname === '/scoreboard' ? '/scoreboard.html'
+          : pathname === '/scoreboard-output' ? '/scoreboard-output.html'
           : pathname;
   // prevent path traversal
   const file = path.join(PUBLIC_DIR, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
@@ -247,10 +328,14 @@ server.listen(PORT, () => {
       if (ni.family === 'IPv4' && !ni.internal) { lan = ni.address; break; }
     }
   }
-  console.log(`\n  StreamGraphics is running.`);
-  console.log(`  ------------------------------------------`);
-  console.log(`  Control panel (this computer):  http://localhost:${PORT}/control`);
-  console.log(`  Output for OBS/vMix (this PC):   http://localhost:${PORT}/output`);
-  console.log(`  Output from ANOTHER computer:    http://${lan}:${PORT}/output`);
-  console.log(`  ------------------------------------------\n`);
+  console.log(`\n  StreamGraphics is running.  Open the control panels in your browser:`);
+  console.log(`  ---------------------------------------------------------------`);
+  console.log(`  Home (all graphics):     http://localhost:${PORT}/`);
+  console.log(`  TIMER    control:        http://localhost:${PORT}/control`);
+  console.log(`  TIMER    output (OBS):   http://localhost:${PORT}/output`);
+  console.log(`  SCOREBOARD control:      http://localhost:${PORT}/scoreboard`);
+  console.log(`  SCOREBOARD output (OBS): http://localhost:${PORT}/scoreboard-output`);
+  console.log(`  ---------------------------------------------------------------`);
+  console.log(`  From ANOTHER computer, swap "localhost" for  ${lan}`);
+  console.log(`  e.g. OBS Browser Source:  http://${lan}:${PORT}/scoreboard-output\n`);
 });
