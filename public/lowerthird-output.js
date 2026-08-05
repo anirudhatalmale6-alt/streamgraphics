@@ -68,6 +68,14 @@
     stage.querySelectorAll('video.ly-vid').forEach(function (v) {
       var prime = function () { try { v.pause(); if (v.currentTime > 0.05) v.currentTime = 0; } catch (e) {} };
       if (v.readyState >= 2) prime(); else v.addEventListener('loadeddata', prime, { once: true });
+      // A non-looping clip that finishes must NOT leave a black box on air.
+      v.addEventListener('ended', function () {
+        if (v.loop) return;
+        var l = LMAP[v.parentNode.dataset.id] || {};
+        if (l.whenDone === 'hide') { v.style.transition = 'opacity .3s ease'; v.style.opacity = '0'; }
+        // 'hold': re-seek to the final frame so the browser repaints it instead of showing black.
+        else { try { if (isFinite(v.duration) && v.duration > 0.1) v.currentTime = Math.max(0, v.duration - 0.05); } catch (e) {} }
+      });
     });
   }
 
@@ -101,6 +109,7 @@
     stage.querySelectorAll('video.ly-vid').forEach(function (v) {
       var l = LMAP[v.parentNode.dataset.id];
       if (!l || l.autoplay === false) return;
+      v.style.opacity = '';   // clear any "hide on end" from a previous run
       var go = function () { try { if (v.currentTime > 0.05) v.currentTime = 0; var p = v.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {} };
       if (v.readyState >= 2) go(); else v.addEventListener('loadeddata', go, { once: true });
     });
@@ -110,7 +119,7 @@
   function applyVcmd(vc) {
     if (!vc || vc.seq === lastVcmd) return; lastVcmd = vc.seq;
     var v = stage.querySelector('video.ly-vid[data-vid="' + vc.id + '"]'); if (!v) return;
-    try { if (vc.cmd === 'play') v.play(); else if (vc.cmd === 'pause') v.pause(); else if (vc.cmd === 'restart') { v.currentTime = 0; v.play(); } } catch (e) {}
+    try { if (vc.cmd === 'pause') { v.pause(); return; } v.style.opacity = ''; if (vc.cmd === 'restart') v.currentTime = 0; v.play(); } catch (e) {}
   }
 
   function eachLi(fn) { stage.querySelectorAll('.ly').forEach(function (ly) { var li = ly.querySelector('.li'); var l = LMAP[ly.dataset.id]; if (li && l) fn(li, l); }); }

@@ -49,8 +49,10 @@
     var byZ = layers.slice().sort(function (a, b) { return (a.z || 0) - (b.z || 0); });
     cstage.innerHTML = byZ.map(function (l) {
       var t = l.rot ? ';transform:rotate(' + l.rot + 'deg);transform-origin:center' : '';
-      var hid = l.hidden ? ';opacity:.28' : '';   // dimmed in the builder so you can still see/select it
-      return '<div class="ly' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + hid + '">' + innerHtml(l) + '</div>';
+      var hid = l.hidden ? ';opacity:.28' : '';   // dimmed in the builder so you can still see it
+      // Hidden OR locked layers let clicks pass through, so you can select whatever is underneath.
+      var clickthru = (l.hidden || l.locked) ? ';pointer-events:none' : '';
+      return '<div class="ly' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + (l.locked ? ' locked' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + hid + clickthru + '">' + innerHtml(l) + '</div>';
     }).join('');
     cstage.querySelectorAll('.ly').forEach(function (el) { el.addEventListener('mousedown', startDrag); });
     renderHandles();
@@ -64,16 +66,19 @@
     var byZ = layers.slice().sort(function (a, b) { return (b.z || 0) - (a.z || 0); }); // top layer first
     $('layerList').innerHTML = byZ.map(function (l) {
       var eye = l.hidden ? '🚫' : '👁';
-      return '<div class="llrow' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + (l.hidden ? ' off' : '') + '" data-id="' + l.id + '">'
+      var lock = l.locked ? '🔒' : '🔓';
+      return '<div class="llrow' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + (l.hidden ? ' off' : '') + (l.locked ? ' locked' : '') + '" data-id="' + l.id + '">'
            + '<button class="eye" data-eye title="show / hide">' + eye + '</button>'
+           + '<button class="eye" data-lock title="lock / unlock (locked = can\'t be selected or moved on the canvas)">' + lock + '</button>'
            + '<span class="t" data-name title="double-click to rename">' + esc(layerName(l)) + '</span>'
            + '<span class="mini2">' + l.type + (l.group ? ' ⧉' : '') + '</span>'
            + '<button data-mv="up" title="move up">▲</button><button data-mv="down" title="move down">▼</button></div>';
     }).join('') || '<div class="llrow"><span class="mini2">No layers — add one above.</span></div>';
     $('layerList').querySelectorAll('.llrow[data-id]').forEach(function (row) {
       var id = row.dataset.id;
-      row.onclick = function (e) { if (e.target.closest('[data-mv],[data-eye]') || e.target.hasAttribute('data-name')) return; select(id, e.shiftKey || e.ctrlKey || e.metaKey); };
+      row.onclick = function (e) { if (e.target.closest('[data-mv],[data-eye],[data-lock]') || e.target.hasAttribute('data-name')) return; select(id, e.shiftKey || e.ctrlKey || e.metaKey); };
       row.querySelector('[data-eye]').onclick = function (e) { e.stopPropagation(); var l = byId(id); if (l) { l.hidden = !l.hidden; renderCanvas(); renderList(); push(); } };
+      row.querySelector('[data-lock]').onclick = function (e) { e.stopPropagation(); var l = byId(id); if (l) { l.locked = !l.locked; if (l.locked && selIds.indexOf(id) >= 0) { selIds = selIds.filter(function (x) { return x !== id; }); selId = selIds[selIds.length - 1] || null; syncProps(); } renderCanvas(); renderList(); push(); } };
       row.querySelector('[data-name]').ondblclick = function (e) { e.stopPropagation(); renameLayer(id, e.currentTarget); };
       row.querySelectorAll('[data-mv]').forEach(function (btn) {
         btn.onclick = function (e) { e.stopPropagation(); reorder(id, btn.dataset.mv === 'up' ? -1 : 1); };
@@ -139,7 +144,7 @@
     if (l.type === 'text') { $('pText').value = l.text || ''; $('pFont').value = l.font || "'Segoe UI', Arial, sans-serif"; $('pSize').value = l.size || 34; $('pBold').checked = !!l.bold; $('pItalic').checked = !!l.italic; $('pColor').value = l.color || '#ffffff'; $('pAlign').value = l.align || 'left'; }
     if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
     if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; }
-    if (l.type === 'video') { $('pVSrc').value = l.src || ''; $('pAutoplay').checked = l.autoplay !== false; $('pLoop').checked = !!l.loop; $('pMuted').checked = l.muted !== false; $('pVFit').value = l.fit || 'contain'; }
+    if (l.type === 'video') { $('pVSrc').value = l.src || ''; $('pAutoplay').checked = l.autoplay !== false; $('pLoop').checked = !!l.loop; $('pMuted').checked = l.muted !== false; $('pVFit').value = l.fit || 'contain'; $('pWhenDone').value = l.whenDone || 'hold'; }
     if (l.type === 'ticker') { $('pTkText').value = l.text || ''; $('pTkSpeed').value = l.speed == null ? 120 : l.speed; $('pTkSpeedV').textContent = l.speed == null ? 120 : l.speed; $('pTkDir').value = l.dir || 'left'; $('pTkColor').value = l.color || '#ffffff'; $('pTkSize').value = l.size || 28; $('pTkBold').checked = !!l.bold; $('pTkFill').value = l.fill || '#0b1f3a'; $('pTkOpacity').value = l.opacity == null ? 90 : l.opacity; $('pTkRadius').value = l.radius || 0; }
     $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h;
     $('pInAnim').value = l.inAnim || 'fade'; $('pInDelay').value = l.inDelay || 0; $('pInDur').value = l.inDur == null ? 500 : l.inDur;
@@ -169,6 +174,7 @@
   $('pLoop').onchange = function () { mutate(function (l) { l.loop = $('pLoop').checked; }); };
   $('pMuted').onchange = function () { mutate(function (l) { l.muted = $('pMuted').checked; }); };
   $('pVFit').onchange = function () { mutate(function (l) { l.fit = $('pVFit').value; }); };
+  $('pWhenDone').onchange = function () { mutate(function (l) { l.whenDone = $('pWhenDone').value; }); };
   function vcmd(cmd) { if (selId) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_vcmd', id: selId, cmd: cmd }) }); }
   $('pVPlay').onclick = function () { vcmd('play'); };
   $('pVPause').onclick = function () { vcmd('pause'); };
@@ -304,7 +310,7 @@
       handles.appendChild(d);
       return;
     }
-    var l = selected(); if (!l) return;
+    var l = selected(); if (!l || l.locked) return;   // locked layers get no drag/resize handles
     var rad = (l.rot || 0) * Math.PI / 180;
     var Cx = l.x + l.w / 2, Cy = l.y + l.h / 2;
     function scr(wx, wy) { return { x: wx * SCALE, y: wy * SCALE }; }
