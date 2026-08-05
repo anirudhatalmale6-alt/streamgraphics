@@ -72,7 +72,7 @@
     }).join('') || '<div class="llrow"><span class="mini2">No layers — add one above.</span></div>';
     $('layerList').querySelectorAll('.llrow[data-id]').forEach(function (row) {
       var id = row.dataset.id;
-      row.onclick = function (e) { if (e.target.dataset.mv || e.target.dataset.eye || e.target.dataset.name) return; select(id, e.shiftKey || e.ctrlKey || e.metaKey); };
+      row.onclick = function (e) { if (e.target.closest('[data-mv],[data-eye]') || e.target.hasAttribute('data-name')) return; select(id, e.shiftKey || e.ctrlKey || e.metaKey); };
       row.querySelector('[data-eye]').onclick = function (e) { e.stopPropagation(); var l = byId(id); if (l) { l.hidden = !l.hidden; renderCanvas(); renderList(); push(); } };
       row.querySelector('[data-name]').ondblclick = function (e) { e.stopPropagation(); renameLayer(id, e.currentTarget); };
       row.querySelectorAll('[data-mv]').forEach(function (btn) {
@@ -115,7 +115,10 @@
       selId = id || null;
     }
     cstage.querySelectorAll('.ly').forEach(function (el) { el.classList.toggle('sel', selIds.indexOf(el.dataset.id) >= 0); });
-    renderList(); syncProps(); renderHandles();
+    // Update list highlights in place — do NOT rebuild the list here, or an in-progress
+    // double-click (rename) loses its target element between the two clicks.
+    document.querySelectorAll('#layerList .llrow[data-id]').forEach(function (r) { r.classList.toggle('sel', selIds.indexOf(r.dataset.id) >= 0); });
+    syncProps(); renderHandles();
   }
   function show(sel, on) { document.querySelectorAll(sel).forEach(function (e) { e.style.display = on ? '' : 'none'; }); }
   function syncProps() {

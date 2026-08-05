@@ -61,6 +61,14 @@
     });
     stage.innerHTML = html;
     setupTickers();
+    primeVideos();
+  }
+  // Decode the first frame while off-air so taking to air shows real footage, not a black flash.
+  function primeVideos() {
+    stage.querySelectorAll('video.ly-vid').forEach(function (v) {
+      var prime = function () { try { v.pause(); if (v.currentTime > 0.05) v.currentTime = 0; } catch (e) {} };
+      if (v.readyState >= 2) prime(); else v.addEventListener('loadeddata', prime, { once: true });
+    });
   }
 
   /* ---- ticker scrollers (continuous, seamless) ---- */
@@ -92,7 +100,9 @@
   function playAutoVideos() {
     stage.querySelectorAll('video.ly-vid').forEach(function (v) {
       var l = LMAP[v.parentNode.dataset.id];
-      if (l && l.autoplay !== false) { try { v.currentTime = 0; v.play(); } catch (e) {} }
+      if (!l || l.autoplay === false) return;
+      var go = function () { try { if (v.currentTime > 0.05) v.currentTime = 0; var p = v.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {} };
+      if (v.readyState >= 2) go(); else v.addEventListener('loadeddata', go, { once: true });
     });
   }
   function pauseVideos() { stage.querySelectorAll('video.ly-vid').forEach(function (v) { try { v.pause(); } catch (e) {} }); }
