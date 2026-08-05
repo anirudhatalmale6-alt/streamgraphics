@@ -6,6 +6,9 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--txt);font:15px/1.4 'Segoe UI','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased}
 .top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:#0a0e14;position:sticky;top:0;z-index:5}
+.topnav{display:flex;gap:8px;margin-left:18px;flex-wrap:wrap}
+.topnav a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border:1px solid var(--line);border-radius:7px;white-space:nowrap}
+.topnav a:hover{color:var(--txt);border-color:var(--accent)}
 .brand{font-weight:800;letter-spacing:.02em;display:flex;align-items:center;gap:10px}
 .brand small{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.18em;text-transform:uppercase}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--go);box-shadow:0 0 12px var(--go)}

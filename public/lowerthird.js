@@ -37,7 +37,7 @@
     }
     if (l.type === 'video') {
       if (!l.src) return '<div class="li" style="width:100%;height:100%;border:2px dashed #6b7a90;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#9fb0c8;font-size:26px">▶ VIDEO</div>';
-      return '<video class="li" src="' + esc(l.src) + '" muted autoplay loop playsinline style="width:100%;height:100%;object-fit:' + (l.fit === 'cover' ? 'cover' : 'contain') + '"></video>';
+      return '<video class="li" src="' + esc(l.src) + '" muted autoplay' + (l.loop ? ' loop' : '') + ' playsinline style="width:100%;height:100%;object-fit:' + (l.fit === 'cover' ? 'cover' : 'contain') + '"></video>';
     }
     if (l.type === 'ticker') {
       var tk = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
