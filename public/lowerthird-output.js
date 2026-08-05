@@ -37,6 +37,7 @@
     layers = layers.slice().sort(function (a, b) { return (a.z || 0) - (b.z || 0); });
     var html = '';
     layers.forEach(function (l) {
+      if (l.hidden) return;   // a layer switched off in the explorer never renders on air
       LMAP[l.id] = l;
       var box = 'left:' + (l.x || 0) + 'px;top:' + (l.y || 0) + 'px;width:' + (l.w || 0) + 'px;height:' + (l.h || 0) + 'px;z-index:' + (l.z || 0) + ';';
       if (l.rot) box += 'transform:rotate(' + l.rot + 'deg);transform-origin:center;';

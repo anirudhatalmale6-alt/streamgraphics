@@ -28,6 +28,9 @@
   .llrow .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .llrow .mini2{color:var(--muted);font-size:11px}
   .llrow button{background:transparent;border:1px solid var(--line);border-radius:5px;color:var(--muted);cursor:pointer;font-size:11px;width:22px;height:20px}
+  .llrow .eye{border:none;width:20px;font-size:13px;opacity:.9;padding:0}
+  .llrow.off .t{color:var(--muted);text-decoration:line-through;opacity:.65}
+  .llrow.off .eye{opacity:.5}
   .props .row{margin-bottom:9px}
   .props label{width:52px;font-size:12px}
   .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -86,7 +89,7 @@
         <section class="panel" style="padding:14px">
           <h3 style="margin-bottom:8px">Layers</h3>
           <div class="layerlist" id="layerList"></div>
-          <p class="mini" style="margin:8px 0 6px;color:var(--muted2)">Shift-click layers (canvas or list) to select several, then Group.</p>
+          <p class="mini" style="margin:8px 0 6px;color:var(--muted2)">Shift/Ctrl-click rows to select several (then Group). Double-click a name to rename. 👁 shows/hides a layer.</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn ghost" id="btnGroup" style="font-size:12px">⧉ Group</button>
             <button class="btn ghost" id="btnUngroup" style="font-size:12px">Ungroup</button>

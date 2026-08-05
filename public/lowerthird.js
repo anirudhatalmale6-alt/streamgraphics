@@ -49,26 +49,46 @@
     var byZ = layers.slice().sort(function (a, b) { return (a.z || 0) - (b.z || 0); });
     cstage.innerHTML = byZ.map(function (l) {
       var t = l.rot ? ';transform:rotate(' + l.rot + 'deg);transform-origin:center' : '';
-      return '<div class="ly' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + '">' + innerHtml(l) + '</div>';
+      var hid = l.hidden ? ';opacity:.28' : '';   // dimmed in the builder so you can still see/select it
+      return '<div class="ly' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + hid + '">' + innerHtml(l) + '</div>';
     }).join('');
     cstage.querySelectorAll('.ly').forEach(function (el) { el.addEventListener('mousedown', startDrag); });
     renderHandles();
   }
+  function layerName(l) {
+    if (l.name) return l.name;
+    if (l.type === 'text' || l.type === 'ticker') return l.text || (l.type === 'ticker' ? 'Ticker' : 'Text');
+    return l.type === 'box' ? 'Box' : l.type === 'video' ? 'Video' : 'Image';
+  }
   function renderList() {
     var byZ = layers.slice().sort(function (a, b) { return (b.z || 0) - (a.z || 0); }); // top layer first
     $('layerList').innerHTML = byZ.map(function (l) {
-      var name = (l.type === 'text' || l.type === 'ticker') ? (l.text || (l.type === 'ticker' ? 'Ticker' : 'Text'))
-               : l.type === 'box' ? 'Box' : l.type === 'video' ? 'Video' : 'Image';
-      return '<div class="llrow' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '">'
-           + '<span class="t">' + esc(name) + '</span><span class="mini2">' + l.type + '</span>'
+      var eye = l.hidden ? '🚫' : '👁';
+      return '<div class="llrow' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + (l.hidden ? ' off' : '') + '" data-id="' + l.id + '">'
+           + '<button class="eye" data-eye title="show / hide">' + eye + '</button>'
+           + '<span class="t" data-name title="double-click to rename">' + esc(layerName(l)) + '</span>'
+           + '<span class="mini2">' + l.type + (l.group ? ' ⧉' : '') + '</span>'
            + '<button data-mv="up" title="move up">▲</button><button data-mv="down" title="move down">▼</button></div>';
     }).join('') || '<div class="llrow"><span class="mini2">No layers — add one above.</span></div>';
     $('layerList').querySelectorAll('.llrow[data-id]').forEach(function (row) {
-      row.onclick = function (e) { if (e.target.dataset.mv) return; select(row.dataset.id, e.shiftKey); };
+      var id = row.dataset.id;
+      row.onclick = function (e) { if (e.target.dataset.mv || e.target.dataset.eye || e.target.dataset.name) return; select(id, e.shiftKey || e.ctrlKey || e.metaKey); };
+      row.querySelector('[data-eye]').onclick = function (e) { e.stopPropagation(); var l = byId(id); if (l) { l.hidden = !l.hidden; renderCanvas(); renderList(); push(); } };
+      row.querySelector('[data-name]').ondblclick = function (e) { e.stopPropagation(); renameLayer(id, e.currentTarget); };
       row.querySelectorAll('[data-mv]').forEach(function (btn) {
-        btn.onclick = function (e) { e.stopPropagation(); reorder(row.dataset.id, btn.dataset.mv === 'up' ? -1 : 1); };
+        btn.onclick = function (e) { e.stopPropagation(); reorder(id, btn.dataset.mv === 'up' ? -1 : 1); };
       });
     });
+  }
+  function renameLayer(id, span) {
+    var l = byId(id); if (!l) return;
+    var inp = document.createElement('input');
+    inp.className = 'inp'; inp.value = l.name || layerName(l);
+    inp.style.cssText = 'height:24px;padding:2px 6px;font-size:13px;flex:1;min-width:0';
+    span.replaceWith(inp); inp.focus(); inp.select();
+    function done() { l.name = inp.value.trim(); if (!l.name) delete l.name; renderList(); renderCanvas(); push(); }
+    inp.onblur = done;
+    inp.onkeydown = function (e) { if (e.key === 'Enter') inp.blur(); else if (e.key === 'Escape') { inp.value = l.name || layerName(l); inp.blur(); } };
   }
   // Move a layer up/down in the stack (renumbers z so order is stable).
   function reorder(id, dir) {
