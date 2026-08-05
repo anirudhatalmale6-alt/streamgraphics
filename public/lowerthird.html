@@ -72,10 +72,12 @@
 
       <div class="side">
         <section class="panel" style="padding:14px">
-          <div class="addrow">
+          <div class="addrow" style="flex-wrap:wrap">
             <button class="btn" id="addText">＋ Text</button>
             <button class="btn" id="addBox">＋ Box</button>
             <button class="btn" id="addImage">＋ Image</button>
+            <button class="btn" id="addVideo">＋ Video</button>
+            <button class="btn" id="addTicker">＋ Ticker</button>
             <button class="btn" id="addBg" title="full-screen background colour">＋ BG</button>
           </div>
         </section>
@@ -123,6 +125,26 @@
               <select class="inp" id="pShape" style="width:auto"><option value="none">Square</option><option value="rounded">Rounded</option><option value="circle">Circle</option></select>
               <select class="inp" id="pFit" style="width:auto"><option value="contain">Fit</option><option value="cover">Fill</option></select>
             </div>
+
+            <div class="row only-video"><label>Video</label><input class="inp" id="pVSrc" placeholder="URL or Browse (mp4/webm)"><label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="video/*" id="pVFile" style="display:none"></label></div>
+            <div class="row only-video" style="gap:14px;flex-wrap:wrap">
+              <label style="width:auto"><input type="checkbox" id="pAutoplay" checked> Autoplay on air</label>
+              <label style="width:auto"><input type="checkbox" id="pLoop"> Loop</label>
+              <label style="width:auto"><input type="checkbox" id="pMuted" checked> Muted</label>
+              <select class="inp" id="pVFit" style="width:auto"><option value="contain">Fit</option><option value="cover">Fill</option></select>
+            </div>
+            <div class="row only-video"><label>Playback</label>
+              <button class="btn ghost" id="pVPlay" style="font-size:12px">▶ Play</button>
+              <button class="btn ghost" id="pVPause" style="font-size:12px">⏸ Pause</button>
+              <button class="btn ghost" id="pVRestart" style="font-size:12px">⟲ Restart</button>
+            </div>
+
+            <div class="row only-ticker"><label>Text</label><input class="inp" id="pTkText" placeholder="scrolling text"></div>
+            <div class="row only-ticker"><label>Speed</label><input class="range" id="pTkSpeed" type="range" min="20" max="400" value="120"><span id="pTkSpeedV" class="mono">120</span>
+              <select class="inp" id="pTkDir" style="width:auto"><option value="left">◀ Left</option><option value="right">Right ▶</option></select>
+            </div>
+            <div class="row only-ticker"><label>Text</label><input type="color" id="pTkColor" value="#ffffff"><input class="inp t" id="pTkSize" type="number" min="8" max="120" value="28" title="size"><label style="width:auto"><input type="checkbox" id="pTkBold"> B</label></div>
+            <div class="row only-ticker"><label>Fill</label><input type="color" id="pTkFill" value="#0b1f3a"><input class="inp s" id="pTkOpacity" type="number" min="0" max="100" value="90" title="opacity %"> %<input class="inp t" id="pTkRadius" type="number" min="0" max="60" value="0" title="radius"></div>
 
             <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
             <div class="cap" style="text-align:left;color:var(--muted);font-size:11px;margin-bottom:4px">Position &amp; size (px)</div>

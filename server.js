@@ -98,6 +98,7 @@ function defaultState() {
       visible: false,
       chroma: '',
       w: 1920, h: 1080,
+      vcmd: { id: '', cmd: '', seq: 0 },   // transient video playback command (play/pause/restart)
       layers: defaultLowerThirdLayers()
     }
   };
@@ -370,6 +371,9 @@ function applyAction(action) {
     case 'lt_reset':
       state.lowerthird.layers = defaultLowerThirdLayers();
       saveLowerThird();
+      break;
+    case 'lt_vcmd': // video play/pause/restart command to a specific video layer
+      state.lowerthird.vcmd = { id: String(action.id || ''), cmd: String(action.cmd || ''), seq: (state.lowerthird.vcmd.seq || 0) + 1 };
       break;
 
     default:

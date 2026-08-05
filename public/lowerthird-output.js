@@ -48,9 +48,58 @@
           + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start')) + ';text-shadow:0 2px 8px rgba(0,0,0,.35)';
         inner = '<div class="li ly-text" style="' + st + '">' + esc(l.text || '') + '</div>';
       } else if (l.type === 'image') inner = '<img class="li ly-img ' + (l.fit === 'cover' ? 'cover ' : '') + (l.shape || 'none') + '" src="' + esc(l.src || '') + '" style="width:100%;height:100%">';
+      else if (l.type === 'video') {
+        var vrad = l.shape === 'circle' ? '50%' : (l.shape === 'rounded' ? '16px' : '0');
+        inner = '<video class="li ly-vid" data-vid="' + l.id + '" src="' + esc(l.src || '') + '"' + (l.loop ? ' loop' : '') + (l.muted === false ? '' : ' muted') + ' playsinline preload="auto" style="width:100%;height:100%;object-fit:' + (l.fit === 'cover' ? 'cover' : 'contain') + ';border-radius:' + vrad + '"></video>';
+      } else if (l.type === 'ticker') {
+        var ts = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
+        var gap = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+        inner = '<div class="li ly-ticker" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px;overflow:hidden;display:flex;align-items:center">' + '<div class="tick-track" style="display:inline-flex;white-space:nowrap;will-change:transform;' + ts + '">' + '<span class="tc">' + esc(l.text || '') + gap + '</span><span class="tc">' + esc(l.text || '') + gap + '</span></div></div>';
+      }
       html += '<div class="ly" data-id="' + l.id + '" style="' + box + '">' + inner + '</div>';
     });
     stage.innerHTML = html;
+    setupTickers();
+  }
+
+  /* ---- ticker scrollers (continuous, seamless) ---- */
+  var tickers = [];
+  function setupTickers() {
+    tickers = [];
+    stage.querySelectorAll('.ly').forEach(function (ly) {
+      var l = LMAP[ly.dataset.id]; if (!l || l.type !== 'ticker') return;
+      var track = ly.querySelector('.tick-track'); if (!track) return;
+      var copies = track.querySelectorAll('.tc');
+      var copyW = copies.length > 1 ? (copies[1].offsetLeft - copies[0].offsetLeft) : copies[0].offsetWidth;
+      var speed = (l.speed == null ? 120 : l.speed);
+      tickers.push({ track: track, copyW: copyW || 1, speed: speed, dir: l.dir === 'right' ? 1 : -1, off: l.dir === 'right' ? -(copyW || 1) : 0 });
+    });
+  }
+  var lastT = 0;
+  function tickLoop(t) {
+    var dt = lastT ? (t - lastT) / 1000 : 0; lastT = t;
+    tickers.forEach(function (tk) {
+      tk.off += tk.dir * tk.speed * dt;
+      if (tk.off <= -tk.copyW) tk.off += tk.copyW;
+      if (tk.dir === 1 && tk.off >= 0) tk.off -= tk.copyW;
+      tk.track.style.transform = 'translateX(' + tk.off + 'px)';
+    });
+    requestAnimationFrame(tickLoop);
+  }
+  requestAnimationFrame(tickLoop);
+
+  function playAutoVideos() {
+    stage.querySelectorAll('video.ly-vid').forEach(function (v) {
+      var l = LMAP[v.parentNode.dataset.id];
+      if (l && l.autoplay !== false) { try { v.currentTime = 0; v.play(); } catch (e) {} }
+    });
+  }
+  function pauseVideos() { stage.querySelectorAll('video.ly-vid').forEach(function (v) { try { v.pause(); } catch (e) {} }); }
+  var lastVcmd = 0;
+  function applyVcmd(vc) {
+    if (!vc || vc.seq === lastVcmd) return; lastVcmd = vc.seq;
+    var v = stage.querySelector('video.ly-vid[data-vid="' + vc.id + '"]'); if (!v) return;
+    try { if (vc.cmd === 'play') v.play(); else if (vc.cmd === 'pause') v.pause(); else if (vc.cmd === 'restart') { v.currentTime = 0; v.play(); } } catch (e) {}
   }
 
   function eachLi(fn) { stage.querySelectorAll('.ly').forEach(function (ly) { var li = ly.querySelector('.li'); var l = LMAP[ly.dataset.id]; if (li && l) fn(li, l); }); }
@@ -84,7 +133,8 @@
     applyChroma(lt.chroma);
     var newSig = JSON.stringify(lt.layers);
     if (newSig !== sig) { sig = newSig; buildLayers(lt.layers || []); snap(visibleNow); }
-    if (!!lt.visible !== visibleNow) { visibleNow = !!lt.visible; requestAnimationFrame(function () { visibleNow ? animateOn() : animateOff(); }); }
+    if (!!lt.visible !== visibleNow) { visibleNow = !!lt.visible; requestAnimationFrame(function () { if (visibleNow) { animateOn(); playAutoVideos(); } else { animateOff(); pauseVideos(); } }); }
+    applyVcmd(lt.vcmd);
   }
 
   var es = new EventSource('/events');
