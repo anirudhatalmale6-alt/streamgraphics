@@ -88,7 +88,8 @@
     if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
     if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; }
     $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h;
-    $('pAnim').value = l.animIn || 'fade'; $('pDelay').value = l.delay || 0;
+    $('pInAnim').value = l.inAnim || 'fade'; $('pInDelay').value = l.inDelay || 0; $('pInDur').value = l.inDur == null ? 500 : l.inDur;
+    $('pOutAnim').value = l.outAnim || 'fade'; $('pOutDelay').value = l.outDelay || 0; $('pOutDur').value = l.outDur == null ? 350 : l.outDur;
   }
   function mutate(fn) { var l = selected(); if (!l) return; fn(l); renderCanvas(); renderList(); push(); }
 
@@ -107,8 +108,12 @@
   $('pShape').onchange = function () { mutate(function (l) { l.shape = $('pShape').value; }); };
   $('pFit').onchange = function () { mutate(function (l) { l.fit = $('pFit').value; }); };
   ['pX', 'pY', 'pW', 'pH'].forEach(function (id) { $(id).oninput = function () { mutate(function (l) { l[id.slice(1).toLowerCase()] = Math.round(+$(id).value); }); }; });
-  $('pAnim').onchange = function () { mutate(function (l) { l.animIn = $('pAnim').value; }); };
-  $('pDelay').oninput = function () { mutate(function (l) { l.delay = +$('pDelay').value; }); };
+  $('pInAnim').onchange = function () { mutate(function (l) { l.inAnim = $('pInAnim').value; }); };
+  $('pInDelay').oninput = function () { mutate(function (l) { l.inDelay = +$('pInDelay').value; }); };
+  $('pInDur').oninput = function () { mutate(function (l) { l.inDur = +$('pInDur').value; }); };
+  $('pOutAnim').onchange = function () { mutate(function (l) { l.outAnim = $('pOutAnim').value; }); };
+  $('pOutDelay').oninput = function () { mutate(function (l) { l.outDelay = +$('pOutDelay').value; }); };
+  $('pOutDur').oninput = function () { mutate(function (l) { l.outDur = +$('pOutDur').value; }); };
   $('pBack').onclick = function () { mutate(function (l) { l.z = Math.min.apply(null, layers.map(function (x) { return x.z || 0; })) - 1; }); };
   $('pFront').onclick = function () { mutate(function (l) { l.z = Math.max.apply(null, layers.map(function (x) { return x.z || 0; })) + 1; }); };
   $('pDelete').onclick = function () { layers = layers.filter(function (x) { return x.id !== selId; }); selId = null; renderCanvas(); renderList(); syncProps(); push(); };
@@ -125,9 +130,11 @@
   /* ---- add layers ---- */
   function topZ() { return layers.length ? Math.max.apply(null, layers.map(function (l) { return l.z || 0; })) + 1 : 1; }
   function add(l) { l.id = uid(); l.z = topZ(); layers.push(l); selId = l.id; renderCanvas(); renderList(); syncProps(); push(); }
-  $('addText').onclick = function () { add({ type: 'text', x: 200, y: 500, w: 560, h: 60, text: 'New text', font: "'Segoe UI', Arial, sans-serif", size: 40, bold: true, italic: false, color: '#ffffff', align: 'left', animIn: 'fade', delay: 0 }); };
-  $('addBox').onclick = function () { add({ type: 'box', x: 160, y: 900, w: 620, h: 100, fill: '#0b1f3a', opacity: 95, radius: 12, animIn: 'slide-up', delay: 0 }); };
-  $('addImage').onclick = function () { add({ type: 'image', x: 120, y: 860, w: 140, h: 140, src: '', shape: 'circle', fit: 'contain', animIn: 'scale', delay: 0 }); };
+  var A = function (inA) { return { inAnim: inA, inDelay: 0, inDur: 500, outAnim: 'fade', outDelay: 0, outDur: 300 }; };
+  function merge(a, b) { for (var k in b) a[k] = b[k]; return a; }
+  $('addText').onclick = function () { add(merge({ type: 'text', x: 200, y: 500, w: 560, h: 60, text: 'New text', font: 'Arial, Helvetica, sans-serif', size: 40, bold: true, italic: false, color: '#ffffff', align: 'left' }, A('fade'))); };
+  $('addBox').onclick = function () { add(merge({ type: 'box', x: 160, y: 900, w: 620, h: 100, fill: '#0b1f3a', opacity: 95, radius: 12 }, A('slide-up'))); };
+  $('addImage').onclick = function () { add(merge({ type: 'image', x: 120, y: 860, w: 140, h: 140, src: '', shape: 'circle', fit: 'contain' }, A('scale'))); };
   $('btnReset').onclick = function () { if (confirm('Reset the lower third to the default design?')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_reset' }) }); };
 
   /* ---- drag on canvas ---- */

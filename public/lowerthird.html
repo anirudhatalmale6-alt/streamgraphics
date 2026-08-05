@@ -123,13 +123,23 @@
               <input class="inp" id="pW" type="number" title="Width"><input class="inp" id="pH" type="number" title="Height">
               <div class="cap">X</div><div class="cap">Y</div><div class="cap">W</div><div class="cap">H</div>
             </div>
-            <div class="row" style="margin-top:10px"><label>Animate</label>
-              <select class="inp" id="pAnim" style="width:auto">
-                <option value="fade">Fade</option><option value="slide-up">Slide up</option>
-                <option value="slide-left">Slide left</option><option value="slide-right">Slide right</option>
-                <option value="scale">Scale</option><option value="none">None</option>
+            <div class="cap" style="text-align:left;color:var(--muted);font-size:11px;margin:10px 0 4px">Animate ON &nbsp;·&nbsp; type / delay / duration (ms)</div>
+            <div class="row">
+              <select class="inp" id="pInAnim" style="width:auto">
+                <option value="fade">Fade</option><option value="slide-up">Slide up</option><option value="slide-down">Slide down</option>
+                <option value="slide-left">Slide left</option><option value="slide-right">Slide right</option><option value="scale">Scale</option><option value="none">None</option>
               </select>
-              <input class="inp t" id="pDelay" type="number" min="0" max="5000" step="20" value="0" title="delay ms"> ms
+              <input class="inp t" id="pInDelay" type="number" min="0" max="10000" step="20" value="0" title="delay ms">
+              <input class="inp t" id="pInDur" type="number" min="0" max="10000" step="20" value="500" title="duration ms">
+            </div>
+            <div class="cap" style="text-align:left;color:var(--muted);font-size:11px;margin:10px 0 4px">Animate OFF &nbsp;·&nbsp; type / delay / duration (ms)</div>
+            <div class="row">
+              <select class="inp" id="pOutAnim" style="width:auto">
+                <option value="fade">Fade</option><option value="slide-up">Slide up</option><option value="slide-down">Slide down</option>
+                <option value="slide-left">Slide left</option><option value="slide-right">Slide right</option><option value="scale">Scale</option><option value="none">None</option>
+              </select>
+              <input class="inp t" id="pOutDelay" type="number" min="0" max="10000" step="20" value="0" title="delay ms">
+              <input class="inp t" id="pOutDur" type="number" min="0" max="10000" step="20" value="350" title="duration ms">
             </div>
             <div style="display:flex;gap:8px;margin-top:8px">
               <button class="btn ghost" id="pBack" style="font-size:12px">Send back</button>
