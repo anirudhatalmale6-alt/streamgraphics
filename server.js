@@ -46,6 +46,9 @@ function defaultState() {
       targetEpoch: 0,      // 'tod' mode: absolute clock time to count down to
       showHours: false,    // display hh:mm:ss vs mm:ss
       label: '',           // optional line above the time
+      // Speaker / confidence-monitor mode: a warning threshold + optional overtime.
+      warnMs: 0,           // 0 = off; >0 = go amber when remaining <= this, red at/under 0
+      overtime: false,     // when true, a countdown keeps going NEGATIVE past zero (overtime)
       visible: false,      // drives the in/out animation on the output
       // Look — all live-editable from the panel.
       style: {
@@ -175,9 +178,9 @@ function liveValueMs(t, now) {
   if (t.mode === 'tod') {
     return Math.max(0, t.targetEpoch - now);
   }
-  // countdown
+  // countdown — in overtime mode it may go negative (past zero into overtime)
   const rem = t.baseMs - (t.running ? now - t.anchorServer : 0);
-  return Math.max(0, rem);
+  return t.overtime ? rem : Math.max(0, rem);
 }
 
 function applyAction(action) {
@@ -244,6 +247,8 @@ function applyAction(action) {
 
     case 'setLabel':   t.label = String(action.value || '').slice(0, 120); break;
     case 'setShowHours': t.showHours = !!action.value; break;
+    case 'setWarn':     t.warnMs = Math.max(0, Number(action.ms) || 0); break;
+    case 'setOvertime': t.overtime = !!action.value; break;
 
     case 'setStyle':
       Object.assign(t.style, action.style || {});

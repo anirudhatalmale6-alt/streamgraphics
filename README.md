@@ -37,6 +37,12 @@ press Ctrl+C), or start this copy on a different port:
 `$env:PORT=4001; node server.js` (PowerShell) / `PORT=4001 node server.js` (Mac/Linux).
 Remember to use the same port in your browser and OBS URLs.
 
+## Timer — speaker / confidence mode
+Beyond countdown / count-up / countdown-to-time, the timer has a speaker mode: set a
+**Warn at** time and the display turns amber under it; at zero it goes red and, if
+**Count into overtime** is on, keeps counting NEGATIVE (with a pulse) for overtime.
+Perfect on a confidence monitor. Turn the warning **Off** for a plain countdown.
+
 ## Scoreboard (Milestone 2)
 A two-team match board, shipped configured for the beach-volley Center Court look
 but reusable for any two-side match:

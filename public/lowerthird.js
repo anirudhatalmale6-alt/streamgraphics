@@ -31,7 +31,10 @@
         + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start'));
       return '<div class="li ly-text" style="' + st + '">' + esc(l.text || '') + '</div>';
     }
-    if (l.type === 'image') return '<img class="li ly-img ' + (l.fit === 'cover' ? 'cover ' : '') + (l.shape || 'none') + '" src="' + esc(l.src || '') + '" style="width:100%;height:100%">';
+    if (l.type === 'image') {
+      if (!l.src) return '<div class="li" style="width:100%;height:100%;border:2px dashed #6b7a90;border-radius:' + (l.shape === 'circle' ? '50%' : '10px') + ';display:flex;align-items:center;justify-content:center;color:#9fb0c8;font-size:26px">IMAGE</div>';
+      return '<img class="li ly-img ' + (l.fit === 'cover' ? 'cover ' : '') + (l.shape || 'none') + '" src="' + esc(l.src) + '" style="width:100%;height:100%">';
+    }
     return '';
   }
   function renderCanvas() {
@@ -45,13 +48,35 @@
     var byZ = layers.slice().sort(function (a, b) { return (b.z || 0) - (a.z || 0); }); // top layer first
     $('layerList').innerHTML = byZ.map(function (l) {
       var name = l.type === 'text' ? (l.text || 'Text') : (l.type === 'box' ? 'Box' : 'Image');
-      return '<div class="llrow' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '"><span class="t">' + esc(name) + '</span><span class="mini2">' + l.type + '</span></div>';
+      return '<div class="llrow' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '">'
+           + '<span class="t">' + esc(name) + '</span><span class="mini2">' + l.type + '</span>'
+           + '<button data-mv="up" title="move up">▲</button><button data-mv="down" title="move down">▼</button></div>';
     }).join('') || '<div class="llrow"><span class="mini2">No layers — add one above.</span></div>';
-    $('layerList').querySelectorAll('.llrow[data-id]').forEach(function (row) { row.onclick = function () { select(row.dataset.id); }; });
+    $('layerList').querySelectorAll('.llrow[data-id]').forEach(function (row) {
+      row.onclick = function (e) { if (e.target.dataset.mv) return; select(row.dataset.id); };
+      row.querySelectorAll('[data-mv]').forEach(function (btn) {
+        btn.onclick = function (e) { e.stopPropagation(); reorder(row.dataset.id, btn.dataset.mv === 'up' ? -1 : 1); };
+      });
+    });
+  }
+  // Move a layer up/down in the stack (renumbers z so order is stable).
+  function reorder(id, dir) {
+    var sorted = layers.slice().sort(function (a, b) { return (b.z || 0) - (a.z || 0); }); // top first
+    var i = -1; for (var k = 0; k < sorted.length; k++) if (sorted[k].id === id) i = k;
+    var j = i + dir; if (i < 0 || j < 0 || j >= sorted.length) return;
+    var t = sorted[i]; sorted[i] = sorted[j]; sorted[j] = t;
+    var n = sorted.length; sorted.forEach(function (l, idx) { l.z = n - idx; }); // top -> highest z
+    renderCanvas(); renderList(); push();
   }
 
-  /* ---- selection + properties ---- */
-  function select(id) { selId = id; renderCanvas(); renderList(); syncProps(); }
+  /* ---- selection + properties ----
+     IMPORTANT: selecting must NOT rebuild the canvas (that detaches the element
+     you're about to drag). Just toggle the highlight on the existing elements. */
+  function select(id) {
+    selId = id;
+    cstage.querySelectorAll('.ly').forEach(function (el) { el.classList.toggle('sel', el.dataset.id === id); });
+    renderList(); syncProps();
+  }
   function show(sel, on) { document.querySelectorAll(sel).forEach(function (e) { e.style.display = on ? '' : 'none'; }); }
   function syncProps() {
     var l = selected();
@@ -99,7 +124,7 @@
 
   /* ---- add layers ---- */
   function topZ() { return layers.length ? Math.max.apply(null, layers.map(function (l) { return l.z || 0; })) + 1 : 1; }
-  function add(l) { l.id = uid(); l.z = topZ(); layers.push(l); select(l.id); push(); }
+  function add(l) { l.id = uid(); l.z = topZ(); layers.push(l); selId = l.id; renderCanvas(); renderList(); syncProps(); push(); }
   $('addText').onclick = function () { add({ type: 'text', x: 200, y: 500, w: 560, h: 60, text: 'New text', font: "'Segoe UI', Arial, sans-serif", size: 40, bold: true, italic: false, color: '#ffffff', align: 'left', animIn: 'fade', delay: 0 }); };
   $('addBox').onclick = function () { add({ type: 'box', x: 160, y: 900, w: 620, h: 100, fill: '#0b1f3a', opacity: 95, radius: 12, animIn: 'slide-up', delay: 0 }); };
   $('addImage').onclick = function () { add({ type: 'image', x: 120, y: 860, w: 140, h: 140, src: '', shape: 'circle', fit: 'contain', animIn: 'scale', delay: 0 }); };

@@ -23,17 +23,19 @@
   function liveValueMs(t, now) {
     if (t.mode === 'up')  return t.baseMs + (t.running ? now - t.anchorServer : 0);
     if (t.mode === 'tod') return Math.max(0, t.targetEpoch - now);
-    return Math.max(0, t.baseMs - (t.running ? now - t.anchorServer : 0));
+    var rem = t.baseMs - (t.running ? now - t.anchorServer : 0);
+    return t.overtime ? rem : Math.max(0, rem);   // overtime lets it go negative
   }
 
   function fmt(ms, showHours) {
+    var neg = ms < 0; if (neg) ms = -ms;
     var total = Math.floor(ms / 1000);
     var h = Math.floor(total / 3600);
     var m = Math.floor((total % 3600) / 60);
     var s = total % 60;
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
-    if (showHours || h > 0) return pad(h) + ':' + pad(m) + ':' + pad(s);
-    return pad(m) + ':' + pad(s);
+    var str = (showHours || h > 0) ? pad(h) + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
+    return (neg ? '-' : '') + str;
   }
 
   function applyStyle(st) {
@@ -72,13 +74,26 @@
     timer = msg.state.timer;
     applyStyle(timer.style);
     labelEl.textContent = timer.label || '';
+    lastState = '';  // re-evaluate warn/over colour after any style/state change
     setVisible(!!timer.visible);
   }
 
+  var lastState = '';
   function tick() {
     if (timer) {
       var v = liveValueMs(timer, serverNow());
       timeEl.textContent = fmt(v, timer.showHours);
+      // Speaker / confidence colours: amber under the warning, red at/under zero.
+      var st = 'normal';
+      if (timer.mode === 'down' && timer.warnMs > 0) {
+        if (v <= 0) st = 'over'; else if (v <= timer.warnMs) st = 'warn';
+      }
+      if (st !== lastState) {
+        lastState = st;
+        var base = (timer.style && timer.style.bg) || '#0b1f3ae6';
+        card.style.background = st === 'over' ? '#c81028' : (st === 'warn' ? '#d98a12' : base);
+        card.classList.toggle('pulse', st === 'over');
+      }
     }
     requestAnimationFrame(tick);
   }

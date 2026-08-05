@@ -70,6 +70,16 @@
           <label>Label</label>
           <input class="inp" id="label" type="text" maxlength="120" placeholder="e.g. STARTING SOON">
         </div>
+
+        <div class="row" style="flex-wrap:wrap;gap:8px;border-top:1px solid var(--line);padding-top:12px">
+          <label style="width:100%;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.1em">Speaker / confidence timer</label>
+          <span class="mini">Warn at</span>
+          <input class="inp t" id="warnMin" type="number" min="0" max="999" value="1"> :
+          <input class="inp t" id="warnSec" type="number" min="0" max="59" value="00">
+          <button class="btn ghost" id="setWarn">Set</button>
+          <button class="btn ghost" id="warnOff" title="turn off warning colours">Off</button>
+          <label class="mini" style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="overtime"> Count into overtime (red, negative)</label>
+        </div>
       </section>
 
       <!-- LOOK -->

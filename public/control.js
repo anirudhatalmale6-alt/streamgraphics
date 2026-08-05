@@ -70,6 +70,14 @@
   });
   $('label').oninput = function () { send({ type: 'setLabel', value: $('label').value }); };
 
+  // speaker / confidence timer: warning threshold + overtime
+  $('setWarn').onclick = function () {
+    var ms = ((+$('warnMin').value || 0) * 60 + (+$('warnSec').value || 0)) * 1000;
+    send({ type: 'setWarn', ms: ms });
+  };
+  $('warnOff').onclick = function () { send({ type: 'setWarn', ms: 0 }); };
+  $('overtime').onchange = function () { send({ type: 'setOvertime', value: $('overtime').checked }); };
+
   $('btnShow').onclick = function () { send({ type: 'show' }); };
   $('btnHide').onclick = function () { send({ type: 'hide' }); };
 
@@ -104,6 +112,8 @@
     var live = !!t.visible;
     $('airState').textContent = live ? 'ON AIR' : 'OFF AIR';
     $('airState').classList.toggle('live', live);
+    // speaker timer reflect
+    if (document.activeElement !== $('overtime')) $('overtime').checked = !!t.overtime;
     $('pvLabel').textContent = t.label || '';
     // look controls (only when the user isn't actively editing them)
     if (!editingLook && t.style) {

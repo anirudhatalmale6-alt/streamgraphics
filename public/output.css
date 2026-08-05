@@ -67,7 +67,9 @@ html, body { width: 100%; height: 100%; background: transparent !important; over
    transform layer via a wrapper variable. To keep it simple and correct with
    the translate() anchors above, we animate opacity + a small translate on an
    inner element. The card toggles .is-out to play the exit. */
-.card { transition: opacity .0s; }
+.card { transition: background .35s ease; }
+.card.pulse { animation: overpulse 1s ease-in-out infinite; }
+@keyframes overpulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
 
 /* We animate an inner wrapper so position transforms are never fought. */
 .card .anim {
