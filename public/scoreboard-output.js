@@ -31,14 +31,26 @@
     $('bracket').textContent = sb.bracketLabel || '';
     $('bracket').style.background = (sb.style && sb.style.bracketColor) || '#7a1420';
 
-    // optional big event logo in the brand cell (replaces the coded Hb mark)
-    var hb = document.querySelector('.hb'), evImg = $('eventLogo');
-    if (sb.eventLogoUrl) {
+    // Event logo: either INLINE in the brand cell, or a FREE OVERLAY you position anywhere.
+    var hb = document.querySelector('.hb'), evImg = $('eventLogo'), floatLogo = $('floatLogo');
+    var placement = sb.eventLogoPlacement || 'inline';
+    var hasLogo = !!sb.eventLogoUrl;
+    if (hasLogo && placement === 'inline') {
       if (!evImg) { evImg = document.createElement('img'); evImg.id = 'eventLogo'; evImg.className = 'eventlogo'; hb.parentNode.insertBefore(evImg, hb); }
       evImg.src = sb.eventLogoUrl; evImg.style.display = 'block'; hb.style.display = 'none';
+      floatLogo.style.display = 'none';
+    } else if (hasLogo) { // free overlay at one of the 9 anchors
+      if (evImg) evImg.style.display = 'none';
+      hb.style.display = '';
+      floatLogo.src = sb.eventLogoUrl;
+      floatLogo.style.height = (sb.eventLogoSize || 150) + 'px';
+      POSITIONS.forEach(function (p) { floatLogo.classList.remove('pos-' + p); });
+      floatLogo.classList.add('pos-' + placement);
+      floatLogo.style.display = 'block';
     } else {
       if (evImg) evImg.style.display = 'none';
       hb.style.display = '';
+      floatLogo.style.display = 'none';
     }
 
     // backdrop image (Photoshop art) if provided

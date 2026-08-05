@@ -113,6 +113,21 @@
         <div class="row"><label>Title</label><input class="inp" id="mTitle" placeholder="HERMOSA BEACH OPEN 2025"></div>
         <div class="row"><label>Round/label</label><input class="inp" id="mBracket" placeholder="MEN'S CONTENDER'S BRACKET"></div>
         <div class="row"><label>Event logo</label><input class="inp" id="mEventLogo" placeholder="big event logo image URL (optional)"></div>
+        <div class="row"><label>Logo place</label>
+          <select class="inp" id="mLogoPlace">
+            <option value="inline">Inside the board</option>
+            <option value="top-left">Overlay · top-left</option>
+            <option value="top-center">Overlay · top-center</option>
+            <option value="top-right">Overlay · top-right</option>
+            <option value="mid-left">Overlay · mid-left</option>
+            <option value="mid-center">Overlay · center</option>
+            <option value="mid-right">Overlay · mid-right</option>
+            <option value="bottom-left">Overlay · bottom-left</option>
+            <option value="bottom-center">Overlay · bottom-center</option>
+            <option value="bottom-right">Overlay · bottom-right</option>
+          </select>
+        </div>
+        <div class="row"><label>Logo size</label><input class="range" id="mLogoSize" type="range" min="40" max="600" value="150"><span id="mLogoSizeV" class="mono">150</span></div>
       </section>
 
       <section class="panel">

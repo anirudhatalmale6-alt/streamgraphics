@@ -74,6 +74,14 @@
     if (next >= 0) send({ type: 'sb_startGame', game: next });
   };
   $('btnBackGame').onclick = function () { send({ type: 'sb_backGame' }); };
+
+  // event-logo placement + size
+  $('mLogoPlace').addEventListener('focus', function () { editing = 'mLogoPlace'; });
+  $('mLogoPlace').addEventListener('blur', function () { editing = null; });
+  $('mLogoPlace').onchange = function () { send({ type: 'sb_meta', eventLogoPlacement: $('mLogoPlace').value }); };
+  $('mLogoSize').addEventListener('focus', function () { editing = 'mLogoSize'; });
+  $('mLogoSize').addEventListener('blur', function () { editing = null; });
+  $('mLogoSize').oninput = function () { $('mLogoSizeV').textContent = $('mLogoSize').value; send({ type: 'sb_meta', eventLogoSize: +$('mLogoSize').value }); };
   $('btnShow').onclick = function () { send({ type: 'sb_show' }); };
   $('btnHide').onclick = function () { send({ type: 'sb_hide' }); };
 
@@ -130,6 +138,8 @@
     if (editing !== 'mTitle') $('mTitle').value = s.title || '';
     if (editing !== 'mBracket') $('mBracket').value = s.bracketLabel || '';
     if (editing !== 'mEventLogo') $('mEventLogo').value = s.eventLogoUrl || '';
+    if (editing !== 'mLogoPlace') $('mLogoPlace').value = s.eventLogoPlacement || 'inline';
+    if (editing !== 'mLogoSize') { $('mLogoSize').value = s.eventLogoSize || 150; $('mLogoSizeV').textContent = s.eventLogoSize || 150; }
     if (s.style) {
       if (editing !== 'stAccent') $('stAccent').value = s.style.accent || '#1e64d2';
       if (editing !== 'stBracket') $('stBracket').value = s.style.bracketColor || '#7a1420';

@@ -52,6 +52,8 @@ body.chroma { background: var(--chroma) !important; }  /* solid key colour for h
   background: radial-gradient(circle at 50% 32%, #f5c518 42%, #1f7a8c 44%); }
 .tlogo { width: 28px; height: 28px; object-fit: contain; margin: 0 6px; flex: none; }
 .eventlogo { height: 44px; max-width: 130px; object-fit: contain; margin-right: 6px; flex: none; }
+/* free-floating event logo overlay */
+.floatlogo { position: absolute; object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
 .nm { flex: 1; font-size: 17px; font-weight: 700; color: #111; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; padding-right: 8px; }
 .nm .seed { color: #999; font-weight: 700; }

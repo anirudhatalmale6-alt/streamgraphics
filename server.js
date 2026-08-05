@@ -65,6 +65,8 @@ function defaultState() {
       presenter: 'WEDBUSH',
       bracketLabel: "MEN'S CONTENDER'S BRACKET",
       eventLogoUrl: '',        // big event logo (e.g. the Hermosa Beach Open mark)
+      eventLogoPlacement: 'inline', // 'inline' (inside the board) OR one of the 9 screen anchors = free overlay
+      eventLogoSize: 150,      // px height when used as a free overlay
       gamesCount: 3,
       activeGame: 0,           // which game column is "current" (highlighted)
       teams: [
@@ -246,6 +248,14 @@ function applyAction(action) {
       if (action.presenter != null) state.scoreboard.presenter = String(action.presenter).slice(0, 40);
       if (action.bracketLabel != null) state.scoreboard.bracketLabel = String(action.bracketLabel).slice(0, 80);
       if (action.eventLogoUrl != null) state.scoreboard.eventLogoUrl = String(action.eventLogoUrl).slice(0, 500);
+      if (action.eventLogoPlacement != null) {
+        var ok = ['inline','top-left','top-center','top-right','mid-left','mid-center','mid-right','bottom-left','bottom-center','bottom-right'];
+        if (ok.indexOf(action.eventLogoPlacement) >= 0) state.scoreboard.eventLogoPlacement = action.eventLogoPlacement;
+      }
+      if (action.eventLogoSize != null) {
+        var sz = parseInt(action.eventLogoSize, 10) || 150;
+        state.scoreboard.eventLogoSize = Math.max(40, Math.min(600, sz));
+      }
       break;
 
     case 'sb_style': Object.assign(state.scoreboard.style, action.style || {}); break;
