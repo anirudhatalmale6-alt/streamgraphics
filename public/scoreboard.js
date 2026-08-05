@@ -222,6 +222,36 @@
   };
   $('libClear').onclick = function () { if (confirm('Clear the whole team library?')) send({ type: 'lib_clear' }); };
 
+  // download helper + a sample template (so headings are always right) + export current
+  function downloadCSV(name, text) {
+    var blob = new Blob([text], { type: 'text/csv' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  function csvField(v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  $('libSample').onclick = function () {
+    var rows = [
+      'TeamName,Seed,TeamLogo,TeamHex,TextColor,Player1,Player2,Player3,Player4,Player5,Player6',
+      'Oceanfront Recovery,1,ucla.png,#bdbdbd,#474747,Evan Cory,Casey Patterson,,,,',
+      'Citrus Ford,2,usc.png,#f19844,#474747,Taylor Crabb,Taylor Sander,,,,',
+      ',,,,,,,,,,   (Seed and TeamName are OPTIONAL - leave Seed blank for unranked events)'
+    ];
+    downloadCSV('team-library-sample.csv', rows.join('\n'));
+  };
+  $('libExport').onclick = function () {
+    if (!lib.length) { alert('Library is empty - nothing to export.'); return; }
+    var maxP = lib.reduce(function (m, t) { return Math.max(m, (t.players || []).length); }, 0) || 2;
+    var hdr = ['TeamName', 'Seed', 'TeamLogo', 'TeamHex', 'TextColor'];
+    for (var i = 1; i <= maxP; i++) hdr.push('Player' + i);
+    var out = [hdr.join(',')];
+    lib.forEach(function (t) {
+      var row = [t.name, t.seed || '', t.logo, t.rowColor, t.textColor];
+      for (var j = 0; j < maxP; j++) row.push((t.players || [])[j] || '');
+      out.push(row.map(csvField).join(','));
+    });
+    downloadCSV('team-library.csv', out.join('\n'));
+  };
+
   /* ---- reflect server state ---- */
   function reflect(s) {
     sb = s;

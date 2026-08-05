@@ -130,9 +130,12 @@
       <h3>Team Library <span id="libCount" class="mini" style="text-transform:none;letter-spacing:0"></span></h3>
       <p class="mini" style="margin-bottom:10px">Your saved teams (names, colours, logo, roster). Pick one in a team card above to fill that side, then choose the two players. To update the list, export your spreadsheet as CSV and import it here. Columns are flexible: TeamName and a rank column are both OPTIONAL — add a <code>Seed</code> (or Rank) column for ranked events, omit it for unranked (no "(n)" shows). No sponsor column? Just leave TeamName out and it labels by the players.</p>
       <div class="matchbtns">
+        <button class="btn ghost" id="libSample">⬇ Download sample CSV</button>
         <label class="browsebtn">Import CSV<input type="file" accept=".csv,text/csv" id="libImport"></label>
+        <button class="btn ghost" id="libExport">Export current</button>
         <button class="btn ghost" id="libClear">Clear library</button>
       </div>
+      <p class="mini" style="margin-top:8px">Tip: start from the sample so the headings are exact. Import shows a clear message if a heading isn't recognised, and unknown columns are simply ignored.</p>
       <p class="mini" style="margin-top:10px">Logos: your CSV lists filenames like <code>ucla.png</code>. Drop those PNG files into the <code>public/logos</code> folder and they resolve automatically. (Or use a full image URL in the sheet.)</p>
     </section>
 
@@ -186,7 +189,7 @@
       <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy link</button>
       <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:var(--txt)"><input type="checkbox" id="chroma" style="width:18px;height:18px;accent-color:var(--go)"> Green screen (for hardware switchers)</label>
     </div>
-    <span class="hint">Add it as a Web Browser input (OBS: Browser Source), 1920×1080.</span>
+    <span class="hint">OBS: Browser Source · vMix: Web Browser input · any browser viewer · 1920×1080.</span>
   </footer>
 
   <script src="/scoreboard.js"></script>
