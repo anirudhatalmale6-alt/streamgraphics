@@ -57,10 +57,17 @@
     <div class="builder">
       <div class="stagewrap">
         <div class="canvas" id="canvas">
+          <img id="refimg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.5;display:none;pointer-events:none">
           <div class="safe"></div>
           <div class="cstage" id="cstage"></div>
         </div>
-        <p class="mini" style="text-align:center;color:var(--muted2);margin-top:10px">Drag a layer to move it. Click to select. The dashed box is the title-safe area.</p>
+        <p class="mini" style="text-align:center;color:var(--muted2);margin-top:10px">Drag a layer to move it. Click to select, then use the handles to resize/rotate. Delete key removes it. Dashed box is title-safe.</p>
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+          <span class="mini" style="color:var(--muted)">Reference image (design aid — not on air):</span>
+          <label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="image/*" id="refFile" style="display:none"></label>
+          <span class="mini" style="color:var(--muted)">opacity</span><input class="range" id="refOpacity" type="range" min="0" max="100" value="50" style="width:90px">
+          <button class="btn ghost" id="refClear" style="font-size:12px">Clear</button>
+        </div>
       </div>
 
       <div class="side">
@@ -69,6 +76,7 @@
             <button class="btn" id="addText">＋ Text</button>
             <button class="btn" id="addBox">＋ Box</button>
             <button class="btn" id="addImage">＋ Image</button>
+            <button class="btn" id="addBg" title="full-screen background colour">＋ BG</button>
           </div>
         </section>
 
