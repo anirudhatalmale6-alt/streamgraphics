@@ -142,7 +142,7 @@
               <button class="btn ghost" id="pVRestart" style="font-size:12px">⟲ Restart</button>
             </div>
 
-            <div class="row only-ticker"><label>Text</label><input class="inp" id="pTkText" placeholder="scrolling text"></div>
+            <div class="row only-ticker"><label>Text</label><input class="inp" id="pTkText" placeholder="scrolling text"><button class="btn ghost" id="pTkExpand" style="font-size:14px;padding:8px 10px" title="pop out to edit long text">⤢</button></div>
             <div class="row only-ticker"><label>Speed</label><input class="range" id="pTkSpeed" type="range" min="20" max="400" value="120"><span id="pTkSpeedV" class="mono">120</span>
               <select class="inp" id="pTkDir" style="width:auto"><option value="left">◀ Left</option><option value="right">Right ▶</option></select>
             </div>
@@ -185,6 +185,18 @@
       </div>
     </div>
   </main>
+
+  <!-- pop-out editor for long ticker text -->
+  <div id="tkModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(760px,92vw)">
+      <h3 style="margin-bottom:10px">Edit ticker text</h3>
+      <textarea id="tkModalText" style="width:100%;height:240px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:14px;font-size:15px;line-height:1.5;resize:vertical" placeholder="Type or paste your ticker text here — plenty of room to review and edit."></textarea>
+      <p class="mini" style="margin-top:8px;color:var(--muted2)">Updates the scrolling ticker live as you edit. It scrolls as one line, so line breaks become spaces.</p>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button class="btn ghost" id="tkModalClose">Close</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/lowerthird.js"></script>
 </body>

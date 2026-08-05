@@ -152,11 +152,16 @@
   $('pVRestart').onclick = function () { vcmd('restart'); };
   $('pVFile').onchange = function () {
     var f = $('pVFile').files[0]; if (!f) return; var r = new FileReader();
-    r.onload = function () { fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result }) }).then(function (x) { return x.json(); }).then(function (res) { if (res && res.ok) mutate(function (l) { l.src = res.url; $('pVSrc').value = res.url; }); else alert('Upload failed - try a smaller/web-friendly (mp4/webm) file.'); }); };
+    r.onload = function () { fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result }) }).then(function (x) { return x.json(); }).then(function (res) { if (res && res.ok) mutate(function (l) { l.src = res.url; $('pVSrc').value = res.url; }); else alert('Upload failed. Use a web-friendly video (mp4/H.264 or webm) under ~150 MB.'); }).catch(function () { alert('Upload failed.'); }); };
     r.readAsDataURL(f); $('pVFile').value = '';
   };
   // ticker props
   $('pTkText').oninput = function () { mutate(function (l) { l.text = $('pTkText').value; }); };
+  // pop-out editor for long ticker text (live)
+  $('pTkExpand').onclick = function () { $('tkModalText').value = $('pTkText').value; $('tkModal').style.display = 'flex'; $('tkModalText').focus(); };
+  $('tkModalText').oninput = function () { $('pTkText').value = $('tkModalText').value; mutate(function (l) { l.text = $('tkModalText').value; }); };
+  $('tkModalClose').onclick = function () { $('tkModal').style.display = 'none'; };
+  $('tkModal').onclick = function (e) { if (e.target === $('tkModal')) $('tkModal').style.display = 'none'; };
   $('pTkSpeed').oninput = function () { $('pTkSpeedV').textContent = $('pTkSpeed').value; mutate(function (l) { l.speed = +$('pTkSpeed').value; }); };
   $('pTkDir').onchange = function () { mutate(function (l) { l.dir = $('pTkDir').value; }); };
   $('pTkColor').oninput = function () { mutate(function (l) { l.color = $('pTkColor').value; }); };

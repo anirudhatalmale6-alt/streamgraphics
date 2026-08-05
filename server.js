@@ -441,14 +441,15 @@ const server = http.createServer((req, res) => {
   //     (so the operator can "Browse" for a file instead of typing a URL)
   if (pathname === '/upload' && req.method === 'POST') {
     let body = '';
-    req.on('data', c => { body += c; if (body.length > 16e6) req.destroy(); }); // ~16MB cap
+    req.on('data', c => { body += c; if (body.length > 200e6) req.destroy(); }); // ~200MB body (~150MB file)
     req.on('end', () => {
       try {
         const j = JSON.parse(body || '{}');
-        const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/.exec(j.data || '');
+        const m = /^data:((?:image|video)\/[a-zA-Z0-9.+-]+);base64,(.*)$/.exec(j.data || '');
         if (!m) throw new Error('bad data');
-        const extMap = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
-        const ext = extMap[m[1]] || 'png';
+        const extMap = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
+          'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/ogg': 'ogv', 'video/x-matroska': 'mkv' };
+        const ext = extMap[m[1]] || (m[1].indexOf('video') === 0 ? 'mp4' : 'png');
         const fname = 'up_' + Date.now() + '_' + (uploadSeq++) + '.' + ext;
         fs.writeFile(path.join(UPLOAD_DIR, fname), Buffer.from(m[2], 'base64'), (err) => {
           if (err) { res.writeHead(500); res.end('{"ok":false}'); return; }
