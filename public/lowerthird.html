@@ -85,8 +85,11 @@
         <section class="panel" style="padding:14px">
           <h3 style="margin-bottom:8px">Layers</h3>
           <div class="layerlist" id="layerList"></div>
-          <div style="margin-top:10px;display:flex;gap:8px">
-            <button class="btn ghost" id="btnReset" style="font-size:12px">Reset to default</button>
+          <p class="mini" style="margin:8px 0 6px;color:var(--muted2)">Shift-click layers (canvas or list) to select several, then Group.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn ghost" id="btnGroup" style="font-size:12px">⧉ Group</button>
+            <button class="btn ghost" id="btnUngroup" style="font-size:12px">Ungroup</button>
+            <button class="btn ghost" id="btnReset" style="font-size:12px">Reset</button>
           </div>
         </section>
 
@@ -146,9 +149,10 @@
             <div class="row only-ticker"><label>Text</label><input type="color" id="pTkColor" value="#ffffff"><input class="inp t" id="pTkSize" type="number" min="8" max="120" value="28" title="size"><label style="width:auto"><input type="checkbox" id="pTkBold"> B</label></div>
             <div class="row only-ticker"><label>Fill</label><input type="color" id="pTkFill" value="#0b1f3a"><input class="inp s" id="pTkOpacity" type="number" min="0" max="100" value="90" title="opacity %"> %<input class="inp t" id="pTkRadius" type="number" min="0" max="60" value="0" title="radius"></div>
 
-            <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
-            <div class="cap" style="text-align:left;color:var(--muted);font-size:11px;margin-bottom:4px">Position &amp; size (px)</div>
-            <div class="grid4">
+            <div class="multi-only cap" style="text-align:left;color:#8ab4ff;font-size:11px;margin:4px 0">Multiple layers selected — Animate settings below apply to all of them. Use Group to link them.</div>
+            <hr style="border:none;border-top:1px solid var(--line);margin:10px 0" class="single-only">
+            <div class="cap single-only" style="text-align:left;color:var(--muted);font-size:11px;margin-bottom:4px">Position &amp; size (px)</div>
+            <div class="grid4 single-only">
               <input class="inp" id="pX" type="number" title="X"><input class="inp" id="pY" type="number" title="Y">
               <input class="inp" id="pW" type="number" title="Width"><input class="inp" id="pH" type="number" title="Height">
               <div class="cap">X</div><div class="cap">Y</div><div class="cap">W</div><div class="cap">H</div>

@@ -5,7 +5,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var SCALE = 0.375;                 // canvas is 1920x1080 shown at 720x405
-  var layers = [], selId = null, loaded = false, seq = 0;
+  var layers = [], selId = null, selIds = [], loaded = false, seq = 0;
   var cstage = $('cstage');
 
   function uid() { return 'L' + Date.now().toString(36) + (seq++); }
@@ -49,7 +49,7 @@
     var byZ = layers.slice().sort(function (a, b) { return (a.z || 0) - (b.z || 0); });
     cstage.innerHTML = byZ.map(function (l) {
       var t = l.rot ? ';transform:rotate(' + l.rot + 'deg);transform-origin:center' : '';
-      return '<div class="ly' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + '">' + innerHtml(l) + '</div>';
+      return '<div class="ly' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + '">' + innerHtml(l) + '</div>';
     }).join('');
     cstage.querySelectorAll('.ly').forEach(function (el) { el.addEventListener('mousedown', startDrag); });
     renderHandles();
@@ -64,7 +64,7 @@
            + '<button data-mv="up" title="move up">▲</button><button data-mv="down" title="move down">▼</button></div>';
     }).join('') || '<div class="llrow"><span class="mini2">No layers — add one above.</span></div>';
     $('layerList').querySelectorAll('.llrow[data-id]').forEach(function (row) {
-      row.onclick = function (e) { if (e.target.dataset.mv) return; select(row.dataset.id); };
+      row.onclick = function (e) { if (e.target.dataset.mv) return; select(row.dataset.id, e.shiftKey); };
       row.querySelectorAll('[data-mv]').forEach(function (btn) {
         btn.onclick = function (e) { e.stopPropagation(); reorder(row.dataset.id, btn.dataset.mv === 'up' ? -1 : 1); };
       });
@@ -83,19 +83,36 @@
   /* ---- selection + properties ----
      IMPORTANT: selecting must NOT rebuild the canvas (that detaches the element
      you're about to drag). Just toggle the highlight on the existing elements. */
-  function select(id) {
-    selId = id;
-    cstage.querySelectorAll('.ly').forEach(function (el) { el.classList.toggle('sel', el.dataset.id === id); });
+  function groupMembers(gid) { return layers.filter(function (x) { return x.group && x.group === gid; }).map(function (x) { return x.id; }); }
+  function select(id, additive) {
+    var l = byId(id);
+    if (additive) {
+      var i = selIds.indexOf(id);
+      if (i >= 0) selIds.splice(i, 1); else selIds.push(id);
+      selId = selIds[selIds.length - 1] || null;
+    } else {
+      selIds = (l && l.group) ? groupMembers(l.group) : (id ? [id] : []);
+      selId = id || null;
+    }
+    cstage.querySelectorAll('.ly').forEach(function (el) { el.classList.toggle('sel', selIds.indexOf(el.dataset.id) >= 0); });
     renderList(); syncProps(); renderHandles();
   }
   function show(sel, on) { document.querySelectorAll(sel).forEach(function (e) { e.style.display = on ? '' : 'none'; }); }
   function syncProps() {
-    var l = selected();
+    var multi = selIds.length > 1;
+    var l = selId ? byId(selId) : (selIds.length ? byId(selIds[0]) : null);
     if (!l) { $('propTitle').textContent = 'No layer selected'; $('propBody').classList.add('hidden'); return; }
-    $('propTitle').textContent = l.type.charAt(0).toUpperCase() + l.type.slice(1) + ' layer';
     $('propBody').classList.remove('hidden');
-    show('.only-text', l.type === 'text'); show('.only-box', l.type === 'box'); show('.only-image', l.type === 'image');
-    show('.only-video', l.type === 'video'); show('.only-ticker', l.type === 'ticker');
+    show('.multi-only', multi); show('.single-only', !multi);
+    if (multi) {
+      var grouped = selIds.every(function (id) { var m = byId(id); return m && m.group && m.group === l.group; });
+      $('propTitle').textContent = selIds.length + ' layers selected' + (grouped ? ' (grouped)' : '');
+      show('.only-text', false); show('.only-box', false); show('.only-image', false); show('.only-video', false); show('.only-ticker', false);
+    } else {
+      $('propTitle').textContent = l.type.charAt(0).toUpperCase() + l.type.slice(1) + ' layer' + (l.group ? ' (grouped)' : '');
+      show('.only-text', l.type === 'text'); show('.only-box', l.type === 'box'); show('.only-image', l.type === 'image');
+      show('.only-video', l.type === 'video'); show('.only-ticker', l.type === 'ticker');
+    }
     if (l.type === 'text') { $('pText').value = l.text || ''; $('pFont').value = l.font || "'Segoe UI', Arial, sans-serif"; $('pSize').value = l.size || 34; $('pBold').checked = !!l.bold; $('pItalic').checked = !!l.italic; $('pColor').value = l.color || '#ffffff'; $('pAlign').value = l.align || 'left'; }
     if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
     if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; }
@@ -106,6 +123,8 @@
     $('pOutAnim').value = l.outAnim || 'fade'; $('pOutDelay').value = l.outDelay || 0; $('pOutDur').value = l.outDur == null ? 350 : l.outDur;
   }
   function mutate(fn) { var l = selected(); if (!l) return; fn(l); renderCanvas(); renderList(); push(); }
+  // apply to EVERY selected layer (so a group's animation is set together)
+  function mutateSel(fn) { (selIds.length ? selIds : (selId ? [selId] : [])).forEach(function (id) { var l = byId(id); if (l) fn(l); }); renderCanvas(); renderList(); push(); }
 
   // wire property inputs
   $('pText').oninput = function () { mutate(function (l) { l.text = $('pText').value; }); };
@@ -147,15 +166,18 @@
   $('pTkOpacity').oninput = function () { mutate(function (l) { l.opacity = +$('pTkOpacity').value; }); };
   $('pTkRadius').oninput = function () { mutate(function (l) { l.radius = +$('pTkRadius').value; }); };
   ['pX', 'pY', 'pW', 'pH'].forEach(function (id) { $(id).oninput = function () { mutate(function (l) { l[id.slice(1).toLowerCase()] = Math.round(+$(id).value); }); }; });
-  $('pInAnim').onchange = function () { mutate(function (l) { l.inAnim = $('pInAnim').value; }); };
-  $('pInDelay').oninput = function () { mutate(function (l) { l.inDelay = +$('pInDelay').value; }); };
-  $('pInDur').oninput = function () { mutate(function (l) { l.inDur = +$('pInDur').value; }); };
-  $('pOutAnim').onchange = function () { mutate(function (l) { l.outAnim = $('pOutAnim').value; }); };
-  $('pOutDelay').oninput = function () { mutate(function (l) { l.outDelay = +$('pOutDelay').value; }); };
-  $('pOutDur').oninput = function () { mutate(function (l) { l.outDur = +$('pOutDur').value; }); };
+  $('pInAnim').onchange = function () { mutateSel(function (l) { l.inAnim = $('pInAnim').value; }); };
+  $('pInDelay').oninput = function () { mutateSel(function (l) { l.inDelay = +$('pInDelay').value; }); };
+  $('pInDur').oninput = function () { mutateSel(function (l) { l.inDur = +$('pInDur').value; }); };
+  $('pOutAnim').onchange = function () { mutateSel(function (l) { l.outAnim = $('pOutAnim').value; }); };
+  $('pOutDelay').oninput = function () { mutateSel(function (l) { l.outDelay = +$('pOutDelay').value; }); };
+  $('pOutDur').oninput = function () { mutateSel(function (l) { l.outDur = +$('pOutDur').value; }); };
   $('pBack').onclick = function () { mutate(function (l) { l.z = Math.min.apply(null, layers.map(function (x) { return x.z || 0; })) - 1; }); };
   $('pFront').onclick = function () { mutate(function (l) { l.z = Math.max.apply(null, layers.map(function (x) { return x.z || 0; })) + 1; }); };
-  $('pDelete').onclick = function () { layers = layers.filter(function (x) { return x.id !== selId; }); selId = null; renderCanvas(); renderList(); syncProps(); push(); };
+  function deleteSelected() { var ids = selIds.length ? selIds.slice() : (selId ? [selId] : []); layers = layers.filter(function (x) { return ids.indexOf(x.id) < 0; }); selId = null; selIds = []; renderCanvas(); renderList(); syncProps(); push(); }
+  $('pDelete').onclick = deleteSelected;
+  $('btnGroup').onclick = function () { if (selIds.length < 2) { alert('Shift-click two or more layers first, then Group.'); return; } var gid = uid(); selIds.forEach(function (id) { var l = byId(id); if (l) l.group = gid; }); renderList(); syncProps(); push(); };
+  $('btnUngroup').onclick = function () { (selIds.length ? selIds : (selId ? [selId] : [])).forEach(function (id) { var l = byId(id); if (l) delete l.group; }); renderList(); syncProps(); push(); };
 
   $('pFile').onchange = function () {
     var f = $('pFile').files[0]; if (!f) return; var r = new FileReader();
@@ -168,7 +190,7 @@
 
   /* ---- add layers ---- */
   function topZ() { return layers.length ? Math.max.apply(null, layers.map(function (l) { return l.z || 0; })) + 1 : 1; }
-  function add(l) { l.id = uid(); l.z = topZ(); layers.push(l); selId = l.id; renderCanvas(); renderList(); syncProps(); push(); }
+  function add(l) { l.id = uid(); l.z = topZ(); layers.push(l); selId = l.id; selIds = [l.id]; renderCanvas(); renderList(); syncProps(); push(); }
   var A = function (inA) { return { inAnim: inA, inDelay: 0, inDur: 500, outAnim: 'fade', outDelay: 0, outDur: 300 }; };
   function merge(a, b) { for (var k in b) a[k] = b[k]; return a; }
   $('addText').onclick = function () { add(merge({ type: 'text', x: 200, y: 500, w: 560, h: 60, text: 'New text', font: 'Arial, Helvetica, sans-serif', size: 40, bold: true, italic: false, color: '#ffffff', align: 'left' }, A('fade'))); };
@@ -203,16 +225,24 @@
   /* ---- drag on canvas ---- */
   var drag = null;
   function startDrag(e) {
-    var id = e.currentTarget.dataset.id; select(id); var l = byId(id); if (!l) return;
-    drag = { id: id, sx: e.clientX, sy: e.clientY, ox: l.x, oy: l.y, el: e.currentTarget };
+    var id = e.currentTarget.dataset.id;
+    if (e.shiftKey) { select(id, true); e.preventDefault(); return; }   // shift-click toggles selection, no drag
+    if (selIds.indexOf(id) < 0) select(id, false);                       // selects the layer (or its whole group)
+    var ids = selIds.slice(), orig = {};
+    ids.forEach(function (lid) { var l = byId(lid); if (l) orig[lid] = { x: l.x, y: l.y }; });
+    drag = { ids: ids, orig: orig, sx: e.clientX, sy: e.clientY };
     e.preventDefault();
   }
   document.addEventListener('mousemove', function (e) {
-    if (!drag) return; var l = byId(drag.id); if (!l) return;
-    l.x = Math.round(drag.ox + (e.clientX - drag.sx) / SCALE);
-    l.y = Math.round(drag.oy + (e.clientY - drag.sy) / SCALE);
-    drag.el.style.left = l.x + 'px'; drag.el.style.top = l.y + 'px';
-    if (selId === l.id) { $('pX').value = l.x; $('pY').value = l.y; }
+    if (!drag) return;
+    var dx = (e.clientX - drag.sx) / SCALE, dy = (e.clientY - drag.sy) / SCALE;
+    drag.ids.forEach(function (lid) {
+      var l = byId(lid); if (!l || !drag.orig[lid]) return;
+      l.x = Math.round(drag.orig[lid].x + dx); l.y = Math.round(drag.orig[lid].y + dy);
+      var el = cstage.querySelector('.ly[data-id="' + lid + '"]');
+      if (el) { el.style.left = l.x + 'px'; el.style.top = l.y + 'px'; }
+    });
+    if (selId) { var pl = byId(selId); if (pl) { $('pX').value = pl.x; $('pY').value = pl.y; } }
     renderHandles();
   });
   document.addEventListener('mouseup', function () { if (drag) { drag = null; push(); } });
@@ -228,6 +258,18 @@
 
   function renderHandles() {
     handles.innerHTML = '';
+    // multi-select / group: just draw a dashed bounding box around all (drag to move together)
+    if (selIds.length > 1) {
+      var xs = [], ys = [], xe = [], ye = [];
+      selIds.forEach(function (id) { var m = byId(id); if (!m) return; xs.push(m.x); ys.push(m.y); xe.push(m.x + m.w); ye.push(m.y + m.h); });
+      if (!xs.length) return;
+      var bx = Math.min.apply(null, xs) * SCALE, by = Math.min.apply(null, ys) * SCALE;
+      var bw = (Math.max.apply(null, xe) - Math.min.apply(null, xs)) * SCALE, bh = (Math.max.apply(null, ye) - Math.min.apply(null, ys)) * SCALE;
+      var d = document.createElement('div');
+      d.style.cssText = 'position:absolute;left:' + bx + 'px;top:' + by + 'px;width:' + bw + 'px;height:' + bh + 'px;border:2px dashed #3b82f6;border-radius:3px;pointer-events:none;box-shadow:0 0 0 9999px rgba(59,130,246,.04) inset';
+      handles.appendChild(d);
+      return;
+    }
     var l = selected(); if (!l) return;
     var rad = (l.rot || 0) * Math.PI / 180;
     var Cx = l.x + l.w / 2, Cy = l.y + l.h / 2;
@@ -307,12 +349,10 @@
 
   // Delete key removes the selected layer (when not typing in a field)
   document.addEventListener('keydown', function (e) {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selId) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && (selIds.length || selId)) {
       var t = document.activeElement && document.activeElement.tagName;
       if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
-      e.preventDefault();
-      layers = layers.filter(function (x) { return x.id !== selId; }); selId = null;
-      renderCanvas(); renderList(); syncProps(); push();
+      e.preventDefault(); deleteSelected();
     }
   });
 
