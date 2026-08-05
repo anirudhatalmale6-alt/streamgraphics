@@ -81,7 +81,26 @@ function defaultState() {
         animation: 'slide-up',
         accent: '#1e64d2',       // active-cell highlight
         bracketColor: '#7a1420', // the round-label strip
-        backdropUrl: ''          // optional Photoshop backdrop image (replaces the coded frame)
+        backdropUrl: '',         // optional Photoshop backdrop image (replaces the coded frame)
+        chroma: ''               // '' = transparent (OBS/vMix key) | 'green'|'magenta'|'blue'|#hex for a hardware switcher
+      }
+    },
+
+    // The lower-third graphic: a name/title bar (with optional logo). Its own
+    // graphic on the same engine, so it inherits positioning, animation, chroma.
+    lowerthird: {
+      visible: false,
+      line1: 'Jordan Mitchell',
+      line2: 'Head Coach · Sea Hawks',
+      logoUrl: '',
+      style: {
+        position: 'bottom-left',
+        animation: 'slide-up',
+        accent: '#e7b53c',       // the side bar / line-2 colour
+        bg: '#0b1f3af2',         // slab background (with alpha)
+        text: '#ffffff',
+        size: 34,                // line-1 size in px
+        chroma: ''
       }
     }
   };
@@ -307,6 +326,16 @@ function applyAction(action) {
     }
     case 'lib_clear': state.library.teams = []; saveLibrary(); break;
 
+    /* -------- lower third -------- */
+    case 'lt_show': state.lowerthird.visible = true;  break;
+    case 'lt_hide': state.lowerthird.visible = false; break;
+    case 'lt_set':
+      ['line1', 'line2', 'logoUrl'].forEach(function (k) {
+        if (action[k] != null) state.lowerthird[k] = String(action[k]).slice(0, 300);
+      });
+      break;
+    case 'lt_style': Object.assign(state.lowerthird.style, action.style || {}); break;
+
     default:
       return false;
   }
@@ -407,6 +436,8 @@ const server = http.createServer((req, res) => {
           : pathname === '/control' ? '/control.html'
           : pathname === '/scoreboard' ? '/scoreboard.html'
           : pathname === '/scoreboard-output' ? '/scoreboard-output.html'
+          : pathname === '/lowerthird' ? '/lowerthird.html'
+          : pathname === '/lowerthird-output' ? '/lowerthird-output.html'
           : pathname;
   // prevent path traversal
   const file = path.join(PUBLIC_DIR, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));

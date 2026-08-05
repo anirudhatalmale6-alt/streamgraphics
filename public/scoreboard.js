@@ -256,6 +256,7 @@
       if (editing !== 'stBracket') $('stBracket').value = s.style.bracketColor || '#7a1420';
       if (editing !== 'stAnim') $('stAnim').value = s.style.animation || 'slide-up';
       if (editing !== 'stBackdrop') $('stBackdrop').value = s.style.backdropUrl || '';
+      if ($('chroma')) $('chroma').checked = !!s.style.chroma;
       if (s.style.position) document.querySelectorAll('#posGrid button').forEach(function (b) {
         b.classList.toggle('on', b.dataset.pos === s.style.position);
       });
@@ -285,4 +286,13 @@
   }
   connect();
   $('outUrl').textContent = location.protocol + '//' + location.host + '/scoreboard-output';
+
+  // green-screen toggle + copy link
+  $('chroma').onchange = function () { send({ type: 'sb_style', style: { chroma: $('chroma').checked ? 'green' : '' } }); };
+  $('copyBtn').onclick = function () {
+    var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent;
+    var ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok, ok);
+    else { var t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); ok(); } catch (e) {} t.remove(); }
+  };
 })();

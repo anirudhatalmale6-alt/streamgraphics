@@ -180,8 +180,13 @@
   </main>
 
   <footer class="foot">
-    Output URL for OBS/vMix: <code id="outUrl">…/scoreboard-output</code>
-    <span class="hint">— Browser Source, 1920×1080. Add <code>?bg=green</code> for a chroma key on a hardware switcher.</span>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span>Output for OBS / vMix / browser:</span>
+      <code id="outUrl">…/scoreboard-output</code>
+      <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy link</button>
+      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:var(--txt)"><input type="checkbox" id="chroma" style="width:18px;height:18px;accent-color:var(--go)"> Green screen (for hardware switchers)</label>
+    </div>
+    <span class="hint">Add it as a Web Browser input (OBS: Browser Source), 1920×1080.</span>
   </footer>
 
   <script src="/scoreboard.js"></script>

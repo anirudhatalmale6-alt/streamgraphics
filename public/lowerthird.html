@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics — Lower Third Control</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .outbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:16px}
+  .outbar code{background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:13px}
+  .copybtn{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer}
+  .toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-weight:600;color:var(--txt)}
+  .toggle input{width:18px;height:18px;accent-color:var(--go)}
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="dot"></span> StreamGraphics <small>Lower Third</small></div>
+    <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
+  </header>
+
+  <main>
+    <div class="outbar">
+      <span class="mini" style="color:var(--muted)">Output for OBS / vMix / browser:</span>
+      <code id="outUrl">…/lowerthird-output</code>
+      <button class="copybtn" id="copyBtn">Copy link</button>
+      <label class="toggle"><input type="checkbox" id="chroma"> Green screen (for hardware switchers)</label>
+    </div>
+
+    <section class="panel hero">
+      <div class="preview">
+        <div class="pv-label" id="pvL2"></div>
+        <div class="pv-time" id="pvL1" style="font-size:34px">Lower third</div>
+      </div>
+      <div class="onair">
+        <button class="btn big show" id="btnShow">Take to air ▸</button>
+        <button class="btn big hide" id="btnHide">◂ Off air</button>
+        <div class="airstate" id="airState">OFF AIR</div>
+      </div>
+    </section>
+
+    <div class="cols">
+      <section class="panel">
+        <h3>Content</h3>
+        <div class="row"><label>Line 1</label><input class="inp" id="line1" placeholder="Name"></div>
+        <div class="row"><label>Line 2</label><input class="inp" id="line2" placeholder="Title / subtitle"></div>
+        <div class="row"><label>Logo</label><input class="inp" id="logoUrl" placeholder="paste a URL, or Browse ▸"><label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap">Browse<input type="file" accept="image/*" id="logoFile" style="display:none"></label></div>
+      </section>
+
+      <section class="panel">
+        <h3>Look</h3>
+        <div class="row"><label>Text</label><input type="color" id="stText" value="#ffffff"></div>
+        <div class="row"><label>Accent</label><input type="color" id="stAccent" value="#e7b53c"></div>
+        <div class="row"><label>Background</label><input type="color" id="stBg" value="#0b1f3a"><input class="inp s" id="stBgA" type="number" min="0" max="100" value="95" title="opacity %"> %</div>
+        <div class="row"><label>Size</label><input class="range" id="stSize" type="range" min="20" max="72" value="34"><span id="stSizeV" class="mono">34</span></div>
+        <div class="row"><label>Position</label>
+          <div class="posgrid" id="posGrid">
+            <button data-pos="top-left"></button><button data-pos="top-center"></button><button data-pos="top-right"></button>
+            <button data-pos="mid-left"></button><button data-pos="mid-center"></button><button data-pos="mid-right"></button>
+            <button data-pos="bottom-left" class="on"></button><button data-pos="bottom-center"></button><button data-pos="bottom-right"></button>
+          </div>
+        </div>
+        <div class="row"><label>Animation</label>
+          <select class="inp" id="stAnim">
+            <option value="slide-up">Slide up</option>
+            <option value="slide-left">Slide from left</option>
+            <option value="fade">Fade</option>
+            <option value="scale">Scale</option>
+          </select>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/lowerthird.js"></script>
+</body>
+</html>

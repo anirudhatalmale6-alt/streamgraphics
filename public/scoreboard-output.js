@@ -12,15 +12,15 @@
   var visibleNow = false, hideTimer = null;
   var prevScores = {};   // "team-game" -> last value, to detect changes for the flash
 
-  // Optional chroma key via URL: /scoreboard-output?bg=green  (or magenta/blue/#00ff00)
-  (function () {
-    var m = new URLSearchParams(location.search).get('bg');
-    if (m) {
-      var map = { green: '#00b140', magenta: '#ff00ff', blue: '#0000ff' };
-      document.documentElement.style.setProperty('--chroma', map[m] || m);
-      document.body.classList.add('chroma');
-    }
-  })();
+  // Chroma key: either the panel toggle (state.scoreboard.style.chroma) or a URL
+  // override (/scoreboard-output?bg=green). URL wins if present.
+  var CMAP = { green: '#00b140', magenta: '#ff00ff', blue: '#0000ff' };
+  var urlChroma = (function () { var m = new URLSearchParams(location.search).get('bg'); return m ? (CMAP[m] || m) : null; })();
+  function applyChroma(styleChroma) {
+    var c = urlChroma || (styleChroma ? (CMAP[styleChroma] || styleChroma) : '');
+    if (c) { document.documentElement.style.setProperty('--chroma', c); document.body.classList.add('chroma'); }
+    else document.body.classList.remove('chroma');
+  }
 
   function fmt(v) { return v == null ? '--' : String(v); }
 
@@ -137,6 +137,7 @@
         card.classList.add('pos-' + sb.style.position);
       }
       if (sb.style.animation) card.setAttribute('data-anim', sb.style.animation);
+      applyChroma(sb.style.chroma);
     }
     setVisible(!!sb.visible);
   }

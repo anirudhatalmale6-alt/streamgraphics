@@ -6,8 +6,20 @@ your network) and an OUTPUT page (add to OBS/vMix as a Browser Source, 1920×108
 
 Run it with `node server.js` (Node 16+, no install step), then open:
 - Home:               http://localhost:4000/
-- Timer control:      http://localhost:4000/control       · output: /output
+- Timer control:      http://localhost:4000/control        · output: /output
 - Scoreboard control: http://localhost:4000/scoreboard     · output: /scoreboard-output
+- Lower-third control: http://localhost:4000/lowerthird    · output: /lowerthird-output
+
+Every output page works the same in **OBS** (Browser Source) or **vMix** (Web Browser
+input) or any browser, at 1920×1080. Each control panel has a **Copy link** button for
+the output URL and a **Green screen** toggle (renders on solid green for a hardware
+switcher that can't key transparency — leave it off for OBS/vMix, which key the
+transparent background directly).
+
+## Lower Third
+A name/title bar with an optional logo. Line 1 (name), Line 2 (title/subtitle),
+colours (text / accent / background + opacity), size, 9 positions, in/out animation,
+and Browse-for-a-local-logo. Take it on/off air with one button.
 
 ## Troubleshooting
 **"EADDRINUSE / port 4000 already in use"** — an earlier copy of StreamGraphics is
