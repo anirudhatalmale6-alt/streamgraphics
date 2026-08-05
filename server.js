@@ -23,6 +23,9 @@ const path = require('path');
 
 const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const UPLOAD_DIR = path.join(PUBLIC_DIR, 'uploads');
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
+let uploadSeq = 0;
 
 /* ------------------------------------------------------------------ *
  *  State
@@ -317,6 +320,32 @@ const server = http.createServer((req, res) => {
       if (ok) broadcast();
       res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ ok }));
+    });
+    return;
+  }
+
+  // --- upload a local image, get back a short URL to use as a logo/backdrop ---
+  //     (so the operator can "Browse" for a file instead of typing a URL)
+  if (pathname === '/upload' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 16e6) req.destroy(); }); // ~16MB cap
+    req.on('end', () => {
+      try {
+        const j = JSON.parse(body || '{}');
+        const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/.exec(j.data || '');
+        if (!m) throw new Error('bad data');
+        const extMap = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
+        const ext = extMap[m[1]] || 'png';
+        const fname = 'up_' + Date.now() + '_' + (uploadSeq++) + '.' + ext;
+        fs.writeFile(path.join(UPLOAD_DIR, fname), Buffer.from(m[2], 'base64'), (err) => {
+          if (err) { res.writeHead(500); res.end('{"ok":false}'); return; }
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ ok: true, url: '/uploads/' + fname }));
+        });
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end('{"ok":false}');
+      }
     });
     return;
   }

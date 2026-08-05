@@ -104,6 +104,36 @@
     };
   });
 
+  /* ---- Browse for a local image: upload it, then use the returned URL ---- */
+  function uploadFile(file, done) {
+    var r = new FileReader();
+    r.onload = function () {
+      fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, data: r.result }) })
+        .then(function (x) { return x.json(); })
+        .then(function (res) { if (res && res.ok && res.url) done(res.url); else alert('Upload failed - try a PNG/JPG under ~15MB.'); })
+        .catch(function () { alert('Upload failed.'); });
+    };
+    r.readAsDataURL(file);
+  }
+  document.querySelectorAll('[data-browse-team]').forEach(function (inp) {
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; var ti = +inp.dataset.browseTeam;
+      uploadFile(f, function (url) { send({ type: 'sb_team', team: ti, logoUrl: url }); }); inp.value = '';
+    };
+  });
+  document.querySelectorAll('[data-browse-meta]').forEach(function (inp) {
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; var key = inp.dataset.browseMeta;
+      uploadFile(f, function (url) { var a = { type: 'sb_meta' }; a[key] = url; send(a); }); inp.value = '';
+    };
+  });
+  document.querySelectorAll('[data-browse-style]').forEach(function (inp) {
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; var key = inp.dataset.browseStyle;
+      uploadFile(f, function (url) { var st = {}; st[key] = url; send({ type: 'sb_style', style: st }); }); inp.value = '';
+    };
+  });
+
   /* ---- reflect server state ---- */
   function reflect(s) {
     sb = s;
