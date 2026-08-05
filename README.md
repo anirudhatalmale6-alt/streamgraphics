@@ -9,6 +9,13 @@ Run it with `node server.js` (Node 16+, no install step), then open:
 - Timer control:      http://localhost:4000/control       · output: /output
 - Scoreboard control: http://localhost:4000/scoreboard     · output: /scoreboard-output
 
+## Troubleshooting
+**"EADDRINUSE / port 4000 already in use"** — an earlier copy of StreamGraphics is
+still running in another window. Either use that window, or close it (click it and
+press Ctrl+C), or start this copy on a different port:
+`$env:PORT=4001; node server.js` (PowerShell) / `PORT=4001 node server.js` (Mac/Linux).
+Remember to use the same port in your browser and OBS URLs.
+
 ## Scoreboard (Milestone 2)
 A two-team match board, shipped configured for the beach-volley Center Court look
 but reusable for any two-side match:

@@ -341,6 +341,22 @@ const server = http.createServer((req, res) => {
   serveFile(res, file);
 });
 
+// Friendly message instead of a scary stack trace if the port is already taken
+// (usually another copy of StreamGraphics is still running in another window).
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error('\n  ⚠  Port ' + PORT + ' is already in use.');
+    console.error('     StreamGraphics is probably already running in another window.');
+    console.error('     • Just use that one (open http://localhost:' + PORT + '/ ), OR');
+    console.error('     • close the other window (click it, press Ctrl+C), then run this again, OR');
+    console.error('     • start this copy on a different port:');
+    console.error('         PowerShell:   $env:PORT=4001; node server.js');
+    console.error('         Mac/Linux:    PORT=4001 node server.js\n');
+    process.exit(1);
+  }
+  throw err;
+});
+
 server.listen(PORT, () => {
   const nets = require('os').networkInterfaces();
   let lan = 'localhost';
