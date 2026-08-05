@@ -3,5 +3,6 @@ node_modules/
 .DS_Store
 public/uploads/
 data/library.json
+data/lowerthird.json
 public/logos/*
 !public/logos/README.txt

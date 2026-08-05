@@ -86,24 +86,26 @@ function defaultState() {
       }
     },
 
-    // The lower-third graphic: a name/title bar (with optional logo). Its own
-    // graphic on the same engine, so it inherits positioning, animation, chroma.
+    // The lower-third BUILDER: a free-form canvas (1920x1080) of independent
+    // layers (text / box / image). Each layer is positioned + sized by pixel,
+    // stacked by z, styled, and animated on its own (with a delay for staggering).
+    // This is the WYSIWYG, no-template flexibility — nothing is hard-coded.
     lowerthird: {
       visible: false,
-      line1: 'Jordan Mitchell',
-      line2: 'Head Coach · Sea Hawks',
-      logoUrl: '',
-      style: {
-        position: 'bottom-left',
-        animation: 'slide-up',
-        accent: '#e7b53c',       // the side bar / line-2 colour
-        bg: '#0b1f3af2',         // slab background (with alpha)
-        text: '#ffffff',
-        size: 34,                // line-1 size in px
-        chroma: ''
-      }
+      chroma: '',
+      w: 1920, h: 1080,
+      layers: defaultLowerThirdLayers()
     }
   };
+}
+
+function defaultLowerThirdLayers() {
+  return [
+    { id: 'bg',     type: 'box',   x: 150, y: 915, w: 600, h: 96, z: 1, fill: '#0b1f3a', opacity: 95, radius: 12, animIn: 'slide-up',   delay: 0 },
+    { id: 'accent', type: 'box',   x: 150, y: 915, w: 8,   h: 96, z: 2, fill: '#e7b53c', opacity: 100, radius: 12, animIn: 'slide-up', delay: 80 },
+    { id: 'name',   type: 'text',  x: 182, y: 928, w: 560, h: 42, z: 3, text: 'Jordan Mitchell', font: "'Segoe UI', Arial, sans-serif", size: 34, bold: true,  italic: false, color: '#ffffff', align: 'left', animIn: 'slide-left', delay: 140 },
+    { id: 'title',  type: 'text',  x: 182, y: 972, w: 560, h: 28, z: 3, text: 'HEAD COACH · SEA HAWKS', font: "'Segoe UI', Arial, sans-serif", size: 17, bold: false, italic: false, color: '#e7b53c', align: 'left', animIn: 'slide-left', delay: 200 }
+  ];
 }
 
 let state = defaultState();
@@ -134,6 +136,20 @@ function saveLibrary() {
   try { fs.writeFileSync(LIB_FILE, JSON.stringify({ teams: state.library.teams }, null, 2)); } catch (e) {}
 }
 state.library = { teams: loadLibrary() };
+
+// Persist the lower-third design so a saved layout survives a restart.
+const LT_FILE = path.join(DATA_DIR, 'lowerthird.json');
+(function () {
+  try {
+    if (fs.existsSync(LT_FILE)) {
+      const j = JSON.parse(fs.readFileSync(LT_FILE, 'utf8'));
+      if (j && Array.isArray(j.layers)) state.lowerthird.layers = j.layers;
+    }
+  } catch (e) {}
+})();
+function saveLowerThird() {
+  try { fs.writeFileSync(LT_FILE, JSON.stringify({ layers: state.lowerthird.layers }, null, 2)); } catch (e) {}
+}
 
 /* ------------------------------------------------------------------ *
  *  SSE client registry
@@ -327,15 +343,20 @@ function applyAction(action) {
     }
     case 'lib_clear': state.library.teams = []; saveLibrary(); break;
 
-    /* -------- lower third -------- */
+    /* -------- lower third builder -------- */
     case 'lt_show': state.lowerthird.visible = true;  break;
     case 'lt_hide': state.lowerthird.visible = false; break;
-    case 'lt_set':
-      ['line1', 'line2', 'logoUrl'].forEach(function (k) {
-        if (action[k] != null) state.lowerthird[k] = String(action[k]).slice(0, 300);
-      });
+    case 'lt_chroma': state.lowerthird.chroma = String(action.value || ''); break;
+    case 'lt_layers': // control panel sends the full layer array on any edit
+      if (Array.isArray(action.layers)) {
+        state.lowerthird.layers = action.layers.slice(0, 100);
+        saveLowerThird();
+      }
       break;
-    case 'lt_style': Object.assign(state.lowerthird.style, action.style || {}); break;
+    case 'lt_reset':
+      state.lowerthird.layers = defaultLowerThirdLayers();
+      saveLowerThird();
+      break;
 
     default:
       return false;

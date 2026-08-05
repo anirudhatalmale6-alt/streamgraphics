@@ -1,93 +1,151 @@
-/* StreamGraphics — Lower Third control panel. */
+/* StreamGraphics — Lower Third BUILDER control.
+ * A WYSIWYG canvas of layers (text / box / image). Drag to move, edit properties,
+ * animate each layer. The full layer array is pushed to the server on every change. */
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var editing = null;
-  function send(a) { return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {}); }
+  var SCALE = 0.375;                 // canvas is 1920x1080 shown at 720x405
+  var layers = [], selId = null, loaded = false, seq = 0;
+  var cstage = $('cstage');
 
-  function bgHex() {
-    var a = Math.round(Math.max(0, Math.min(100, +$('stBgA').value)) * 255 / 100).toString(16);
-    if (a.length < 2) a = '0' + a;
-    return $('stBg').value + a;
+  function uid() { return 'L' + Date.now().toString(36) + (seq++); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function rgba(hex, pct) {
+    hex = String(hex || '#000').replace(/^#/, ''); if (hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
+    var r = parseInt(hex.slice(0, 2), 16) || 0, g = parseInt(hex.slice(2, 4), 16) || 0, b = parseInt(hex.slice(4, 6), 16) || 0;
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + (pct == null ? 1 : pct / 100) + ')';
   }
-  function pushStyle() {
-    send({ type: 'lt_style', style: {
-      text: $('stText').value, accent: $('stAccent').value, bg: bgHex(),
-      size: +$('stSize').value, animation: $('stAnim').value
-    }});
+  function byId(id) { for (var i = 0; i < layers.length; i++) if (layers[i].id === id) return layers[i]; return null; }
+  function selected() { return byId(selId); }
+
+  function push() {
+    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: layers }) }).catch(function () {});
   }
 
-  // content fields
-  [['line1', 'line1'], ['line2', 'line2'], ['logoUrl', 'logoUrl']].forEach(function (p) {
-    var el = $(p[0]);
-    el.addEventListener('focus', function () { editing = p[0]; });
-    el.addEventListener('blur', function () { editing = null; });
-    el.addEventListener('input', function () { var a = { type: 'lt_set' }; a[p[1]] = el.value; send(a); });
-  });
+  /* ---- render the canvas ---- */
+  function innerHtml(l) {
+    if (l.type === 'box') return '<div class="li ly-box" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>';
+    if (l.type === 'text') {
+      var st = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 24) + 'px;color:' + esc(l.color || '#fff')
+        + ';font-weight:' + (l.bold ? '800' : '400') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'left')
+        + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start'));
+      return '<div class="li ly-text" style="' + st + '">' + esc(l.text || '') + '</div>';
+    }
+    if (l.type === 'image') return '<img class="li ly-img ' + (l.fit === 'cover' ? 'cover ' : '') + (l.shape || 'none') + '" src="' + esc(l.src || '') + '" style="width:100%;height:100%">';
+    return '';
+  }
+  function renderCanvas() {
+    var byZ = layers.slice().sort(function (a, b) { return (a.z || 0) - (b.z || 0); });
+    cstage.innerHTML = byZ.map(function (l) {
+      return '<div class="ly' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + '">' + innerHtml(l) + '</div>';
+    }).join('');
+    cstage.querySelectorAll('.ly').forEach(function (el) { el.addEventListener('mousedown', startDrag); });
+  }
+  function renderList() {
+    var byZ = layers.slice().sort(function (a, b) { return (b.z || 0) - (a.z || 0); }); // top layer first
+    $('layerList').innerHTML = byZ.map(function (l) {
+      var name = l.type === 'text' ? (l.text || 'Text') : (l.type === 'box' ? 'Box' : 'Image');
+      return '<div class="llrow' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '"><span class="t">' + esc(name) + '</span><span class="mini2">' + l.type + '</span></div>';
+    }).join('') || '<div class="llrow"><span class="mini2">No layers — add one above.</span></div>';
+    $('layerList').querySelectorAll('.llrow[data-id]').forEach(function (row) { row.onclick = function () { select(row.dataset.id); }; });
+  }
 
-  // look controls
-  ['stText', 'stAccent', 'stBg', 'stBgA', 'stAnim'].forEach(function (id) {
-    $(id).addEventListener('focus', function () { editing = id; });
-    $(id).addEventListener('blur', function () { editing = null; });
-    $(id).oninput = pushStyle;
-  });
-  $('stSize').oninput = function () { $('stSizeV').textContent = $('stSize').value; pushStyle(); };
-  document.querySelectorAll('#posGrid button').forEach(function (b) {
-    b.onclick = function () {
-      document.querySelectorAll('#posGrid button').forEach(function (x) { x.classList.remove('on'); });
-      b.classList.add('on'); send({ type: 'lt_style', style: { position: b.dataset.pos } });
-    };
-  });
+  /* ---- selection + properties ---- */
+  function select(id) { selId = id; renderCanvas(); renderList(); syncProps(); }
+  function show(sel, on) { document.querySelectorAll(sel).forEach(function (e) { e.style.display = on ? '' : 'none'; }); }
+  function syncProps() {
+    var l = selected();
+    if (!l) { $('propTitle').textContent = 'No layer selected'; $('propBody').classList.add('hidden'); return; }
+    $('propTitle').textContent = l.type.charAt(0).toUpperCase() + l.type.slice(1) + ' layer';
+    $('propBody').classList.remove('hidden');
+    show('.only-text', l.type === 'text'); show('.only-box', l.type === 'box'); show('.only-image', l.type === 'image');
+    if (l.type === 'text') { $('pText').value = l.text || ''; $('pFont').value = l.font || "'Segoe UI', Arial, sans-serif"; $('pSize').value = l.size || 34; $('pBold').checked = !!l.bold; $('pItalic').checked = !!l.italic; $('pColor').value = l.color || '#ffffff'; $('pAlign').value = l.align || 'left'; }
+    if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
+    if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; }
+    $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h;
+    $('pAnim').value = l.animIn || 'fade'; $('pDelay').value = l.delay || 0;
+  }
+  function mutate(fn) { var l = selected(); if (!l) return; fn(l); renderCanvas(); renderList(); push(); }
 
-  // on air
-  $('btnShow').onclick = function () { send({ type: 'lt_show' }); };
-  $('btnHide').onclick = function () { send({ type: 'lt_hide' }); };
+  // wire property inputs
+  $('pText').oninput = function () { mutate(function (l) { l.text = $('pText').value; }); };
+  $('pFont').onchange = function () { mutate(function (l) { l.font = $('pFont').value; }); };
+  $('pSize').oninput = function () { mutate(function (l) { l.size = +$('pSize').value; }); };
+  $('pBold').onchange = function () { mutate(function (l) { l.bold = $('pBold').checked; }); };
+  $('pItalic').onchange = function () { mutate(function (l) { l.italic = $('pItalic').checked; }); };
+  $('pColor').oninput = function () { mutate(function (l) { l.color = $('pColor').value; }); };
+  $('pAlign').onchange = function () { mutate(function (l) { l.align = $('pAlign').value; }); };
+  $('pFill').oninput = function () { mutate(function (l) { l.fill = $('pFill').value; }); };
+  $('pOpacity').oninput = function () { mutate(function (l) { l.opacity = +$('pOpacity').value; }); };
+  $('pRadius').oninput = function () { $('pRadiusV').textContent = $('pRadius').value; mutate(function (l) { l.radius = +$('pRadius').value; }); };
+  $('pSrc').oninput = function () { mutate(function (l) { l.src = $('pSrc').value; }); };
+  $('pShape').onchange = function () { mutate(function (l) { l.shape = $('pShape').value; }); };
+  $('pFit').onchange = function () { mutate(function (l) { l.fit = $('pFit').value; }); };
+  ['pX', 'pY', 'pW', 'pH'].forEach(function (id) { $(id).oninput = function () { mutate(function (l) { l[id.slice(1).toLowerCase()] = Math.round(+$(id).value); }); }; });
+  $('pAnim').onchange = function () { mutate(function (l) { l.animIn = $('pAnim').value; }); };
+  $('pDelay').oninput = function () { mutate(function (l) { l.delay = +$('pDelay').value; }); };
+  $('pBack').onclick = function () { mutate(function (l) { l.z = Math.min.apply(null, layers.map(function (x) { return x.z || 0; })) - 1; }); };
+  $('pFront').onclick = function () { mutate(function (l) { l.z = Math.max.apply(null, layers.map(function (x) { return x.z || 0; })) + 1; }); };
+  $('pDelete').onclick = function () { layers = layers.filter(function (x) { return x.id !== selId; }); selId = null; renderCanvas(); renderList(); syncProps(); push(); };
 
-  // green-screen toggle + copy link
-  $('chroma').onchange = function () { send({ type: 'lt_style', style: { chroma: $('chroma').checked ? 'green' : '' } }); };
-  $('copyBtn').onclick = function () {
-    var url = $('outUrl').textContent;
-    if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { flash('Copied!'); }, function () { flash('Copy failed'); });
-    else { var t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); flash('Copied!'); } catch (e) {} t.remove(); }
-  };
-  function flash(msg) { var b = $('copyBtn'), old = b.textContent; b.textContent = msg; setTimeout(function () { b.textContent = old; }, 1200); }
-
-  // Browse a local logo
-  $('logoFile').onchange = function () {
-    var f = $('logoFile').files[0]; if (!f) return;
-    var r = new FileReader();
+  $('pFile').onchange = function () {
+    var f = $('pFile').files[0]; if (!f) return; var r = new FileReader();
     r.onload = function () {
       fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result }) })
-        .then(function (x) { return x.json(); }).then(function (res) { if (res && res.ok) send({ type: 'lt_set', logoUrl: res.url }); else alert('Upload failed.'); })
-        .catch(function () { alert('Upload failed.'); });
+        .then(function (x) { return x.json(); }).then(function (res) { if (res && res.ok) mutate(function (l) { l.src = res.url; $('pSrc').value = res.url; }); else alert('Upload failed.'); });
     };
-    r.readAsDataURL(f); $('logoFile').value = '';
+    r.readAsDataURL(f); $('pFile').value = '';
   };
 
-  function reflect(lt) {
-    $('airState').textContent = lt.visible ? 'ON AIR' : 'OFF AIR';
-    $('airState').classList.toggle('live', !!lt.visible);
-    if (editing !== 'line1') $('line1').value = lt.line1 || '';
-    if (editing !== 'line2') $('line2').value = lt.line2 || '';
-    if (editing !== 'logoUrl') $('logoUrl').value = lt.logoUrl || '';
-    $('pvL1').textContent = lt.line1 || '';
-    $('pvL2').textContent = lt.line2 || '';
-    var s = lt.style || {};
-    $('pvL1').style.color = s.text || '#fff';
-    $('pvL2').style.color = s.accent || '#e7b53c';
-    if (editing !== 'stText' && s.text) $('stText').value = s.text;
-    if (editing !== 'stAccent' && s.accent) $('stAccent').value = s.accent;
-    if (editing !== 'stBg' && s.bg && /^#[0-9a-f]{8}$/i.test(s.bg)) { $('stBg').value = s.bg.slice(0, 7); $('stBgA').value = Math.round(parseInt(s.bg.slice(7), 16) / 255 * 100); }
-    if (editing !== 'stSize' && s.size) { $('stSize').value = s.size; $('stSizeV').textContent = s.size; }
-    if (editing !== 'stAnim' && s.animation) $('stAnim').value = s.animation;
-    $('chroma').checked = !!s.chroma;
-    if (s.position) document.querySelectorAll('#posGrid button').forEach(function (b) { b.classList.toggle('on', b.dataset.pos === s.position); });
-  }
+  /* ---- add layers ---- */
+  function topZ() { return layers.length ? Math.max.apply(null, layers.map(function (l) { return l.z || 0; })) + 1 : 1; }
+  function add(l) { l.id = uid(); l.z = topZ(); layers.push(l); select(l.id); push(); }
+  $('addText').onclick = function () { add({ type: 'text', x: 200, y: 500, w: 560, h: 60, text: 'New text', font: "'Segoe UI', Arial, sans-serif", size: 40, bold: true, italic: false, color: '#ffffff', align: 'left', animIn: 'fade', delay: 0 }); };
+  $('addBox').onclick = function () { add({ type: 'box', x: 160, y: 900, w: 620, h: 100, fill: '#0b1f3a', opacity: 95, radius: 12, animIn: 'slide-up', delay: 0 }); };
+  $('addImage').onclick = function () { add({ type: 'image', x: 120, y: 860, w: 140, h: 140, src: '', shape: 'circle', fit: 'contain', animIn: 'scale', delay: 0 }); };
+  $('btnReset').onclick = function () { if (confirm('Reset the lower third to the default design?')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_reset' }) }); };
 
+  /* ---- drag on canvas ---- */
+  var drag = null;
+  function startDrag(e) {
+    var id = e.currentTarget.dataset.id; select(id); var l = byId(id); if (!l) return;
+    drag = { id: id, sx: e.clientX, sy: e.clientY, ox: l.x, oy: l.y, el: e.currentTarget };
+    e.preventDefault();
+  }
+  document.addEventListener('mousemove', function (e) {
+    if (!drag) return; var l = byId(drag.id); if (!l) return;
+    l.x = Math.round(drag.ox + (e.clientX - drag.sx) / SCALE);
+    l.y = Math.round(drag.oy + (e.clientY - drag.sy) / SCALE);
+    drag.el.style.left = l.x + 'px'; drag.el.style.top = l.y + 'px';
+    if (selId === l.id) { $('pX').value = l.x; $('pY').value = l.y; }
+  });
+  document.addEventListener('mouseup', function () { if (drag) { drag = null; push(); } });
+
+  /* ---- air / chroma / copy ---- */
+  $('btnShow').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_show' }) }); };
+  $('btnHide').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_hide' }) }); };
+  $('chroma').onchange = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_chroma', value: $('chroma').checked ? 'green' : '' }) }); };
+  $('copyBtn').onclick = function () {
+    var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok, ok);
+  };
+
+  /* ---- server state ---- */
   function connect() {
     var es = new EventSource('/events');
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
-    es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state && m.state.lowerthird) reflect(m.state.lowerthird); } catch (x) {} };
+    es.onmessage = function (e) {
+      try {
+        var m = JSON.parse(e.data); if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
+        $('airState').textContent = lt.visible ? 'ON AIR' : 'OFF AIR'; $('airState').classList.toggle('live', !!lt.visible);
+        $('chroma').checked = !!lt.chroma;
+        if (!loaded) { loaded = true; layers = (lt.layers || []).map(function (l) { return l; }); if (layers.length) selId = layers[0].id; renderCanvas(); renderList(); syncProps(); }
+        else if (JSON.stringify(lt.layers) !== JSON.stringify(layers) && !drag) {
+          // reset (or another operator) changed layers — reload
+          layers = (lt.layers || []); if (!byId(selId)) selId = layers.length ? layers[0].id : null; renderCanvas(); renderList(); syncProps();
+        }
+      } catch (x) {}
+    };
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();

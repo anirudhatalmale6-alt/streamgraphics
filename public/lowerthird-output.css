@@ -3,32 +3,26 @@ html, body { width: 100%; height: 100%; background: transparent !important; over
   font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; }
 body.chroma { background: var(--chroma) !important; }
 
-#stage { position: fixed; inset: 0; padding: 60px; }
+/* #stage is the true 1920x1080 canvas; #fit scales it to whatever the window is
+   (in OBS/vMix at 1920x1080 the scale is 1:1). */
+#fit { position: fixed; inset: 0; }
+#stage { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; transform-origin: top left; }
 
-.lt { position: absolute; will-change: transform, opacity; }
-.lt .anim { display: flex; align-items: stretch;
-  transition: transform .55s cubic-bezier(.16,1,.3,1), opacity .45s ease; }
-.lt[data-anim] .anim { opacity: 1; transform: none; }
-.lt.is-out[data-anim="slide-up"] .anim { opacity: 0; transform: translateY(40px); }
-.lt.is-out[data-anim="slide-left"] .anim { opacity: 0; transform: translateX(-50px); }
-.lt.is-out[data-anim="fade"] .anim    { opacity: 0; }
-.lt.is-out[data-anim="scale"] .anim   { opacity: 0; transform: scale(.9); }
-.lt.is-hidden { display: none; }
+.ly { position: absolute; }
+.ly .li { width: 100%; height: 100%; opacity: 1; transition: transform .55s cubic-bezier(.16,1,.3,1), opacity .5s ease; }
 
-/* positions (9 anchors) */
-.pos-top-left{top:60px;left:60px}.pos-top-center{top:60px;left:50%;transform:translateX(-50%)}.pos-top-right{top:60px;right:60px}
-.pos-mid-left{top:50%;left:60px;transform:translateY(-50%)}.pos-mid-center{top:50%;left:50%;transform:translate(-50%,-50%)}.pos-mid-right{top:50%;right:60px;transform:translateY(-50%)}
-.pos-bottom-left{bottom:60px;left:60px}.pos-bottom-center{bottom:60px;left:50%;transform:translateX(-50%)}.pos-bottom-right{bottom:60px;right:60px}
+/* out states (before take-to-air / after off-air) per animation */
+.ly[data-anim="fade"] .li.out       { opacity: 0; }
+.ly[data-anim="slide-up"] .li.out   { opacity: 0; transform: translateY(46px); }
+.ly[data-anim="slide-left"] .li.out { opacity: 0; transform: translateX(-60px); }
+.ly[data-anim="slide-right"] .li.out{ opacity: 0; transform: translateX(60px); }
+.ly[data-anim="scale"] .li.out      { opacity: 0; transform: scale(.86); }
+.ly[data-anim="none"] .li.out       { opacity: 1; }
 
-/* the bar */
-.accent { width: 8px; flex: none; background: #e7b53c; border-radius: 12px 0 0 12px; box-shadow: 0 0 16px currentColor; color: #e7b53c; }
-.lt-logo { height: auto; align-self: center; max-height: 84px; max-width: 96px; object-fit: contain;
-  margin: 10px 0 10px 16px; }
-.lt-text { background: #0b1f3af2; border-radius: 0 12px 12px 0; padding: 14px 30px 16px 22px;
-  box-shadow: 0 18px 50px rgba(0,0,0,.45); display: flex; flex-direction: column; justify-content: center; }
-/* when there's a logo, round its left corner too via the accent staying on the far left */
-.lt-1 { font-weight: 800; font-size: 34px; line-height: 1.05; color: #fff; white-space: nowrap;
-  text-shadow: 0 2px 8px rgba(0,0,0,.4); }
-.lt-2 { font-weight: 600; font-size: 18px; line-height: 1.15; letter-spacing: .08em; text-transform: uppercase;
-  color: #e7b53c; margin-top: 5px; white-space: nowrap; }
-.lt-2:empty { display: none; }
+.ly-box { border-radius: 12px; }
+.ly-text { display: flex; flex-direction: column; justify-content: center; white-space: pre-wrap;
+  line-height: 1.08; overflow: hidden; }
+.ly-img { object-fit: contain; }
+.ly-img.cover { object-fit: cover; }
+.ly-img.circle { border-radius: 50%; }
+.ly-img.rounded { border-radius: 16px; }

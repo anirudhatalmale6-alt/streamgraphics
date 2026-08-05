@@ -3,72 +3,136 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StreamGraphics — Lower Third Control</title>
+<title>StreamGraphics — Lower Third Builder</title>
 <link rel="stylesheet" href="/control.css">
 <style>
-  .outbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:16px}
-  .outbar code{background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:13px}
-  .copybtn{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer}
-  .toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-weight:600;color:var(--txt)}
-  .toggle input{width:18px;height:18px;accent-color:var(--go)}
+  .builder{display:grid;grid-template-columns:1fr 320px;gap:16px}
+  @media(max-width:900px){.builder{grid-template-columns:1fr}}
+  .stagewrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .canvas{position:relative;width:720px;max-width:100%;height:405px;border-radius:8px;overflow:hidden;
+    background:repeating-conic-gradient(#0e131b 0% 25%,#10151f 0% 50%) 50%/28px 28px;margin:0 auto}
+  .safe{position:absolute;border:1px dashed rgba(255,255,255,.18);pointer-events:none;inset:5% 5%}
+  .cstage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform:scale(.375);transform-origin:top left}
+  .ly{position:absolute;cursor:move;outline:2px solid transparent}
+  .ly.sel{outline:2px solid var(--accent);outline-offset:1px}
+  .ly .li{width:100%;height:100%;pointer-events:none;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+  .ly-text{white-space:pre-wrap;line-height:1.08}
+  .ly-img{object-fit:contain}.ly-img.cover{object-fit:cover}.ly-img.circle{border-radius:50%}.ly-img.rounded{border-radius:16px}
+  .side{display:flex;flex-direction:column;gap:14px}
+  .addrow{display:flex;gap:8px}
+  .addrow .btn{flex:1;font-size:13px;padding:9px 6px}
+  .layerlist{border:1px solid var(--line);border-radius:10px;max-height:150px;overflow:auto}
+  .llrow{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+  .llrow:hover{background:var(--panel2)}
+  .llrow.sel{background:var(--panel2);color:#fff}
+  .llrow .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .llrow .mini2{color:var(--muted);font-size:11px}
+  .llrow button{background:transparent;border:1px solid var(--line);border-radius:5px;color:var(--muted);cursor:pointer;font-size:11px;width:22px;height:20px}
+  .props .row{margin-bottom:9px}
+  .props label{width:52px;font-size:12px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .grid4 input{width:100%;text-align:center}
+  .grid4 .cap{grid-column:span 1;color:var(--muted);font-size:11px;text-align:center}
+  .hidden{display:none}
 </style>
 </head>
 <body>
   <header class="top">
-    <div class="brand"><span class="dot"></span> StreamGraphics <small>Lower Third</small></div>
+    <div class="brand"><span class="dot"></span> StreamGraphics <small>Lower Third Builder</small></div>
     <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
   </header>
 
   <main>
-    <div class="outbar">
-      <span class="mini" style="color:var(--muted)">Output for OBS / vMix / browser:</span>
-      <code id="outUrl">…/lowerthird-output</code>
-      <button class="copybtn" id="copyBtn">Copy link</button>
-      <label class="toggle"><input type="checkbox" id="chroma"> Green screen (for hardware switchers)</label>
+    <div class="outbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:16px">
+      <button class="btn big show" id="btnShow">Take to air ▸</button>
+      <button class="btn big hide" id="btnHide">◂ Off air</button>
+      <div class="airstate" id="airState" style="min-width:90px">OFF AIR</div>
+      <span style="flex:1"></span>
+      <span class="mini" style="color:var(--muted)">Output:</span>
+      <code id="outUrl" style="background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:12px">…/lowerthird-output</code>
+      <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button>
+      <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600"><input type="checkbox" id="chroma" style="width:16px;height:16px;accent-color:var(--go)"> Green screen</label>
     </div>
 
-    <section class="panel hero">
-      <div class="preview">
-        <div class="pv-label" id="pvL2"></div>
-        <div class="pv-time" id="pvL1" style="font-size:34px">Lower third</div>
+    <div class="builder">
+      <div class="stagewrap">
+        <div class="canvas" id="canvas">
+          <div class="safe"></div>
+          <div class="cstage" id="cstage"></div>
+        </div>
+        <p class="mini" style="text-align:center;color:var(--muted2);margin-top:10px">Drag a layer to move it. Click to select. The dashed box is the title-safe area.</p>
       </div>
-      <div class="onair">
-        <button class="btn big show" id="btnShow">Take to air ▸</button>
-        <button class="btn big hide" id="btnHide">◂ Off air</button>
-        <div class="airstate" id="airState">OFF AIR</div>
-      </div>
-    </section>
 
-    <div class="cols">
-      <section class="panel">
-        <h3>Content</h3>
-        <div class="row"><label>Line 1</label><input class="inp" id="line1" placeholder="Name"></div>
-        <div class="row"><label>Line 2</label><input class="inp" id="line2" placeholder="Title / subtitle"></div>
-        <div class="row"><label>Logo</label><input class="inp" id="logoUrl" placeholder="paste a URL, or Browse ▸"><label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap">Browse<input type="file" accept="image/*" id="logoFile" style="display:none"></label></div>
-      </section>
-
-      <section class="panel">
-        <h3>Look</h3>
-        <div class="row"><label>Text</label><input type="color" id="stText" value="#ffffff"></div>
-        <div class="row"><label>Accent</label><input type="color" id="stAccent" value="#e7b53c"></div>
-        <div class="row"><label>Background</label><input type="color" id="stBg" value="#0b1f3a"><input class="inp s" id="stBgA" type="number" min="0" max="100" value="95" title="opacity %"> %</div>
-        <div class="row"><label>Size</label><input class="range" id="stSize" type="range" min="20" max="72" value="34"><span id="stSizeV" class="mono">34</span></div>
-        <div class="row"><label>Position</label>
-          <div class="posgrid" id="posGrid">
-            <button data-pos="top-left"></button><button data-pos="top-center"></button><button data-pos="top-right"></button>
-            <button data-pos="mid-left"></button><button data-pos="mid-center"></button><button data-pos="mid-right"></button>
-            <button data-pos="bottom-left" class="on"></button><button data-pos="bottom-center"></button><button data-pos="bottom-right"></button>
+      <div class="side">
+        <section class="panel" style="padding:14px">
+          <div class="addrow">
+            <button class="btn" id="addText">＋ Text</button>
+            <button class="btn" id="addBox">＋ Box</button>
+            <button class="btn" id="addImage">＋ Image</button>
           </div>
-        </div>
-        <div class="row"><label>Animation</label>
-          <select class="inp" id="stAnim">
-            <option value="slide-up">Slide up</option>
-            <option value="slide-left">Slide from left</option>
-            <option value="fade">Fade</option>
-            <option value="scale">Scale</option>
-          </select>
-        </div>
-      </section>
+        </section>
+
+        <section class="panel" style="padding:14px">
+          <h3 style="margin-bottom:8px">Layers</h3>
+          <div class="layerlist" id="layerList"></div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn ghost" id="btnReset" style="font-size:12px">Reset to default</button>
+          </div>
+        </section>
+
+        <section class="panel props" id="propsPanel" style="padding:14px">
+          <h3 id="propTitle">No layer selected</h3>
+          <div id="propBody" class="hidden">
+            <div class="row"><label>Text</label><input class="inp only-text" id="pText" placeholder="text"></div>
+            <div class="row only-text"><label>Font</label>
+              <select class="inp" id="pFont">
+                <option value="'Segoe UI', Arial, sans-serif">Segoe / Helvetica</option>
+                <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
+                <option value="Georgia, 'Times New Roman', serif">Serif</option>
+                <option value="Impact, Haettenschweiler, sans-serif">Impact</option>
+                <option value="'Courier New', ui-monospace, monospace">Mono</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+              </select>
+            </div>
+            <div class="row only-text"><label>Size</label><input class="inp t" id="pSize" type="number" min="8" max="300" value="34">
+              <label style="width:auto;margin-left:6px"><input type="checkbox" id="pBold"> B</label>
+              <label style="width:auto"><input type="checkbox" id="pItalic"> i</label>
+              <select class="inp" id="pAlign" style="min-width:0;width:70px"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select>
+            </div>
+            <div class="row only-text"><label>Colour</label><input type="color" id="pColor" value="#ffffff"></div>
+
+            <div class="row only-box"><label>Fill</label><input type="color" id="pFill" value="#0b1f3a"><input class="inp s" id="pOpacity" type="number" min="0" max="100" value="95" title="opacity %"> %</div>
+            <div class="row only-box"><label>Radius</label><input class="range" id="pRadius" type="range" min="0" max="120" value="12"><span id="pRadiusV" class="mono">12</span></div>
+
+            <div class="row only-image"><label>Image</label><input class="inp" id="pSrc" placeholder="URL or Browse"><label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="image/*" id="pFile" style="display:none"></label></div>
+            <div class="row only-image"><label>Shape</label>
+              <select class="inp" id="pShape" style="width:auto"><option value="none">Square</option><option value="rounded">Rounded</option><option value="circle">Circle</option></select>
+              <select class="inp" id="pFit" style="width:auto"><option value="contain">Fit</option><option value="cover">Fill</option></select>
+            </div>
+
+            <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+            <div class="cap" style="text-align:left;color:var(--muted);font-size:11px;margin-bottom:4px">Position &amp; size (px)</div>
+            <div class="grid4">
+              <input class="inp" id="pX" type="number" title="X"><input class="inp" id="pY" type="number" title="Y">
+              <input class="inp" id="pW" type="number" title="Width"><input class="inp" id="pH" type="number" title="Height">
+              <div class="cap">X</div><div class="cap">Y</div><div class="cap">W</div><div class="cap">H</div>
+            </div>
+            <div class="row" style="margin-top:10px"><label>Animate</label>
+              <select class="inp" id="pAnim" style="width:auto">
+                <option value="fade">Fade</option><option value="slide-up">Slide up</option>
+                <option value="slide-left">Slide left</option><option value="slide-right">Slide right</option>
+                <option value="scale">Scale</option><option value="none">None</option>
+              </select>
+              <input class="inp t" id="pDelay" type="number" min="0" max="5000" step="20" value="0" title="delay ms"> ms
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn ghost" id="pBack" style="font-size:12px">Send back</button>
+              <button class="btn ghost" id="pFront" style="font-size:12px">Bring front</button>
+              <button class="btn ghost" id="pDelete" style="font-size:12px;color:#e06">Delete</button>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   </main>
 

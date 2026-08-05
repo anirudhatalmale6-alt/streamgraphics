@@ -16,10 +16,19 @@ the output URL and a **Green screen** toggle (renders on solid green for a hardw
 switcher that can't key transparency — leave it off for OBS/vMix, which key the
 transparent background directly).
 
-## Lower Third
-A name/title bar with an optional logo. Line 1 (name), Line 2 (title/subtitle),
-colours (text / accent / background + opacity), size, 9 positions, in/out animation,
-and Browse-for-a-local-logo. Take it on/off air with one button.
+## Lower Third Builder (WYSIWYG)
+Not a template — a canvas you build. Add **Text**, **Box**, and **Image** layers,
+drag them on the 1920×1080 canvas (or type exact pixel X/Y/W/H), and style each one:
+- Text: content, font, size, bold/italic, colour, alignment — as many text layers as
+  you want (title, second title, subtitle…).
+- Box: fill, opacity, corner radius — a small bar, two coloured bars, or one that
+  spans the whole bottom of the screen.
+- Image: any PNG/logo, with a shape (square / rounded / circle) and fit.
+- Every layer has its own in/out **animation** and a **delay**, so layers stagger or
+  group. Stack order (send back / bring front) controls what sits on top — so a logo
+  never intrudes on a background.
+The design is saved (survives restart) and persists in `data/lowerthird.json`;
+"Reset to default" restores the starter design. Title-safe guide shown on the canvas.
 
 ## Troubleshooting
 **"EADDRINUSE / port 4000 already in use"** — an earlier copy of StreamGraphics is
