@@ -511,12 +511,11 @@ server.listen(PORT, () => {
   }
   console.log(`\n  StreamGraphics is running.  Open the control panels in your browser:`);
   console.log(`  ---------------------------------------------------------------`);
-  console.log(`  Home (all graphics):     http://localhost:${PORT}/`);
-  console.log(`  TIMER    control:        http://localhost:${PORT}/control`);
-  console.log(`  TIMER    output (OBS):   http://localhost:${PORT}/output`);
-  console.log(`  SCOREBOARD control:      http://localhost:${PORT}/scoreboard`);
-  console.log(`  SCOREBOARD output (OBS): http://localhost:${PORT}/scoreboard-output`);
+  console.log(`  Home (all graphics):         http://localhost:${PORT}/`);
+  console.log(`  TIMER control:               http://localhost:${PORT}/control          · output: /output`);
+  console.log(`  BEACH VOLLEYBALL SCOREBOARD: http://localhost:${PORT}/scoreboard       · output: /scoreboard-output`);
+  console.log(`  LOWER THIRD / GRAPHICS:      http://localhost:${PORT}/lowerthird       · output: /lowerthird-output`);
   console.log(`  ---------------------------------------------------------------`);
   console.log(`  From ANOTHER computer, swap "localhost" for  ${lan}`);
-  console.log(`  e.g. OBS Browser Source:  http://${lan}:${PORT}/scoreboard-output\n`);
+  console.log(`  e.g. OBS/vMix Browser Source:  http://${lan}:${PORT}/lowerthird-output\n`);
 });
