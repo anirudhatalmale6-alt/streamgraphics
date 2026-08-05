@@ -24,6 +24,31 @@
 
   function fmt(v) { return v == null ? '--' : String(v); }
 
+  /* ---- auto-contrast: pick readable text colour for a row background ---- */
+  function hexRgb(h) {
+    h = String(h || '').trim().replace(/^#/, '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    if (h.length < 6) return null;
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function relLum(rgb) {
+    var a = rgb.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+  }
+  function contrast(c1, c2) {
+    var a = hexRgb(c1), b = hexRgb(c2); if (!a || !b) return 21;
+    var l1 = relLum(a), l2 = relLum(b); var hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+  // effective text colour on a given row bg: auto black/white unless a manual colour reads well
+  function textOn(rowColor, textColor) {
+    if (!rowColor) return textColor || '';           // no row bg -> honour choice / CSS default (dark)
+    var rgb = hexRgb(rowColor);
+    var auto = (rgb && relLum(rgb) > 0.5) ? '#141414' : '#ffffff';
+    if (textColor && contrast(textColor, rowColor) >= 4) return textColor; // good manual colour -> keep
+    return auto;
+  }
+
   function render(sb) {
     // meta
     $('presenter').textContent = sb.presenter || '';
@@ -77,8 +102,9 @@
                + '>' + fmt(v) + '</div>';
       }
       var rowStyle = tm.rowColor ? 'background:' + tm.rowColor + ';' : '';
-      var txtStyle = tm.textColor ? 'color:' + tm.textColor + ';' : '';
-      var seedStyle = tm.textColor ? 'color:' + tm.textColor + ';opacity:.7' : '';
+      var effText = textOn(tm.rowColor, tm.textColor);
+      var txtStyle = effText ? 'color:' + effText + ';' : '';
+      var seedStyle = effText ? 'color:' + effText + ';opacity:.7' : '';
       var logo = tm.logoUrl
         ? '<img class="tlogo" src="' + esc(tm.logoUrl) + '" alt="">'
         : '<div class="dot"></div>';
