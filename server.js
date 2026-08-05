@@ -318,6 +318,7 @@ function applyAction(action) {
           logo: String(t.logo || '').slice(0, 300),
           rowColor: String(t.rowColor || '').slice(0, 30),
           textColor: String(t.textColor || '').slice(0, 30),
+          seed: String(t.seed || '').slice(0, 10),
           players: (Array.isArray(t.players) ? t.players : []).slice(0, 12).map(function (p) { return String(p || '').slice(0, 60); }).filter(Boolean)
         };
       });

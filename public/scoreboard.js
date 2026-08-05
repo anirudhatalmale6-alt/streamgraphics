@@ -151,15 +151,20 @@
     libSig = sig;
     document.querySelectorAll('.libteam').forEach(function (sel) {
       sel.innerHTML = '<option value="">— load team from library —</option>' +
-        lib.map(function (t, i) { return '<option value="' + i + '">' + esc(t.name) + '</option>'; }).join('');
+        lib.map(function (t, i) {
+          var label = t.name || t.players.slice(0, 2).join(' / ') || ('Team ' + (i + 1));
+          return '<option value="' + i + '">' + esc(label) + '</option>';
+        }).join('');
     });
   }
   document.querySelectorAll('.libteam').forEach(function (sel) {
     sel.onchange = function () {
       var ti = +sel.dataset.team, t = lib[+sel.value];
       if (!t) return;
+      // seed comes from the sheet only if it had a Rank/Seed column; otherwise blank
+      // (so unranked tournaments show no "(n)" at all).
       send({ type: 'sb_team', team: ti, rowColor: t.rowColor || '', textColor: t.textColor || '',
-             logoUrl: resolveLogo(t.logo), p1: t.players[0] || '', p2: t.players[1] || '' });
+             logoUrl: resolveLogo(t.logo), seed: t.seed || '', p1: t.players[0] || '', p2: t.players[1] || '' });
       var card = document.querySelector('.teamcard[data-team="' + ti + '"]');
       card.querySelectorAll('.libplayer').forEach(function (ps) {
         ps.disabled = false;
@@ -191,15 +196,17 @@
     var hdr = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
     var idx = function (names) { for (var n = 0; n < names.length; n++) { var k = hdr.indexOf(names[n]); if (k >= 0) return k; } return -1; };
     var iName = idx(['teamname', 'name', 'team']), iLogo = idx(['teamlogo', 'logo']),
-        iHex = idx(['teamhex', 'hex', 'rowcolor', 'color']), iText = idx(['textcolor', 'text']);
+        iHex = idx(['teamhex', 'hex', 'rowcolor', 'color']), iText = idx(['textcolor', 'text']),
+        iSeed = idx(['seed', 'rank', 'ranking', 'seeding']); // OPTIONAL \u2014 omit for unranked events
     var pcols = []; hdr.forEach(function (h, k) { if (/^player/.test(h)) pcols.push(k); });
     var clean = function (v) { return String(v == null ? '' : v).replace(/\u00a0/g, ' ').trim(); };
     var out = [];
     for (var r = 1; r < rows.length; r++) {
-      var row = rows[r], name = iName >= 0 ? clean(row[iName]) : '';
-      if (!name) continue;
+      var row = rows[r], players = pcols.map(function (k) { return clean(row[k]); }).filter(Boolean);
+      var name = iName >= 0 ? clean(row[iName]) : '';
+      if (!name && !players.length) continue;                 // sponsor column is OPTIONAL
       out.push({ name: name, logo: iLogo >= 0 ? clean(row[iLogo]) : '', rowColor: iHex >= 0 ? clean(row[iHex]) : '',
-                 textColor: iText >= 0 ? clean(row[iText]) : '', players: pcols.map(function (k) { return clean(row[k]); }).filter(Boolean) });
+                 textColor: iText >= 0 ? clean(row[iText]) : '', seed: iSeed >= 0 ? clean(row[iSeed]) : '', players: players });
     }
     return out;
   }
