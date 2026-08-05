@@ -6,7 +6,10 @@
 <title>StreamGraphics — Scoreboard Control</title>
 <link rel="stylesheet" href="/control.css">
 <style>
-  .teamcard{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;background:var(--panel2)}
+  .teamcard{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;background:var(--panel2);min-width:0}
+  .cols>*{min-width:0}
+  .names input{min-width:0}
+  .names{min-width:0}
   .teamcard h4{font-size:13px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
   .swatch{width:16px;height:16px;border-radius:4px;border:1px solid #0006}
   .names{display:grid;grid-template-columns:1fr 1fr 64px;gap:8px;margin-bottom:10px}
@@ -20,6 +23,26 @@
   .gamebox .pm button:hover{border-color:var(--muted2)}
   .matchbtns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
   .mini{font-size:12px;color:var(--muted2)}
+  .tstyle{display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap}
+  .tstyle label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+  .tstyle input[type=color]{width:36px;height:30px}
+  .clr{width:24px;height:24px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;font-size:11px}
+  .clr:hover{color:var(--txt);border-color:var(--muted2)}
+  /* phones / iPads held in portrait: stack the two teams, bigger tap targets */
+  @media(max-width:700px){
+    main{padding:12px}
+    .hero{flex-direction:column;gap:14px}
+    .hero .preview{width:100%}
+    .onair{width:100%;flex-direction:row;flex-wrap:wrap}
+    .onair .btn{flex:1;min-width:40%}
+    .onair .airstate{width:100%}
+    .gamebox .pm button{width:44px;height:40px;font-size:20px}
+    .gamebox .gv{font-size:30px}
+    .names{grid-template-columns:1fr 1fr;}
+    .names input[data-f="seed"]{grid-column:1 / -1}
+    .btn.big{padding:16px}
+    .matchbtns .btn{flex:1;min-width:44%}
+  }
 </style>
 </head>
 <body>
@@ -45,8 +68,9 @@
     <div class="matchbtns">
       <button class="btn go" id="btnRestart">⟲ Restart Match (0 / -- / --)</button>
       <button class="btn" id="btnNextGame">Start Next Game ▸</button>
+      <button class="btn" id="btnBackGame">◂ Back a Game</button>
     </div>
-    <p class="mini" style="margin-bottom:14px">Restart sets game 1 to 0 and the rest to "--". Start Next Game brings the next "--" to 0 and makes it the active (highlighted) game.</p>
+    <p class="mini" style="margin-bottom:14px">Restart sets game 1 to 0 and the rest to "--". Start Next Game brings the next "--" to 0 and makes it the active game. Back a Game undoes that if it was hit by accident.</p>
 
     <div class="cols">
       <section class="teamcard" data-team="0">
@@ -56,7 +80,12 @@
           <input class="inp" data-f="p2" placeholder="Player 2">
           <input class="inp" data-f="seed" placeholder="Seed">
         </div>
-        <div class="row" style="margin-bottom:10px"><label style="width:60px">Colour</label><input type="color" data-f="color" value="#f5c518"></div>
+        <div class="tstyle">
+          <label><span>Bar</span><input type="color" data-f="color" value="#f5c518"></label>
+          <label><span>Row</span><input type="color" data-f="rowColor" value="#ffffff"><button class="clr" data-clr="rowColor" title="clear row colour">✕</button></label>
+          <label><span>Text</span><input type="color" data-f="textColor" value="#111111"><button class="clr" data-clr="textColor" title="clear text colour">✕</button></label>
+        </div>
+        <div class="row" style="margin:2px 0 12px"><label style="width:60px">Logo URL</label><input class="inp" data-f="logoUrl" placeholder="team / university logo image URL"></div>
         <div class="games-ctl" id="games0"></div>
       </section>
 
@@ -67,7 +96,12 @@
           <input class="inp" data-f="p2" placeholder="Player 2">
           <input class="inp" data-f="seed" placeholder="Seed">
         </div>
-        <div class="row" style="margin-bottom:10px"><label style="width:60px">Colour</label><input type="color" data-f="color" value="#1f7a8c"></div>
+        <div class="tstyle">
+          <label><span>Bar</span><input type="color" data-f="color" value="#1f7a8c"></label>
+          <label><span>Row</span><input type="color" data-f="rowColor" value="#ffffff"><button class="clr" data-clr="rowColor" title="clear row colour">✕</button></label>
+          <label><span>Text</span><input type="color" data-f="textColor" value="#111111"><button class="clr" data-clr="textColor" title="clear text colour">✕</button></label>
+        </div>
+        <div class="row" style="margin:2px 0 12px"><label style="width:60px">Logo URL</label><input class="inp" data-f="logoUrl" placeholder="team / university logo image URL"></div>
         <div class="games-ctl" id="games1"></div>
       </section>
     </div>
@@ -78,6 +112,7 @@
         <div class="row"><label>Presenter</label><input class="inp" id="mPresenter" placeholder="WEDBUSH"></div>
         <div class="row"><label>Title</label><input class="inp" id="mTitle" placeholder="HERMOSA BEACH OPEN 2025"></div>
         <div class="row"><label>Round/label</label><input class="inp" id="mBracket" placeholder="MEN'S CONTENDER'S BRACKET"></div>
+        <div class="row"><label>Event logo</label><input class="inp" id="mEventLogo" placeholder="big event logo image URL (optional)"></div>
       </section>
 
       <section class="panel">

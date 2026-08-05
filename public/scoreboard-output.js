@@ -31,6 +31,16 @@
     $('bracket').textContent = sb.bracketLabel || '';
     $('bracket').style.background = (sb.style && sb.style.bracketColor) || '#7a1420';
 
+    // optional big event logo in the brand cell (replaces the coded Hb mark)
+    var hb = document.querySelector('.hb'), evImg = $('eventLogo');
+    if (sb.eventLogoUrl) {
+      if (!evImg) { evImg = document.createElement('img'); evImg.id = 'eventLogo'; evImg.className = 'eventlogo'; hb.parentNode.insertBefore(evImg, hb); }
+      evImg.src = sb.eventLogoUrl; evImg.style.display = 'block'; hb.style.display = 'none';
+    } else {
+      if (evImg) evImg.style.display = 'none';
+      hb.style.display = '';
+    }
+
     // backdrop image (Photoshop art) if provided
     if (sb.style && sb.style.backdropUrl) {
       backdrop.src = sb.style.backdropUrl;
@@ -54,11 +64,17 @@
                + (g === active && v != null ? ' style="background:' + accent + '"' : '')
                + '>' + fmt(v) + '</div>';
       }
-      html += '<div class="row">'
+      var rowStyle = tm.rowColor ? 'background:' + tm.rowColor + ';' : '';
+      var txtStyle = tm.textColor ? 'color:' + tm.textColor + ';' : '';
+      var seedStyle = tm.textColor ? 'color:' + tm.textColor + ';opacity:.7' : '';
+      var logo = tm.logoUrl
+        ? '<img class="tlogo" src="' + esc(tm.logoUrl) + '" alt="">'
+        : '<div class="dot"></div>';
+      html += '<div class="row" style="' + rowStyle + '">'
             + '<div class="tcolor" style="background:' + (tm.color || '#ccc') + '"></div>'
-            + '<div class="dot"></div>'
-            + '<div class="nm">' + esc(tm.p1) + ' / ' + esc(tm.p2)
-            + (tm.seed ? ' <span class="seed">(' + esc(tm.seed) + ')</span>' : '') + '</div>'
+            + logo
+            + '<div class="nm" style="' + txtStyle + '">' + esc(tm.p1) + ' / ' + esc(tm.p2)
+            + (tm.seed ? ' <span class="seed" style="' + seedStyle + '">(' + esc(tm.seed) + ')</span>' : '') + '</div>'
             + '<div class="cells">' + cells + '</div>'
             + '</div>';
     });

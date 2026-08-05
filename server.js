@@ -64,11 +64,12 @@ function defaultState() {
       title: 'HERMOSA BEACH OPEN 2025',
       presenter: 'WEDBUSH',
       bracketLabel: "MEN'S CONTENDER'S BRACKET",
+      eventLogoUrl: '',        // big event logo (e.g. the Hermosa Beach Open mark)
       gamesCount: 3,
       activeGame: 0,           // which game column is "current" (highlighted)
       teams: [
-        { p1: 'Terese Cannon', p2: 'Megan Kraft', seed: '1', color: '#f5c518', games: [0, null, null] },
-        { p1: 'Kelly Cheng',   p2: 'Molly Shaw',  seed: '2', color: '#1f7a8c', games: [0, null, null] }
+        { p1: 'Terese Cannon', p2: 'Megan Kraft', seed: '1', color: '#f5c518', rowColor: '', textColor: '', logoUrl: '', games: [0, null, null] },
+        { p1: 'Kelly Cheng',   p2: 'Molly Shaw',  seed: '2', color: '#1f7a8c', rowColor: '', textColor: '', logoUrl: '', games: [0, null, null] }
       ],
       style: {
         position: 'bottom-left',
@@ -203,6 +204,15 @@ function applyAction(action) {
       break;
     }
 
+    case 'sb_backGame': { // undo Start Next Game — reset the active game to "--" and step back
+      const g = state.scoreboard.activeGame | 0;
+      if (g > 0) {
+        state.scoreboard.teams.forEach(function (tm) { tm.games[g] = null; });
+        state.scoreboard.activeGame = g - 1;
+      }
+      break;
+    }
+
     case 'sb_score': { // +/- a started game's score (null games ignored)
       const g = clampGame(action.game);
       const tm = state.scoreboard.teams[action.team === 1 ? 1 : 0];
@@ -223,18 +233,19 @@ function applyAction(action) {
 
     case 'sb_setActive': state.scoreboard.activeGame = clampGame(action.game); break;
 
-    case 'sb_team': { // edit a team's name/seed/color fields
+    case 'sb_team': { // edit a team's name/seed/colour/logo fields
       const tm = state.scoreboard.teams[action.team === 1 ? 1 : 0];
-      ['p1', 'p2', 'seed', 'color'].forEach(function (k) {
-        if (action[k] != null) tm[k] = String(action[k]).slice(0, 60);
+      ['p1', 'p2', 'seed', 'color', 'rowColor', 'textColor', 'logoUrl'].forEach(function (k) {
+        if (action[k] != null) tm[k] = String(action[k]).slice(0, 300);
       });
       break;
     }
 
-    case 'sb_meta': // title / presenter / bracket label
+    case 'sb_meta': // title / presenter / bracket label / event logo
       if (action.title != null)     state.scoreboard.title = String(action.title).slice(0, 80);
       if (action.presenter != null) state.scoreboard.presenter = String(action.presenter).slice(0, 40);
       if (action.bracketLabel != null) state.scoreboard.bracketLabel = String(action.bracketLabel).slice(0, 80);
+      if (action.eventLogoUrl != null) state.scoreboard.eventLogoUrl = String(action.eventLogoUrl).slice(0, 500);
       break;
 
     case 'sb_style': Object.assign(state.scoreboard.style, action.style || {}); break;

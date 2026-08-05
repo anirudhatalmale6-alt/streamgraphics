@@ -48,8 +48,16 @@
     });
   });
 
+  // clear row/text colour buttons -> set that field back to "" (unset)
+  document.querySelectorAll('.clr').forEach(function (b) {
+    b.onclick = function () {
+      var ti = +b.closest('.teamcard').dataset.team;
+      var a = { type: 'sb_team', team: ti }; a[b.dataset.clr] = ''; send(a);
+    };
+  });
+
   /* ---- match info ---- */
-  [['mPresenter','presenter'],['mTitle','title'],['mBracket','bracketLabel']].forEach(function (p) {
+  [['mPresenter','presenter'],['mTitle','title'],['mBracket','bracketLabel'],['mEventLogo','eventLogoUrl']].forEach(function (p) {
     var el = $(p[0]);
     el.addEventListener('focus', function () { editing = p[0]; });
     el.addEventListener('blur', function () { editing = null; });
@@ -65,6 +73,7 @@
     for (var g = 0; g < sb.gamesCount; g++) { if (sb.teams[0].games[g] == null || sb.teams[1].games[g] == null) { next = g; break; } }
     if (next >= 0) send({ type: 'sb_startGame', game: next });
   };
+  $('btnBackGame').onclick = function () { send({ type: 'sb_backGame' }); };
   $('btnShow').onclick = function () { send({ type: 'sb_show' }); };
   $('btnHide').onclick = function () { send({ type: 'sb_hide' }); };
 
@@ -97,10 +106,14 @@
     s.teams.forEach(function (tm, ti) {
       var card = document.querySelector('.teamcard[data-team="' + ti + '"]');
       card.querySelectorAll('[data-f]').forEach(function (inp) {
-        var key = 't' + ti + inp.dataset.f;
-        if (editing !== key) {
-          if (inp.type === 'color') inp.value = tm.color || '#888888';
-          else inp.value = tm[inp.dataset.f] == null ? '' : tm[inp.dataset.f];
+        var f = inp.dataset.f, key = 't' + ti + f;
+        if (editing === key) return;
+        var val = tm[f];
+        if (inp.type === 'color') {
+          // empty rowColor/textColor means "unset" — show a neutral default in the picker
+          inp.value = (val && /^#/.test(val)) ? val : (f === 'textColor' ? '#111111' : (f === 'rowColor' ? '#ffffff' : (tm.color || '#888888')));
+        } else {
+          inp.value = val == null ? '' : val;
         }
       });
       $('sw' + ti).style.background = tm.color || '#888';
@@ -116,6 +129,7 @@
     if (editing !== 'mPresenter') $('mPresenter').value = s.presenter || '';
     if (editing !== 'mTitle') $('mTitle').value = s.title || '';
     if (editing !== 'mBracket') $('mBracket').value = s.bracketLabel || '';
+    if (editing !== 'mEventLogo') $('mEventLogo').value = s.eventLogoUrl || '';
     if (s.style) {
       if (editing !== 'stAccent') $('stAccent').value = s.style.accent || '#1e64d2';
       if (editing !== 'stBracket') $('stBracket').value = s.style.bracketColor || '#7a1420';
