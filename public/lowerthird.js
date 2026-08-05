@@ -57,7 +57,8 @@
   function renderList() {
     var byZ = layers.slice().sort(function (a, b) { return (b.z || 0) - (a.z || 0); }); // top layer first
     $('layerList').innerHTML = byZ.map(function (l) {
-      var name = l.type === 'text' ? (l.text || 'Text') : (l.type === 'box' ? 'Box' : 'Image');
+      var name = (l.type === 'text' || l.type === 'ticker') ? (l.text || (l.type === 'ticker' ? 'Ticker' : 'Text'))
+               : l.type === 'box' ? 'Box' : l.type === 'video' ? 'Video' : 'Image';
       return '<div class="llrow' + (l.id === selId ? ' sel' : '') + '" data-id="' + l.id + '">'
            + '<span class="t">' + esc(name) + '</span><span class="mini2">' + l.type + '</span>'
            + '<button data-mv="up" title="move up">▲</button><button data-mv="down" title="move down">▼</button></div>';
