@@ -19,12 +19,18 @@
     return 'rgba(' + r + ',' + g + ',' + b + ',' + (pct == null ? 1 : pct / 100) + ')';
   }
   // the "hidden" state (from-state for ON, to-state for OFF) of an animation type
+  var BOUNCE = 'cubic-bezier(.34,1.62,.5,1)';   // overshoot for bounce/pop
   function hidden(type) {
     switch (type) {
       case 'slide-up': return { o: 0, t: 'translateY(46px)' };
       case 'slide-down': return { o: 0, t: 'translateY(-46px)' };
       case 'slide-left': return { o: 0, t: 'translateX(-60px)' };
       case 'slide-right': return { o: 0, t: 'translateX(60px)' };
+      case 'fly-left': return { o: 0, t: 'translateX(-1280px)' };   // in from off-screen left
+      case 'fly-right': return { o: 0, t: 'translateX(1280px)' };   // in from off-screen right
+      case 'bounce': return { o: 0, t: 'translateY(64px) scale(.9)', ease: BOUNCE };
+      case 'pop': return { o: 0, t: 'scale(.3)', ease: BOUNCE };
+      case 'rotate': return { o: 0, t: 'rotate(-180deg) scale(.4)' };  // spin in
       case 'scale': return { o: 0, t: 'scale(.86)' };
       case 'none': return { o: 1, t: 'none' };
       default: return { o: 0, t: 'none' }; // fade
@@ -128,14 +134,14 @@
     eachLi(function (li, l) {
       var h = hidden(l.inAnim || 'fade'), dur = l.inDur == null ? 500 : l.inDur, del = l.inDelay || 0;
       li.style.transition = 'none'; setState(li, h.o, h.t); void li.offsetWidth;
-      li.style.transition = 'transform ' + dur + 'ms ' + EASE + ' ' + del + 'ms, opacity ' + dur + 'ms ease ' + del + 'ms';
+      li.style.transition = 'transform ' + dur + 'ms ' + (h.ease || EASE) + ' ' + del + 'ms, opacity ' + dur + 'ms ease ' + del + 'ms';
       setState(li, 1, 'none');
     });
   }
   function animateOff() {
     eachLi(function (li, l) {
       var h = hidden(l.outAnim || 'fade'), dur = l.outDur == null ? 350 : l.outDur, del = l.outDelay || 0;
-      li.style.transition = 'transform ' + dur + 'ms ' + EASE + ' ' + del + 'ms, opacity ' + dur + 'ms ease ' + del + 'ms';
+      li.style.transition = 'transform ' + dur + 'ms ' + (h.ease || EASE) + ' ' + del + 'ms, opacity ' + dur + 'ms ease ' + del + 'ms';
       setState(li, h.o, h.t);
     });
   }

@@ -76,9 +76,22 @@
     }).join('') || '<div class="llrow"><span class="mini2">No layers — add one above.</span></div>';
     $('layerList').querySelectorAll('.llrow[data-id]').forEach(function (row) {
       var id = row.dataset.id;
-      row.onclick = function (e) { if (e.target.closest('[data-mv],[data-eye],[data-lock]') || e.target.hasAttribute('data-name')) return; select(id, e.shiftKey || e.ctrlKey || e.metaKey); };
-      row.querySelector('[data-eye]').onclick = function (e) { e.stopPropagation(); var l = byId(id); if (l) { l.hidden = !l.hidden; renderCanvas(); renderList(); push(); } };
-      row.querySelector('[data-lock]').onclick = function (e) { e.stopPropagation(); var l = byId(id); if (l) { l.locked = !l.locked; if (l.locked && selIds.indexOf(id) >= 0) { selIds = selIds.filter(function (x) { return x !== id; }); selId = selIds[selIds.length - 1] || null; syncProps(); } renderCanvas(); renderList(); push(); } };
+      // Clicking a row (incl. its name) selects it; double-clicking the name renames.
+      // select() no longer rebuilds the list, so the dblclick target survives the single clicks.
+      row.onclick = function (e) { if (e.target.closest('[data-mv],[data-eye],[data-lock]')) return; select(id, e.shiftKey || e.ctrlKey || e.metaKey); };
+      row.querySelector('[data-eye]').onclick = function (e) {
+        e.stopPropagation(); var l = byId(id); if (!l) return;
+        var nv = !l.hidden, ids = l.group ? groupMembers(l.group) : [id];   // a grouped layer hides the whole group
+        ids.forEach(function (x) { var m = byId(x); if (m) m.hidden = nv; });
+        renderCanvas(); renderList(); push();
+      };
+      row.querySelector('[data-lock]').onclick = function (e) {
+        e.stopPropagation(); var l = byId(id); if (!l) return;
+        var nv = !l.locked, ids = l.group ? groupMembers(l.group) : [id];   // lock the whole group together
+        ids.forEach(function (x) { var m = byId(x); if (m) m.locked = nv; });
+        if (nv) { selIds = selIds.filter(function (x) { return ids.indexOf(x) < 0; }); selId = selIds[selIds.length - 1] || null; syncProps(); }
+        renderCanvas(); renderList(); push();
+      };
       row.querySelector('[data-name]').ondblclick = function (e) { e.stopPropagation(); renameLayer(id, e.currentTarget); };
       row.querySelectorAll('[data-mv]').forEach(function (btn) {
         btn.onclick = function (e) { e.stopPropagation(); reorder(id, btn.dataset.mv === 'up' ? -1 : 1); };
