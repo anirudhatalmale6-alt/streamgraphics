@@ -101,20 +101,29 @@
     }
   }
   function setState(li, o, t) { li.style.opacity = o; li.style.transform = t; }
+  // Grouped layer with own animation "none" inherits its group's animation (move as one unit).
+  function groupLead(map, gid, dir) {
+    for (var k in map) { var m = map[k]; if (m.group !== gid) continue; var a = dir === 'in' ? (m.inAnim || 'none') : (m.outAnim || 'none'); if (a && a !== 'none') return dir === 'in' ? { anim: a, dur: m.inDur == null ? 500 : m.inDur, del: m.inDelay || 0 } : { anim: a, dur: m.outDur == null ? 350 : m.outDur, del: m.outDelay || 0 }; }
+    return null;
+  }
+  function effAnim(map, l, dir) {
+    var own = dir === 'in' ? (l.inAnim || 'fade') : (l.outAnim || 'fade');
+    if (l.group && own === 'none') { var g = groupLead(map, l.group, dir); if (g) return g; }
+    return dir === 'in' ? { anim: own, dur: l.inDur == null ? 500 : l.inDur, del: l.inDelay || 0 } : { anim: own, dur: l.outDur == null ? 350 : l.outDur, del: l.outDelay || 0 };
+  }
   function animatePreset(container, dir) {
-    var maxOut = 0;
+    var maxOut = 0, map = container._lmap || {};
     container.querySelectorAll('.ly').forEach(function (ly) {
-      var l = container._lmap && container._lmap[ly.dataset.id]; var li = ly.querySelector('.li'); if (!l || !li) return;
+      var l = map[ly.dataset.id]; var li = ly.querySelector('.li'); if (!l || !li) return;
+      var e = effAnim(map, l, dir), h = hidden(e.anim);
       if (dir === 'in') {
-        var h = hidden(l.inAnim || 'fade'), dur = l.inDur == null ? 500 : l.inDur, del = l.inDelay || 0;
         li.style.transition = 'none'; setState(li, h.o, h.t); void li.offsetWidth;
-        li.style.transition = 'transform ' + dur + 'ms ' + (h.ease || EASE) + ' ' + del + 'ms, opacity ' + dur + 'ms ease ' + del + 'ms';
+        li.style.transition = 'transform ' + e.dur + 'ms ' + (h.ease || EASE) + ' ' + e.del + 'ms, opacity ' + e.dur + 'ms ease ' + e.del + 'ms';
         setState(li, 1, 'none');
       } else {
-        var ho = hidden(l.outAnim || 'fade'), odur = l.outDur == null ? 350 : l.outDur, odel = l.outDelay || 0;
-        li.style.transition = 'transform ' + odur + 'ms ' + (ho.ease || EASE) + ' ' + odel + 'ms, opacity ' + odur + 'ms ease ' + odel + 'ms';
-        setState(li, ho.o, ho.t);
-        maxOut = Math.max(maxOut, odur + odel);
+        li.style.transition = 'transform ' + e.dur + 'ms ' + (h.ease || EASE) + ' ' + e.del + 'ms, opacity ' + e.dur + 'ms ease ' + e.del + 'ms';
+        setState(li, h.o, h.t);
+        maxOut = Math.max(maxOut, e.dur + e.del);
       }
     });
     return maxOut;

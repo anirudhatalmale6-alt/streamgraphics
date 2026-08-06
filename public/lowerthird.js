@@ -95,14 +95,25 @@
       default: return { o: 0, t: 'none' }; // fade
     }
   }
+  // Grouped layer with own animation "none" inherits its group's animation (whole group moves as one).
+  function groupLead(gid, dir) {
+    for (var i = 0; i < layers.length; i++) { var m = layers[i]; if (m.group !== gid) continue; var a = dir === 'in' ? (m.inAnim || 'none') : (m.outAnim || 'none'); if (a && a !== 'none') return dir === 'in' ? { anim: a, dur: m.inDur == null ? 500 : m.inDur, del: m.inDelay || 0 } : { anim: a, dur: m.outDur == null ? 350 : m.outDur, del: m.outDelay || 0 }; }
+    return null;
+  }
+  function effAnim(l, dir) {
+    var own = dir === 'in' ? (l.inAnim || 'fade') : (l.outAnim || 'fade');
+    if (l.group && own === 'none') { var g = groupLead(l.group, dir); if (g) return g; }
+    return dir === 'in' ? { anim: own, dur: l.inDur == null ? 500 : l.inDur, del: l.inDelay || 0 } : { anim: own, dur: l.outDur == null ? 350 : l.outDur, del: l.outDelay || 0 };
+  }
   function previewAnim() {
     var ids = selIds.length ? selIds : (selId ? [selId] : []);
     ids.forEach(function (id) {
       var el = cstage.querySelector('.ly[data-id="' + id + '"]'); if (!el) return;
       var li = el.querySelector('.li'); if (!li) return;
       var l = byId(id); if (!l) return;
-      var hIn = animHidden(l.inAnim || 'fade'), inDur = l.inDur == null ? 500 : l.inDur, inDel = l.inDelay || 0;
-      var hOut = animHidden(l.outAnim || 'fade'), outDur = l.outDur == null ? 350 : l.outDur;
+      var eIn = effAnim(l, 'in'), eOut = effAnim(l, 'out');
+      var hIn = animHidden(eIn.anim), inDur = eIn.dur, inDel = eIn.del;
+      var hOut = animHidden(eOut.anim), outDur = eOut.dur;
       li.style.transition = 'none'; li.style.opacity = hIn.o; li.style.transform = hIn.t; void li.offsetWidth;   // snap to IN start
       li.style.transition = 'transform ' + inDur + 'ms ' + (hIn.ease || A_EASE) + ' ' + inDel + 'ms, opacity ' + inDur + 'ms ease ' + inDel + 'ms';
       li.style.opacity = 1; li.style.transform = 'none';

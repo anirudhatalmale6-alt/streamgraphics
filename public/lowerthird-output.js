@@ -197,23 +197,34 @@
 
   function eachLi(fn) { stage.querySelectorAll('.ly').forEach(function (ly) { var li = ly.querySelector('.li'); var l = LMAP[ly.dataset.id]; if (li && l) fn(li, l); }); }
 
+  // A grouped layer whose OWN animation is "none" inherits its group's animation (+timing),
+  // so the whole group flies in/out together as one — even the plain background box.
+  function groupLead(gid, dir) {
+    for (var k in LMAP) { var m = LMAP[k]; if (m.group !== gid) continue; var a = dir === 'in' ? (m.inAnim || 'none') : (m.outAnim || 'none'); if (a && a !== 'none') return dir === 'in' ? { anim: a, dur: m.inDur == null ? 500 : m.inDur, del: m.inDelay || 0 } : { anim: a, dur: m.outDur == null ? 350 : m.outDur, del: m.outDelay || 0 }; }
+    return null;
+  }
+  function effAnim(l, dir) {
+    var own = dir === 'in' ? (l.inAnim || 'fade') : (l.outAnim || 'fade');
+    if (l.group && own === 'none') { var g = groupLead(l.group, dir); if (g) return g; }
+    return dir === 'in' ? { anim: own, dur: l.inDur == null ? 500 : l.inDur, del: l.inDelay || 0 } : { anim: own, dur: l.outDur == null ? 350 : l.outDur, del: l.outDelay || 0 };
+  }
   function animateOn() {
     eachLi(function (li, l) {
-      var h = hidden(l.inAnim || 'fade'), dur = l.inDur == null ? 500 : l.inDur, del = l.inDelay || 0;
+      var e = effAnim(l, 'in'), h = hidden(e.anim);
       li.style.transition = 'none'; setState(li, h.o, h.t); void li.offsetWidth;
-      li.style.transition = 'transform ' + dur + 'ms ' + (h.ease || EASE) + ' ' + del + 'ms, opacity ' + dur + 'ms ease ' + del + 'ms';
+      li.style.transition = 'transform ' + e.dur + 'ms ' + (h.ease || EASE) + ' ' + e.del + 'ms, opacity ' + e.dur + 'ms ease ' + e.del + 'ms';
       setState(li, 1, 'none');
     });
   }
   function animateOff() {
     eachLi(function (li, l) {
-      var h = hidden(l.outAnim || 'fade'), dur = l.outDur == null ? 350 : l.outDur, del = l.outDelay || 0;
-      li.style.transition = 'transform ' + dur + 'ms ' + (h.ease || EASE) + ' ' + del + 'ms, opacity ' + dur + 'ms ease ' + del + 'ms';
+      var e = effAnim(l, 'out'), h = hidden(e.anim);
+      li.style.transition = 'transform ' + e.dur + 'ms ' + (h.ease || EASE) + ' ' + e.del + 'ms, opacity ' + e.dur + 'ms ease ' + e.del + 'ms';
       setState(li, h.o, h.t);
     });
   }
   function snap(v) { // instant reflect after an edit (no animation)
-    eachLi(function (li, l) { li.style.transition = 'none'; if (v) setState(li, 1, 'none'); else { var h = hidden(l.inAnim || 'fade'); setState(li, h.o, h.t); } });
+    eachLi(function (li, l) { li.style.transition = 'none'; if (v) setState(li, 1, 'none'); else { var h = hidden(effAnim(l, 'in').anim); setState(li, h.o, h.t); } });
   }
 
   function applyChroma(c) {
