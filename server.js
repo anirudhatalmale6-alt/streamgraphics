@@ -25,10 +25,36 @@ const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 let VERSION = '?'; try { VERSION = require('./package.json').version; } catch (e) {}
 const UPLOAD_DIR = path.join(PUBLIC_DIR, 'uploads');
-const MEDIA_DIR = path.join(PUBLIC_DIR, 'media');   // images referenced by name from a CSV live here
+const MEDIA_DIR = path.join(PUBLIC_DIR, 'media');   // CSV images live here, organised in per-show/event subfolders
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(MEDIA_DIR, { recursive: true }); } catch (e) {}
 let uploadSeq = 0;
+
+const IMG_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
+function sanitizeSeg(s) { return String(s || '').replace(/[^a-zA-Z0-9._ -]/g, '_').replace(/^\.+/, '').slice(0, 100); }
+// Resolve a media-relative path ("folder/name.jpg" or "name.jpg") to an absolute path inside MEDIA_DIR.
+function mediaPath(rel) {
+  const parts = String(rel || '').replace(/\\/g, '/').split('/').filter(p => p && p !== '.' && p !== '..').map(sanitizeSeg);
+  if (!parts.length) return null;
+  const full = path.join(MEDIA_DIR, ...parts);
+  return full.startsWith(MEDIA_DIR) ? full : null;
+}
+// Index of media images (one folder level deep) — kept in memory so the outputs can resolve a
+// CSV's bare filename to wherever it actually lives, even inside a show/event folder.
+let mediaIndex = [];   // array of relative paths e.g. ["Grad2026/jane.jpg", "logo.png"]
+function refreshMediaIndex() {
+  const out = [];
+  try {
+    fs.readdirSync(MEDIA_DIR, { withFileTypes: true }).forEach(e => {
+      if (e.isFile() && IMG_RE.test(e.name)) out.push(e.name);
+      else if (e.isDirectory()) {
+        try { fs.readdirSync(path.join(MEDIA_DIR, e.name)).forEach(f => { if (IMG_RE.test(f)) out.push(e.name + '/' + f); }); } catch (x) {}
+      }
+    });
+  } catch (x) {}
+  mediaIndex = out;
+}
+refreshMediaIndex();
 
 /* ------------------------------------------------------------------ *
  *  State
@@ -203,7 +229,7 @@ function wireState() {
       rowLabels: it.rows ? it.rows.map(function (r) { return it.rowKey ? (r[it.rowKey] || '') : (r[Object.keys(r)[0]] || ''); }) : []
     };
   });
-  return Object.assign({}, state, { shows: shows });
+  return Object.assign({}, state, { shows: shows, media: mediaIndex });
 }
 
 /* ------------------------------------------------------------------ *
@@ -606,17 +632,24 @@ const server = http.createServer((req, res) => {
         const ext = extMap[m[1]] || (m[1].indexOf('video') === 0 ? 'mp4' : 'png');
         // keepName: save into /media under the ORIGINAL filename so a CSV that references
         // "photo.jpg" (or C:\...\photo.jpg) finds it — clients never touch the folder themselves.
-        let dir = UPLOAD_DIR, urlBase = '/uploads/', fname;
+        let target, urlPath;
         if (j.keepName && j.name) {
-          const base = String(j.name).split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || ('img.' + ext);
-          fname = base; dir = MEDIA_DIR; urlBase = '/media/';
+          // Save to /media/<folder>/<original name> so a CSV referencing that filename matches.
+          const folder = j.folder ? sanitizeSeg(j.folder) : '';
+          const base = sanitizeSeg(String(j.name).split(/[\\/]/).pop()) || ('img.' + ext);
+          if (folder) { try { fs.mkdirSync(path.join(MEDIA_DIR, folder), { recursive: true }); } catch (x) {} }
+          const rel = folder ? folder + '/' + base : base;
+          target = mediaPath(rel); urlPath = '/media/' + rel;
         } else {
-          fname = 'up_' + Date.now() + '_' + (uploadSeq++) + '.' + ext;
+          const fname = 'up_' + Date.now() + '_' + (uploadSeq++) + '.' + ext;
+          target = path.join(UPLOAD_DIR, fname); urlPath = '/uploads/' + fname;
         }
-        fs.writeFile(path.join(dir, fname), Buffer.from(m[2], 'base64'), (err) => {
+        if (!target) { res.writeHead(400); res.end('{"ok":false}'); return; }
+        fs.writeFile(target, Buffer.from(m[2], 'base64'), (err) => {
           if (err) { res.writeHead(500); res.end('{"ok":false}'); return; }
+          refreshMediaIndex(); broadcast();
           res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-          res.end(JSON.stringify({ ok: true, url: urlBase + fname }));
+          res.end(JSON.stringify({ ok: true, url: urlPath }));
         });
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -633,12 +666,39 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // --- list images available in /media (so users see what they've uploaded for CSV fields) ---
+  // --- images in /media, grouped by folder (show/event), so users see + tidy their uploads ---
   if (pathname === '/media-list') {
-    fs.readdir(MEDIA_DIR, (err, files) => {
-      const imgs = (files || []).filter(f => /\.(png|jpe?g|gif|webp|svg)$/i.test(f)).sort();
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-      res.end(JSON.stringify({ ok: true, files: imgs }));
+    refreshMediaIndex();
+    const folders = [];
+    try { fs.readdirSync(MEDIA_DIR, { withFileTypes: true }).forEach(e => { if (e.isDirectory()) folders.push(e.name); }); } catch (x) {}
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ ok: true, files: mediaIndex.slice().sort(), folders: folders.sort() }));
+    return;
+  }
+
+  // --- rename / delete an image, or make / remove a folder ---
+  if (pathname === '/media-manage' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', () => {
+      let ok = false;
+      try {
+        const j = JSON.parse(body || '{}'), op = String(j.op || '');
+        if (op === 'mkdir' && j.folder) { fs.mkdirSync(path.join(MEDIA_DIR, sanitizeSeg(j.folder)), { recursive: true }); ok = true; }
+        else if (op === 'rmdir' && j.folder) { const d = mediaPath(j.folder); if (d && fs.existsSync(d)) { fs.rmSync(d, { recursive: true, force: true }); ok = true; } }
+        else if (op === 'delete' && j.path) { const f = mediaPath(j.path); if (f && fs.existsSync(f) && fs.statSync(f).isFile()) { fs.unlinkSync(f); ok = true; } }
+        else if (op === 'rename' && j.path && j.name) {
+          const f = mediaPath(j.path); if (f && fs.existsSync(f)) {
+            const dir = path.dirname(f), ext = path.extname(f);
+            let nn = sanitizeSeg(String(j.name)); if (!IMG_RE.test(nn)) nn += ext;
+            const dest = path.join(dir, nn);
+            if (dest.startsWith(MEDIA_DIR)) { fs.renameSync(f, dest); ok = true; }
+          }
+        }
+      } catch (e) { ok = false; }
+      refreshMediaIndex(); if (ok) broadcast();
+      res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ ok: ok }));
     });
     return;
   }
@@ -671,6 +731,8 @@ const server = http.createServer((req, res) => {
           : pathname === '/shows' ? '/shows.html'
           : pathname === '/program-output' ? '/program-output.html'
           : pathname;
+  // decode %20 etc. so files/folders with spaces (e.g. /media/Grad 2026/jane.jpg) resolve
+  try { rel = decodeURIComponent(rel); } catch (e) {}
   // prevent path traversal
   const file = path.join(PUBLIC_DIR, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
   if (!file.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end('Forbidden'); return; }

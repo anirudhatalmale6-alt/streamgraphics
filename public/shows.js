@@ -116,25 +116,46 @@
   $('manCancel').onclick = closeManual;
   $('manualModal').onclick = function (e) { if (e.target === $('manualModal')) closeManual(); };
 
-  /* ---- media uploader: drop images into the app's /media folder (no filesystem access needed) ---- */
+  /* ---- media manager: upload/organise images into per-show/event folders (no filesystem access) ---- */
+  function manageMedia(op, extra) { return fetch('/media-manage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ op: op }, extra || {})) }).then(function (r) { return r.json(); }); }
   function refreshMediaList() {
     fetch('/media-list').then(function (r) { return r.json(); }).then(function (res) {
-      var files = (res && res.files) || [];
-      $('mediaList').innerHTML = files.length
-        ? files.map(function (f) { return '<span class="kind" title="reference this by name in your CSV" style="background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 8px;color:var(--txt)">' + esc(f) + '</span>'; }).join('')
-        : '<span class="mini" style="color:var(--muted)">No images uploaded yet.</span>';
+      var files = (res && res.files) || [], folders = (res && res.folders) || [];
+      // keep the upload-target dropdown in sync (preserve selection)
+      var sel = $('mediaFolder'), cur = sel.value;
+      sel.innerHTML = '<option value="">(top level)</option>' + folders.map(function (f) { return '<option value="' + esc(f) + '">' + esc(f) + '</option>'; }).join('');
+      if (folders.indexOf(cur) >= 0) sel.value = cur;
+      // group files by folder
+      var groups = { '': [] }; folders.forEach(function (f) { groups[f] = []; });
+      files.forEach(function (p) { var i = p.indexOf('/'); if (i < 0) groups[''].push(p); else { var fo = p.slice(0, i); (groups[fo] = groups[fo] || []).push(p); } });
+      var html = '';
+      Object.keys(groups).forEach(function (fo) {
+        var list = groups[fo]; if (fo === '' && !list.length) return;
+        html += '<div style="margin-bottom:10px"><div class="mini" style="color:var(--muted2);font-weight:700;margin-bottom:4px">' + (fo ? '📁 ' + esc(fo) : 'Top level') + (fo ? ' <button class="minibtn danger" data-rmdir="' + esc(fo) + '" style="padding:2px 7px" title="delete this folder and its images">✕ folder</button>' : '') + '</div>';
+        html += list.length ? list.map(function (p) {
+          var name = p.split('/').pop();
+          return '<span class="mediachip" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 6px 3px 9px;color:var(--txt);margin:0 6px 6px 0">' + esc(name)
+            + '<button class="minibtn" data-ren="' + esc(p) + '" style="padding:1px 6px" title="rename">✎</button>'
+            + '<button class="minibtn danger" data-del="' + esc(p) + '" style="padding:1px 6px" title="delete">🗑</button></span>';
+        }).join('') : '<span class="mini" style="color:var(--muted)">empty</span>';
+        html += '</div>';
+      });
+      $('mediaList').innerHTML = html || '<span class="mini" style="color:var(--muted)">No images uploaded yet.</span>';
+      $('mediaList').querySelectorAll('[data-del]').forEach(function (btn) { btn.onclick = function () { if (confirm('Delete ' + btn.dataset.del.split('/').pop() + '?')) manageMedia('delete', { path: btn.dataset.del }).then(refreshMediaList); }; });
+      $('mediaList').querySelectorAll('[data-ren]').forEach(function (btn) { btn.onclick = function () { var n = prompt('Rename to:', btn.dataset.ren.split('/').pop()); if (n && n.trim()) manageMedia('rename', { path: btn.dataset.ren, name: n.trim() }).then(refreshMediaList); }; });
+      $('mediaList').querySelectorAll('[data-rmdir]').forEach(function (btn) { btn.onclick = function () { if (confirm('Delete the folder "' + btn.dataset.rmdir + '" and everything in it?')) manageMedia('rmdir', { folder: btn.dataset.rmdir }).then(refreshMediaList); }; });
     }).catch(function () {});
   }
   function uploadMedia(files) {
     files = Array.prototype.slice.call(files).filter(function (f) { return /^image\//.test(f.type); });
     if (!files.length) return;
-    var done = 0, fail = 0;
-    $('mediaStatus').textContent = 'Uploading ' + files.length + ' image' + (files.length === 1 ? '' : 's') + '…';
+    var folder = $('mediaFolder').value, done = 0, fail = 0;
+    $('mediaStatus').textContent = 'Uploading ' + files.length + ' image' + (files.length === 1 ? '' : 's') + (folder ? ' into ' + folder : '') + '…';
     files.forEach(function (f) {
       if (f.size > 25 * 1024 * 1024) { fail++; step(); return; }
       var r = new FileReader();
       r.onload = function () {
-        fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result, keepName: true }) })
+        fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result, keepName: true, folder: folder }) })
           .then(function (x) { return x.json(); }).then(function (res) { if (!res || !res.ok) fail++; step(); }).catch(function () { fail++; step(); });
       };
       r.onerror = function () { fail++; step(); };
@@ -143,6 +164,7 @@
     function step() { done++; if (done >= files.length) { $('mediaStatus').textContent = 'Done — ' + (done - fail) + ' uploaded' + (fail ? ', ' + fail + ' skipped (too large or unreadable)' : '') + '.'; refreshMediaList(); } }
   }
   $('mediaFiles').onchange = function () { uploadMedia(this.files); this.value = ''; };
+  $('mkFolder').onclick = function () { var n = ($('newFolder').value || '').trim(); if (!n) return; manageMedia('mkdir', { folder: n }).then(function () { $('newFolder').value = ''; refreshMediaList().then ? null : null; refreshMediaList(); setTimeout(function () { $('mediaFolder').value = n.replace(/[^a-zA-Z0-9._ -]/g, '_'); }, 150); }); };
   var dz = $('dropZone');
   ['dragenter', 'dragover'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; }); });
   ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.style.borderColor = ''; }); });

@@ -156,6 +156,7 @@
     timerLayers.forEach(function (l, i) { if (els[i]) els[i].setAttribute('data-t', JSON.stringify(l)); });
   }
 
+  var MEDIA_MAP = {};   // basename(lowercased) -> relative path within /media (built from state.media)
   // Mail-merge: fill a template's field-layers (l.field) from a CSV row (matched by column name).
   function fillLayers(layers, row) {
     if (!row) return layers;
@@ -167,9 +168,13 @@
       if (l.type === 'text') return Object.assign({}, l, { text: v });
       if (l.type === 'image') {
         var s = String(v);
-        // A browser can't load a local path like C:\...\pic.jpg. If it's not a URL/absolute
-        // path, treat it as a filename served from the app's /media folder.
-        if (s && !/^(https?:|data:|\/)/i.test(s)) s = '/media/' + s.split(/[\\/]/).pop();
+        // A browser can't load a local path like C:\...\pic.jpg. Resolve by filename against the
+        // /media index (which may live in a show/event subfolder); else fall back to /media/<name>.
+        if (s && !/^(https?:|data:|\/)/i.test(s)) {
+          var base = s.split(/[\\/]/).pop();
+          var rel = MEDIA_MAP[base.toLowerCase()] || base;
+          s = '/media/' + rel.split('/').map(encodeURIComponent).join('/');   // encode spaces etc. in folder/name
+        }
         return Object.assign({}, l, { src: s });
       }
       return l;
@@ -185,6 +190,7 @@
 
   function render(state) {
     applyChroma(state.lowerthird && state.lowerthird.chroma);
+    MEDIA_MAP = {}; (state.media || []).forEach(function (rel) { MEDIA_MAP[rel.split('/').pop().toLowerCase()] = rel; });
     var shows = state.shows || [];
     var onIds = {};
     shows.forEach(function (it) {
