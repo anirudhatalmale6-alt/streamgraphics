@@ -419,7 +419,27 @@
 
   /* ---- add layers ---- */
   function topZ() { return layers.length ? Math.max.apply(null, layers.map(function (l) { return l.z || 0; })) + 1 : 1; }
-  function add(l) { l.id = uid(); l.z = topZ(); layers.push(l); selId = l.id; selIds = [l.id]; renderCanvas(); renderList(); syncProps(); push(); }
+  function add(l) {
+    l.id = uid(); l.z = topZ();
+    // Cascade a new layer so it doesn't land exactly on top of an existing one (which would
+    // hide/block it). Nudge down-right until its top-left is clear of other layers.
+    var guard = 0;
+    while (guard++ < 12 && layers.some(function (o) { return Math.abs((o.x || 0) - l.x) < 18 && Math.abs((o.y || 0) - l.y) < 18; })) { l.x += 40; l.y += 40; }
+    layers.push(l); selId = l.id; selIds = [l.id]; renderCanvas(); renderList(); syncProps(); push();
+  }
+  function saveToLibrary() {
+    var suggested = '';
+    for (var i = 0; i < layers.length; i++) { if (layers[i].type === 'text' && layers[i].text) { suggested = layers[i].text; break; } }
+    var name = prompt('Save this design to the Show Library as:', suggested || 'Untitled graphic');
+    if (name == null) return; name = name.trim() || 'Untitled graphic';
+    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'show_save', name: name, kind: 'lowerthird', payload: { layers: layers } }) })
+      .then(function () {
+        var b = $('saveToLib'), old = b.textContent; b.textContent = 'Saved ✓'; setTimeout(function () { b.textContent = old; }, 1500);
+        if (confirm('Saved "' + name + '" to the Show Library.\n\nStart a new blank design so you can build the next one?')) {
+          fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [] }) });
+        }
+      }).catch(function () { alert('Save failed — is the server running?'); });
+  }
   var A = function (inA) { return { inAnim: inA, inDelay: 0, inDur: 500, outAnim: 'fade', outDelay: 0, outDur: 300 }; };
   function merge(a, b) { for (var k in b) a[k] = b[k]; return a; }
   $('addText').onclick = function () { add(merge({ type: 'text', x: 200, y: 500, w: 560, h: 60, text: 'New text', font: 'Arial, Helvetica, sans-serif', size: 40, bold: true, italic: false, color: '#ffffff', align: 'left' }, A('fade'))); };
@@ -603,6 +623,8 @@
   /* ---- air / chroma / copy ---- */
   $('btnShow').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_show' }) }); };
   $('btnHide').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_hide' }) }); };
+  $('saveToLib').onclick = saveToLibrary;
+  $('newDesign').onclick = function () { if (confirm('Start a new blank design? (Save to Library first if you want to keep the current one.)')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [] }) }); };
   $('chroma').onchange = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_chroma', value: $('chroma').checked ? 'green' : '' }) }); };
   $('copyBtn').onclick = function () {
     var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
