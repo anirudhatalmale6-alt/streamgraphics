@@ -88,6 +88,14 @@
         var ts = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
         var gap = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
         inner = '<div class="li ly-ticker" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px;overflow:hidden;display:flex;align-items:center">' + '<div class="tick-track" style="display:inline-flex;white-space:nowrap;will-change:transform;' + ts + '">' + '<span class="tc">' + esc(l.text || '') + gap + '</span><span class="tc">' + esc(l.text || '') + gap + '</span></div></div>';
+      } else if (l.type === 'slides') {
+        var sst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 54) + 'px;color:' + esc(l.color || '#fff')
+          + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
+          + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start'))
+          + ';justify-content:center;line-height:1.18;text-shadow:0 2px 8px rgba(0,0,0,.4);transition:opacity .3s ease';
+        var sidx = (l.index == null ? -1 : l.index);
+        var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
+        inner = '<div class="li ly-slide" data-idx="' + sidx + '" style="' + sst + '">' + esc(stxt).replace(/\n/g, '<br>') + '</div>';
       } else if (l.type === 'timer') {
         var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
           + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
@@ -190,10 +198,25 @@
     else document.body.classList.remove('chroma');
   }
 
+  // Advancing a slide changes only its `index` — cross-fade the text in place instead of
+  // rebuilding the whole layer, so it glides like lyrics/scripture rather than hard-cutting.
+  function refreshSlides(lt) {
+    (lt.layers || []).forEach(function (l) {
+      if (l.type !== 'slides') return;
+      var el = stage.querySelector('.ly[data-id="' + l.id + '"] .ly-slide'); if (!el) return;
+      var idx = (l.index == null ? -1 : l.index);
+      if (String(idx) === el.getAttribute('data-idx')) return;
+      var txt = (idx >= 0 && l.slides && l.slides[idx] != null) ? l.slides[idx] : '';
+      el.style.opacity = '0';
+      setTimeout(function () { el.innerHTML = esc(txt).replace(/\n/g, '<br>'); el.setAttribute('data-idx', String(idx)); el.style.opacity = '1'; }, 160);
+    });
+  }
   function render(lt) {
     applyChroma(lt.chroma);
-    var newSig = JSON.stringify(lt.layers);
+    // Neutralise slide `index` so advancing a slide does NOT trigger a full rebuild.
+    var newSig = JSON.stringify(lt.layers, function (k, v) { return k === 'index' ? 0 : v; });
     if (newSig !== sig) { sig = newSig; buildLayers(lt.layers || []); snap(visibleNow); }
+    refreshSlides(lt);
     if (!!lt.visible !== visibleNow) { visibleNow = !!lt.visible; requestAnimationFrame(function () { if (visibleNow) { animateOn(); playAutoVideos(); } else { animateOff(); pauseVideos(); } }); }
     applyVcmd(lt.vcmd);
   }

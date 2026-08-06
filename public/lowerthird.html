@@ -87,6 +87,7 @@
             <button class="btn" id="addVideo">＋ Video</button>
             <button class="btn" id="addTicker">＋ Ticker</button>
             <button class="btn" id="addTimer" title="live clock / countdown / count-up as a layer">＋ Timer</button>
+            <button class="btn" id="addSlides" title="advance blocks of text next/next/next, like lyrics">＋ Slides</button>
             <button class="btn" id="addBg" title="full-screen background colour">＋ BG</button>
           </div>
         </section>
@@ -193,6 +194,33 @@
             </div>
             <div class="row only-timer"><label>Font</label>
               <select class="inp" id="pTmFont" style="width:auto">
+                <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Clean</option>
+                <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
+                <option value="Georgia, 'Times New Roman', serif">Serif</option>
+                <option value="'Courier New', ui-monospace, monospace">Mono</option>
+                <option value="Impact, Haettenschweiler, sans-serif">Impact</option>
+              </select>
+            </div>
+
+            <div class="row only-slides" style="flex-direction:column;align-items:stretch;gap:4px">
+              <label style="width:100%;color:var(--muted);font-size:11px">Slides — separate each slide with a blank line</label>
+              <textarea id="pSlText" rows="6" style="width:100%;resize:vertical;font:14px/1.4 'Segoe UI',Arial,sans-serif;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px" placeholder="First slide&#10;&#10;Second slide&#10;&#10;Third slide"></textarea>
+            </div>
+            <div class="row only-slides">
+              <button class="btn ghost" id="pSlFirst" style="font-size:12px">⏮ First</button>
+              <button class="btn ghost" id="pSlPrev" style="font-size:12px">◀ Prev</button>
+              <span id="pSlIdx" class="mono" style="min-width:64px;text-align:center">0 / 0</span>
+              <button class="btn go" id="pSlNext" style="font-size:12px">Next ▶</button>
+              <button class="btn ghost" id="pSlBlank" style="font-size:12px" title="hide the text (blank screen)">Blank</button>
+            </div>
+            <div class="row only-slides"><label>Look</label>
+              <input type="color" id="pSlColor" value="#ffffff">
+              <input class="inp t" id="pSlSize" type="number" min="16" max="300" value="64" title="size">
+              <label style="width:auto"><input type="checkbox" id="pSlBold"> B</label>
+              <select class="inp" id="pSlAlign" style="width:auto"><option value="center">Center</option><option value="left">Left</option><option value="right">Right</option></select>
+            </div>
+            <div class="row only-slides"><label>Font</label>
+              <select class="inp" id="pSlFont" style="width:auto">
                 <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Clean</option>
                 <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
                 <option value="Georgia, 'Times New Roman', serif">Serif</option>

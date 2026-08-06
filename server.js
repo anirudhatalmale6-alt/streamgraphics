@@ -375,6 +375,22 @@ function applyAction(action) {
     case 'lt_vcmd': // video play/pause/restart command to a specific video layer
       state.lowerthird.vcmd = { id: String(action.id || ''), cmd: String(action.cmd || ''), seq: (state.lowerthird.vcmd.seq || 0) + 1 };
       break;
+    case 'lt_slides': { // advance a SLIDES layer (next/prev/first/last/blank/goto) — index synced to every machine
+      const L = (state.lowerthird.layers || []).find(x => x.id === action.id && x.type === 'slides');
+      if (L) {
+        const n = (L.slides || []).length, cmd = String(action.cmd || '');
+        let i = (L.index == null ? -1 : L.index);
+        if (cmd === 'next') { i = (i < 0 ? 0 : i + 1); i = n ? Math.min(i, n - 1) : -1; }
+        else if (cmd === 'prev') { if (i > 0) i = i - 1; }
+        else if (cmd === 'first') { i = n ? 0 : -1; }
+        else if (cmd === 'last') { i = n ? n - 1 : -1; }
+        else if (cmd === 'blank') { i = -1; }
+        else if (cmd === 'goto') { i = parseInt(action.n, 10); if (isNaN(i)) i = -1; i = Math.max(-1, Math.min(n - 1, i)); }
+        L.index = i;
+        saveLowerThird();
+      }
+      break;
+    }
     case 'lt_timer': { // transport for a TIMER layer — time is stamped on the SERVER so every machine agrees
       const L = (state.lowerthird.layers || []).find(x => x.id === action.id && x.type === 'timer');
       if (L) {
