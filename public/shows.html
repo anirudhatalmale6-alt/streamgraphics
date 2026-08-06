@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics — Show Library</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .lib{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .libitem{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .libitem.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .libitem .nm{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .libitem .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .sw{position:relative;width:52px;height:28px;border-radius:16px;background:#39424f;cursor:pointer;flex:none;transition:background .15s}
+  .sw.on{background:var(--accent)}
+  .sw::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s}
+  .sw.on::after{left:27px}
+  .minibtn{font-size:12px;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer}
+  .minibtn:hover{border-color:var(--accent)}
+  .minibtn.danger:hover{border-color:#e06;color:#e06}
+  .empty{color:var(--muted);padding:18px;text-align:center;border:1px dashed var(--line);border-radius:10px}
+</style>
+</head>
+<body>
+  <header class="top">
+    <div style="display:flex;align-items:center">
+      <div class="brand"><span class="dot"></span> StreamGraphics <small>Show Library</small></div>
+      <nav class="topnav"><a href="/">☰ All graphics</a><a href="/program-output" target="_blank">Open Program output ↗</a><a href="/lowerthird">Graphics builder</a><a href="/scoreboard">Scoreboard</a></nav>
+    </div>
+    <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h3>Save a graphic to the library</h3>
+      <p class="mini" style="color:var(--muted);margin:2px 0 10px">Design a graphic in the Graphics Builder, and when it's just right, save it here as a named preset — ready to turn on and off from the Program output.</p>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <input class="inp" id="saveName" type="text" maxlength="120" placeholder="Preset name — e.g. Coach Lower Third" style="flex:1;min-width:220px">
+        <button class="btn go" id="saveBtn">＋ Save current Builder design</button>
+      </div>
+      <p class="mini" id="saveHint" style="color:var(--muted);margin-top:8px">Snapshots whatever is currently in the Graphics Builder.</p>
+    </section>
+
+    <section class="panel">
+      <h3 style="display:flex;align-items:center;justify-content:space-between">Library
+        <button class="minibtn" id="allOff" title="turn every preset off air">All off</button>
+      </h3>
+      <div class="lib" id="lib"></div>
+    </section>
+
+    <section class="panel">
+      <h3>Populate from a spreadsheet <span class="mini" style="color:var(--muted);font-weight:400">(coming next)</span></h3>
+      <p class="mini" style="color:var(--muted)">This is where you'll drop a CSV to mail-merge rows (player/team profiles, etc.) into a saved graphic — generating a ready-to-go preset per row. Building this next.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Program output for OBS / vMix / browser: <code id="outUrl">http://THIS-PC-IP:PORT/program-output</code>
+    <button class="btn ghost" id="copyBtn" style="font-size:12px;margin-left:8px">Copy</button>
+    <span class="hint">— shows every preset that's toggled ON, composited, transparent.</span>
+  </footer>
+
+  <script src="/shows.js"></script>
+</body>
+</html>

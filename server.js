@@ -100,7 +100,10 @@ function defaultState() {
       w: 1920, h: 1080,
       vcmd: { id: '', cmd: '', seq: 0 },   // transient video playback command (play/pause/restart)
       layers: defaultLowerThirdLayers()
-    }
+    },
+
+    // The Show Library — saved named graphics, recallable and toggleable on the Program output.
+    shows: []
   };
 }
 
@@ -161,6 +164,21 @@ const LT_FILE = path.join(DATA_DIR, 'lowerthird.json');
 })();
 function saveLowerThird() {
   try { fs.writeFileSync(LT_FILE, JSON.stringify({ layers: state.lowerthird.layers }, null, 2)); } catch (e) {}
+}
+
+// The SHOW LIBRARY — saved, named graphics ("presets") that can be recalled or toggled on air.
+// Each item: { id, name, kind, payload, on }. Persisted so the library survives restarts.
+const SHOWS_FILE = path.join(DATA_DIR, 'shows.json');
+(function () {
+  try {
+    if (fs.existsSync(SHOWS_FILE)) {
+      const j = JSON.parse(fs.readFileSync(SHOWS_FILE, 'utf8'));
+      if (j && Array.isArray(j.items)) state.shows = j.items;
+    }
+  } catch (e) {}
+})();
+function saveShows() {
+  try { fs.writeFileSync(SHOWS_FILE, JSON.stringify({ items: state.shows }, null, 2)); } catch (e) {}
 }
 
 /* ------------------------------------------------------------------ *
@@ -408,6 +426,25 @@ function applyAction(action) {
       break;
     }
 
+    /* ---- Show Library ---- */
+    case 'show_save': { // snapshot a graphic into the library (or overwrite an existing preset by id)
+      const name = String(action.name || 'Untitled').slice(0, 120);
+      const kind = String(action.kind || 'lowerthird');
+      const payload = action.payload && typeof action.payload === 'object' ? action.payload : {};
+      const existing = action.id ? state.shows.find(x => x.id === action.id) : null;
+      if (existing) { existing.name = name; existing.kind = kind; existing.payload = payload; }
+      else {
+        if (state.shows.length >= 300) break;
+        state.shows.push({ id: 'S' + Date.now().toString(36) + (state.shows.length), name, kind, payload, on: false });
+      }
+      saveShows();
+      break;
+    }
+    case 'show_delete': state.shows = state.shows.filter(x => x.id !== action.id); saveShows(); break;
+    case 'show_rename': { const it = state.shows.find(x => x.id === action.id); if (it) { it.name = String(action.name || it.name).slice(0, 120); saveShows(); } break; }
+    case 'show_toggle': { const it = state.shows.find(x => x.id === action.id); if (it) { it.on = (action.on == null ? !it.on : !!action.on); saveShows(); } break; }
+    case 'show_alloff': state.shows.forEach(x => { x.on = false; }); saveShows(); break;
+
     default:
       return false;
   }
@@ -524,6 +561,8 @@ const server = http.createServer((req, res) => {
           : pathname === '/scoreboard-output' ? '/scoreboard-output.html'
           : pathname === '/lowerthird' ? '/lowerthird.html'
           : pathname === '/lowerthird-output' ? '/lowerthird-output.html'
+          : pathname === '/shows' ? '/shows.html'
+          : pathname === '/program-output' ? '/program-output.html'
           : pathname;
   // prevent path traversal
   const file = path.join(PUBLIC_DIR, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
@@ -561,6 +600,7 @@ server.listen(PORT, () => {
   console.log(`  PRESENTER'S TIMER control:   http://localhost:${PORT}/control          · output: /output`);
   console.log(`  BEACH VOLLEYBALL SCOREBOARD: http://localhost:${PORT}/scoreboard       · output: /scoreboard-output`);
   console.log(`  LOWER THIRD / GRAPHICS:      http://localhost:${PORT}/lowerthird       · output: /lowerthird-output`);
+  console.log(`  SHOW LIBRARY:                http://localhost:${PORT}/shows            · output: /program-output`);
   console.log(`  ---------------------------------------------------------------`);
   console.log(`  From ANOTHER computer, swap "localhost" for  ${lan}`);
   console.log(`  e.g. OBS/vMix Browser Source:  http://${lan}:${PORT}/lowerthird-output\n`);
