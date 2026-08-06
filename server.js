@@ -25,7 +25,9 @@ const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 let VERSION = '?'; try { VERSION = require('./package.json').version; } catch (e) {}
 const UPLOAD_DIR = path.join(PUBLIC_DIR, 'uploads');
+const MEDIA_DIR = path.join(PUBLIC_DIR, 'media');   // images referenced by name from a CSV live here
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
+try { fs.mkdirSync(MEDIA_DIR, { recursive: true }); } catch (e) {}
 let uploadSeq = 0;
 
 /* ------------------------------------------------------------------ *
@@ -602,11 +604,19 @@ const server = http.createServer((req, res) => {
         const extMap = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
           'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/ogg': 'ogv', 'video/x-matroska': 'mkv' };
         const ext = extMap[m[1]] || (m[1].indexOf('video') === 0 ? 'mp4' : 'png');
-        const fname = 'up_' + Date.now() + '_' + (uploadSeq++) + '.' + ext;
-        fs.writeFile(path.join(UPLOAD_DIR, fname), Buffer.from(m[2], 'base64'), (err) => {
+        // keepName: save into /media under the ORIGINAL filename so a CSV that references
+        // "photo.jpg" (or C:\...\photo.jpg) finds it — clients never touch the folder themselves.
+        let dir = UPLOAD_DIR, urlBase = '/uploads/', fname;
+        if (j.keepName && j.name) {
+          const base = String(j.name).split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || ('img.' + ext);
+          fname = base; dir = MEDIA_DIR; urlBase = '/media/';
+        } else {
+          fname = 'up_' + Date.now() + '_' + (uploadSeq++) + '.' + ext;
+        }
+        fs.writeFile(path.join(dir, fname), Buffer.from(m[2], 'base64'), (err) => {
           if (err) { res.writeHead(500); res.end('{"ok":false}'); return; }
           res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-          res.end(JSON.stringify({ ok: true, url: '/uploads/' + fname }));
+          res.end(JSON.stringify({ ok: true, url: urlBase + fname }));
         });
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -620,6 +630,16 @@ const server = http.createServer((req, res) => {
   if (pathname === '/state') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ serverTime: Date.now(), state }));
+    return;
+  }
+
+  // --- list images available in /media (so users see what they've uploaded for CSV fields) ---
+  if (pathname === '/media-list') {
+    fs.readdir(MEDIA_DIR, (err, files) => {
+      const imgs = (files || []).filter(f => /\.(png|jpe?g|gif|webp|svg)$/i.test(f)).sort();
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ ok: true, files: imgs }));
+    });
     return;
   }
 

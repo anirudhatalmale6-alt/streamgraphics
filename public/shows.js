@@ -115,6 +115,39 @@
   $('allOff').onclick = function () { post({ type: 'show_alloff' }); };
   $('manCancel').onclick = closeManual;
   $('manualModal').onclick = function (e) { if (e.target === $('manualModal')) closeManual(); };
+
+  /* ---- media uploader: drop images into the app's /media folder (no filesystem access needed) ---- */
+  function refreshMediaList() {
+    fetch('/media-list').then(function (r) { return r.json(); }).then(function (res) {
+      var files = (res && res.files) || [];
+      $('mediaList').innerHTML = files.length
+        ? files.map(function (f) { return '<span class="kind" title="reference this by name in your CSV" style="background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 8px;color:var(--txt)">' + esc(f) + '</span>'; }).join('')
+        : '<span class="mini" style="color:var(--muted)">No images uploaded yet.</span>';
+    }).catch(function () {});
+  }
+  function uploadMedia(files) {
+    files = Array.prototype.slice.call(files).filter(function (f) { return /^image\//.test(f.type); });
+    if (!files.length) return;
+    var done = 0, fail = 0;
+    $('mediaStatus').textContent = 'Uploading ' + files.length + ' image' + (files.length === 1 ? '' : 's') + '…';
+    files.forEach(function (f) {
+      if (f.size > 25 * 1024 * 1024) { fail++; step(); return; }
+      var r = new FileReader();
+      r.onload = function () {
+        fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: r.result, keepName: true }) })
+          .then(function (x) { return x.json(); }).then(function (res) { if (!res || !res.ok) fail++; step(); }).catch(function () { fail++; step(); });
+      };
+      r.onerror = function () { fail++; step(); };
+      r.readAsDataURL(f);
+    });
+    function step() { done++; if (done >= files.length) { $('mediaStatus').textContent = 'Done — ' + (done - fail) + ' uploaded' + (fail ? ', ' + fail + ' skipped (too large or unreadable)' : '') + '.'; refreshMediaList(); } }
+  }
+  $('mediaFiles').onchange = function () { uploadMedia(this.files); this.value = ''; };
+  var dz = $('dropZone');
+  ['dragenter', 'dragover'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; }); });
+  ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.style.borderColor = ''; }); });
+  dz.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files) uploadMedia(e.dataTransfer.files); });
+  refreshMediaList();
   $('copyBtn').onclick = function () {
     var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
     if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok, ok);

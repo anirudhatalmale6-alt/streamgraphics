@@ -41,6 +41,19 @@
     </section>
 
     <section class="panel">
+      <h3>Images for spreadsheet fields</h3>
+      <p class="mini" style="color:var(--muted);margin:2px 0 10px">Driving images from a CSV? Drop your photos here — no folder access needed. Then in your spreadsheet's image column, just use the file name (e.g. mn2_3944.jpg) or even the full path from your computer; the app matches by file name. (Make sure the image layer has a "CSV field" set in the Graphics Builder.)</p>
+      <label id="dropZone" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2px dashed var(--line);border-radius:12px;padding:22px;cursor:pointer;color:var(--muted)">
+        <div style="font-size:26px">⬆</div>
+        <div><b style="color:var(--txt)">Drop images here</b> or click to choose</div>
+        <div class="mini">PNG · JPG · GIF · WEBP · SVG · up to ~25 MB each</div>
+        <input type="file" id="mediaFiles" accept="image/*" multiple style="display:none">
+      </label>
+      <div id="mediaStatus" class="mini" style="color:var(--muted);margin-top:8px"></div>
+      <div id="mediaList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
+    </section>
+
+    <section class="panel">
       <h3>Mail-merge from a spreadsheet</h3>
       <p class="mini" style="color:var(--muted)">In the Graphics Builder, name a text (or image) layer a "CSV field" — e.g. PlayerName. Then hit "Import CSV" on that graphic above; each row fills the fields and becomes a version you can step through (◀ ▶) or jump to by name. Great for rosters, speakers, graduations.</p>
     </section>
