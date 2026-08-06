@@ -559,6 +559,7 @@ const server = http.createServer((req, res) => {
           : pathname === '/control' ? '/control.html'
           : pathname === '/scoreboard' ? '/scoreboard.html'
           : pathname === '/scoreboard-output' ? '/scoreboard-output.html'
+          : pathname === '/scorer' ? '/scorer.html'
           : pathname === '/lowerthird' ? '/lowerthird.html'
           : pathname === '/lowerthird-output' ? '/lowerthird-output.html'
           : pathname === '/shows' ? '/shows.html'
@@ -599,6 +600,7 @@ server.listen(PORT, () => {
   console.log(`  Home (all graphics):         http://localhost:${PORT}/`);
   console.log(`  PRESENTER'S TIMER control:   http://localhost:${PORT}/control          · output: /output`);
   console.log(`  BEACH VOLLEYBALL SCOREBOARD: http://localhost:${PORT}/scoreboard       · output: /scoreboard-output`);
+  console.log(`     big-button Scorer:        http://localhost:${PORT}/scorer`);
   console.log(`  LOWER THIRD / GRAPHICS:      http://localhost:${PORT}/lowerthird       · output: /lowerthird-output`);
   console.log(`  SHOW LIBRARY:                http://localhost:${PORT}/shows            · output: /program-output`);
   console.log(`  ---------------------------------------------------------------`);

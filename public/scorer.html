@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics — Scorer</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  body { -webkit-user-select: none; user-select: none; }
+  .scorer { max-width: 1100px; margin: 0 auto; padding: 8px 14px 28px; }
+  .sbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sbar .ttl { font-weight: 800; font-size: 18px; }
+  .gtag { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 800; }
+  .air { display: flex; gap: 8px; margin-left: auto; }
+  .air .btn { font-size: 15px; padding: 10px 16px; }
+  .airstate { align-self: center; font-weight: 800; font-size: 13px; color: var(--muted); }
+  .airstate.live { color: #ff5470; }
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .tcard { border: 2px solid var(--line); border-radius: 18px; padding: 18px 16px 20px; background: var(--panel); display: flex; flex-direction: column; align-items: center; }
+  .tname { font-size: clamp(20px, 3vw, 30px); font-weight: 800; text-align: center; line-height: 1.1; min-height: 2.2em; display: flex; align-items: center; }
+  .tscore { font-size: clamp(90px, 18vw, 190px); font-weight: 900; line-height: 1; margin: 6px 0 14px; font-variant-numeric: tabular-nums; }
+  .plus { width: 100%; font-size: clamp(30px, 5vw, 46px); font-weight: 900; padding: 30px 0; border: none; border-radius: 16px; color: #fff; cursor: pointer; }
+  .minus { width: 100%; margin-top: 12px; font-size: 20px; font-weight: 800; padding: 14px 0; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); color: var(--txt); cursor: pointer; }
+  .minus:active { background: #3a2530; }
+  .games { display: flex; gap: 8px; margin-top: 14px; }
+  .games .g { min-width: 46px; text-align: center; padding: 6px 8px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-weight: 800; }
+  .games .g.active { border-color: var(--accent); color: var(--accent); }
+  .games .g small { display: block; font-size: 10px; color: var(--muted); font-weight: 700; }
+  .bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .bottom .btn { font-size: 17px; padding: 18px 10px; font-weight: 800; }
+  @media (max-width: 620px) { .teams { grid-template-columns: 1fr; } .bottom { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div style="display:flex;align-items:center">
+      <div class="brand"><span class="dot"></span> StreamGraphics <small>Scorer</small></div>
+      <nav class="topnav"><a href="/">☰ All graphics</a><a href="/scoreboard">Full scoreboard controls</a><a href="/scoreboard-output" target="_blank">Output ↗</a></nav>
+    </div>
+    <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
+  </header>
+
+  <main class="scorer">
+    <div class="sbar">
+      <span class="ttl" id="matchTitle"></span>
+      <span class="gtag" id="gtag">Game 1</span>
+      <div class="air">
+        <span class="airstate" id="airState">OFF AIR</span>
+        <button class="btn big show" id="btnShow">Take to air ▸</button>
+        <button class="btn big hide" id="btnHide">◂ Off air</button>
+      </div>
+    </div>
+
+    <div class="teams">
+      <div class="tcard" id="cardA">
+        <div class="tname" id="nameA">Team A</div>
+        <div class="tscore" id="scoreA">0</div>
+        <button class="plus" id="plusA">+1 POINT</button>
+        <button class="minus" id="minusA">− Undo point</button>
+      </div>
+      <div class="tcard" id="cardB">
+        <div class="tname" id="nameB">Team B</div>
+        <div class="tscore" id="scoreB">0</div>
+        <button class="plus" id="plusB">+1 POINT</button>
+        <button class="minus" id="minusB">− Undo point</button>
+      </div>
+    </div>
+
+    <div class="games" id="gamesRow" style="justify-content:center"></div>
+
+    <div class="bottom">
+      <button class="btn" id="startNext">Start Next Game ▸</button>
+      <button class="btn ghost" id="backGame">◂ Back a Game</button>
+      <button class="btn ghost" id="restart">↺ Restart Match</button>
+    </div>
+  </main>
+
+  <script src="/scorer.js"></script>
+</body>
+</html>

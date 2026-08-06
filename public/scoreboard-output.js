@@ -139,7 +139,26 @@
       if (sb.style.animation) card.setAttribute('data-anim', sb.style.animation);
       applyChroma(sb.style.chroma);
     }
+    layoutLogoBoard(sb);
     setVisible(!!sb.visible);
+  }
+
+  // When the event logo is a free overlay on the SAME side as the board, shift the board over
+  // so the logo sits beside it (not hidden behind it) — matching the sample layout.
+  function layoutLogoBoard(sb) {
+    var floatLogo = document.getElementById('floatLogo');
+    card.style.marginLeft = ''; card.style.marginRight = '';
+    var placement = sb.eventLogoPlacement || 'inline';
+    if (!sb.eventLogoUrl || placement === 'inline') return;
+    var boardPos = (sb.style && sb.style.position) || 'bottom-left';
+    var gap = 30;
+    var apply = function () {
+      var w = floatLogo.offsetWidth || Math.round((sb.eventLogoSize || 150) * 1.4);
+      if (placement.indexOf('left') >= 0 && boardPos.indexOf('left') >= 0) card.style.marginLeft = (w + gap) + 'px';
+      else if (placement.indexOf('right') >= 0 && boardPos.indexOf('right') >= 0) card.style.marginRight = (w + gap) + 'px';
+    };
+    if (floatLogo.complete && floatLogo.offsetWidth) apply();
+    else floatLogo.onload = apply;
   }
 
   function setVisible(v) {
