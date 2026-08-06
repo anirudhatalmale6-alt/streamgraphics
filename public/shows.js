@@ -19,7 +19,7 @@
         + '<div class="sw' + (it.on ? ' on' : '') + '" data-act="toggle" title="on / off air"></div>'
         + '<div class="nm">' + esc(it.name) + '</div>'
         + '<span class="kind">' + esc(it.kind || 'lowerthird') + '</span>'
-        + '<button class="minibtn" data-act="load" title="load into the Graphics Builder to edit">Load</button>'
+        + '<button class="minibtn" data-act="load" title="open this preset in the Graphics Builder to edit">Edit</button>'
         + '<button class="minibtn" data-act="rename">Rename</button>'
         + '<button class="minibtn danger" data-act="delete">Delete</button>'
         + '</div>';
@@ -31,24 +31,18 @@
         var b = row.querySelector('[data-act="load"]'); b.textContent = '…';
         // OFF presets don't carry their payload over the live stream — fetch it on demand.
         fetch('/show-payload?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (res) {
-          if (!res.ok || !res.payload || !Array.isArray(res.payload.layers)) { alert('This preset has no editable layers.'); b.textContent = 'Load'; return; }
-          post({ type: 'show_load', id: id }).then(function () { b.textContent = 'Loaded ✓'; setTimeout(function () { b.textContent = 'Load'; }, 1400); });
-        }).catch(function () { b.textContent = 'Load'; });
+          if (!res.ok || !res.payload || !Array.isArray(res.payload.layers)) { alert('This preset has no editable layers.'); b.textContent = 'Edit'; return; }
+          post({ type: 'show_load', id: id }).then(function () {
+            b.textContent = 'Opened ✓'; setTimeout(function () { b.textContent = 'Edit'; }, 1400);
+            window.open('/lowerthird', 'sg_builder');   // bring the builder up so the edit is obvious
+          });
+        }).catch(function () { b.textContent = 'Edit'; });
       };
       row.querySelector('[data-act="rename"]').onclick = function () { var n = prompt('Rename preset:', it.name); if (n != null && n.trim()) post({ type: 'show_rename', id: id, name: n.trim() }); };
       row.querySelector('[data-act="delete"]').onclick = function () { if (confirm('Delete "' + it.name + '" from the library?')) post({ type: 'show_delete', id: id }); };
     });
   }
 
-  $('saveBtn').onclick = function () {
-    var name = ($('saveName').value || '').trim();
-    if (!name) { name = 'Preset ' + (shows.length + 1); }
-    if (!ltLayers.length) { if (!confirm('The Graphics Builder looks empty. Save it anyway?')) return; }
-    post({ type: 'show_save', name: name, kind: 'lowerthird', payload: { layers: ltLayers } }).then(function () {
-      $('saveName').value = '';
-      var b = $('saveBtn'); var old = b.textContent; b.textContent = 'Saved ✓'; setTimeout(function () { b.textContent = old; }, 1400);
-    });
-  };
   $('allOff').onclick = function () { post({ type: 'show_alloff' }); };
   $('copyBtn').onclick = function () {
     var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };

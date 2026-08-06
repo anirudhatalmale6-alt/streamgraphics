@@ -33,19 +33,10 @@
 
   <main>
     <section class="panel">
-      <h3>Save a graphic to the library</h3>
-      <p class="mini" style="color:var(--muted);margin:2px 0 10px">Design a graphic in the Graphics Builder, and when it's just right, save it here as a named preset — ready to turn on and off from the Program output.</p>
-      <div class="row" style="gap:8px;flex-wrap:wrap">
-        <input class="inp" id="saveName" type="text" maxlength="120" placeholder="Preset name — e.g. Coach Lower Third" style="flex:1;min-width:220px">
-        <button class="btn go" id="saveBtn">＋ Save current Builder design</button>
-      </div>
-      <p class="mini" id="saveHint" style="color:var(--muted);margin-top:8px">Snapshots whatever is currently in the Graphics Builder.</p>
-    </section>
-
-    <section class="panel">
       <h3 style="display:flex;align-items:center;justify-content:space-between">Library
         <button class="minibtn" id="allOff" title="turn every preset off air">All off</button>
       </h3>
+      <p class="mini" id="saveHint" style="color:var(--muted);margin:2px 0 10px">Save graphics from the Graphics Builder (the purple "＋ Save to Library" button). They appear here to turn on/off, Edit, rename, or delete.</p>
       <div class="lib" id="lib"></div>
     </section>
 

@@ -75,10 +75,49 @@
         var bg = (l.bgOpacity > 0 && l.bg) ? '<div style="position:absolute;inset:0;background:' + rgba(l.bg, l.bgOpacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>' : '';
         inner = '<div class="li" style="position:relative;overflow:visible;width:100%;height:100%">' + bg + '<div class="ly-slide-text" style="' + (stxt ? '' : 'display:none;') + slideTextStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
       }
-      html += '<div class="ly" style="' + box + '">' + inner + '</div>';
+      html += '<div class="ly" data-id="' + l.id + '" style="' + box + '">' + inner + '</div>';
     });
     container.innerHTML = html;
+    container._lmap = {}; layers.forEach(function (l) { container._lmap[l.id] = l; });   // for per-layer animation
     setupTickers(container);
+  }
+
+  // ---- per-layer in/out animation (same design as the builder output) ----
+  var EASE = 'cubic-bezier(.16,1,.3,1)', BOUNCE = 'cubic-bezier(.34,1.62,.5,1)';
+  function hidden(type) {
+    switch (type) {
+      case 'slide-up': return { o: 0, t: 'translateY(46px)' };
+      case 'slide-down': return { o: 0, t: 'translateY(-46px)' };
+      case 'slide-left': return { o: 0, t: 'translateX(-60px)' };
+      case 'slide-right': return { o: 0, t: 'translateX(60px)' };
+      case 'fly-left': return { o: 0, t: 'translateX(-1280px)' };
+      case 'fly-right': return { o: 0, t: 'translateX(1280px)' };
+      case 'bounce': return { o: 0, t: 'translateY(64px) scale(.9)', ease: BOUNCE };
+      case 'pop': return { o: 0, t: 'scale(.3)', ease: BOUNCE };
+      case 'rotate': return { o: 0, t: 'rotate(-180deg) scale(.4)' };
+      case 'scale': return { o: 0, t: 'scale(.86)' };
+      case 'none': return { o: 1, t: 'none' };
+      default: return { o: 0, t: 'none' };
+    }
+  }
+  function setState(li, o, t) { li.style.opacity = o; li.style.transform = t; }
+  function animatePreset(container, dir) {
+    var maxOut = 0;
+    container.querySelectorAll('.ly').forEach(function (ly) {
+      var l = container._lmap && container._lmap[ly.dataset.id]; var li = ly.querySelector('.li'); if (!l || !li) return;
+      if (dir === 'in') {
+        var h = hidden(l.inAnim || 'fade'), dur = l.inDur == null ? 500 : l.inDur, del = l.inDelay || 0;
+        li.style.transition = 'none'; setState(li, h.o, h.t); void li.offsetWidth;
+        li.style.transition = 'transform ' + dur + 'ms ' + (h.ease || EASE) + ' ' + del + 'ms, opacity ' + dur + 'ms ease ' + del + 'ms';
+        setState(li, 1, 'none');
+      } else {
+        var ho = hidden(l.outAnim || 'fade'), odur = l.outDur == null ? 350 : l.outDur, odel = l.outDelay || 0;
+        li.style.transition = 'transform ' + odur + 'ms ' + (ho.ease || EASE) + ' ' + odel + 'ms, opacity ' + odur + 'ms ease ' + odel + 'ms';
+        setState(li, ho.o, ho.t);
+        maxOut = Math.max(maxOut, odur + odel);
+      }
+    });
+    return maxOut;
   }
 
   // ---- ticker scrolling (per container) ----
@@ -125,20 +164,22 @@
       var sig = JSON.stringify(it.payload.layers);
       var a = active[it.id];
       if (!a) {
-        var el = document.createElement('div'); el.className = 'preset'; el.setAttribute('data-id', it.id);
+        var el = document.createElement('div'); el.className = 'preset in'; el.setAttribute('data-id', it.id);
         stage.appendChild(el); buildInto(el, it.payload.layers); tagTimers(el, it.payload.layers);
         active[it.id] = { el: el, sig: sig };
-        requestAnimationFrame(function () { el.classList.add('in'); });
+        // Play each layer's own Animate-ON (fly/bounce/stagger), not just a block fade.
+        requestAnimationFrame(function () { animatePreset(el, 'in'); });
       } else if (a.sig !== sig) {
         buildInto(a.el, it.payload.layers); tagTimers(a.el, it.payload.layers); a.sig = sig;
+        requestAnimationFrame(function () { animatePreset(a.el, 'in'); });
       }
     });
-    // fade out + remove presets no longer on
+    // Turn OFF: play each layer's Animate-OFF, then remove after the longest exit finishes.
     Object.keys(active).forEach(function (id) {
       if (onIds[id]) return;
       var a = active[id]; delete active[id];
-      a.el.classList.remove('in');
-      setTimeout(function () { if (a.el.parentNode) a.el.parentNode.removeChild(a.el); }, 500);
+      var maxOut = animatePreset(a.el, 'out');
+      setTimeout(function () { if (a.el.parentNode) a.el.parentNode.removeChild(a.el); }, maxOut + 120);
     });
   }
 
