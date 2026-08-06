@@ -17,6 +17,8 @@
   }
   function byId(id) { for (var i = 0; i < layers.length; i++) if (layers[i].id === id) return layers[i]; return null; }
   function selected() { return byId(selId); }
+  // Slide text: "//" or a real newline = line break; a line starting with - or * = bullet.
+  function slideHtml(txt) { return esc(txt).replace(/\s*\/\/\s*/g, '\n').replace(/\n/g, '<br>').replace(/(^|<br>)\s*[-*•]\s+/g, '$1• '); }
 
   // ---- timer/clock helpers (same math as the output + server) ----
   var clockOffset = 0;
@@ -133,7 +135,7 @@
       var sidx = (l.index == null ? -1 : l.index);
       var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
       if (!stxt) return '<div class="li" style="' + sst + ';color:#6b7a90">(blank — Next to show a slide)</div>';
-      return '<div class="li ly-slide" style="' + sst + '">' + esc(stxt).replace(/\n/g, '<br>') + '</div>';
+      return '<div class="li ly-slide" style="' + sst + '">' + slideHtml(stxt) + '</div>';
     }
     if (l.type === 'timer') {
       var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')

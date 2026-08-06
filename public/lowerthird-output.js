@@ -19,6 +19,11 @@
     var r = parseInt(hex.slice(0, 2), 16) || 0, g = parseInt(hex.slice(2, 4), 16) || 0, b = parseInt(hex.slice(4, 6), 16) || 0;
     return 'rgba(' + r + ',' + g + ',' + b + ',' + (pct == null ? 1 : pct / 100) + ')';
   }
+  // Render one slide's text: "//" or a real newline = line break; a line starting with - or * = bullet.
+  function slideHtml(txt) {
+    return esc(txt).replace(/\s*\/\/\s*/g, '\n').replace(/\n/g, '<br>').replace(/(^|<br>)\s*[-*•]\s+/g, '$1• ');
+  }
+
   // ---- timer layer math (shared shape with the standalone timer + server) ----
   function liveTimerMs(t, now) {
     if (t.mode === 'up')  return (t.baseMs || 0) + (t.running ? now - t.anchorServer : 0);
@@ -95,7 +100,7 @@
           + ';justify-content:center;line-height:1.18;text-shadow:0 2px 8px rgba(0,0,0,.4);transition:opacity .3s ease';
         var sidx = (l.index == null ? -1 : l.index);
         var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
-        inner = '<div class="li ly-slide" data-idx="' + sidx + '" style="' + sst + '">' + esc(stxt).replace(/\n/g, '<br>') + '</div>';
+        inner = '<div class="li ly-slide" data-idx="' + sidx + '" style="' + sst + '">' + slideHtml(stxt) + '</div>';
       } else if (l.type === 'timer') {
         var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
           + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
@@ -208,7 +213,7 @@
       if (String(idx) === el.getAttribute('data-idx')) return;
       var txt = (idx >= 0 && l.slides && l.slides[idx] != null) ? l.slides[idx] : '';
       el.style.opacity = '0';
-      setTimeout(function () { el.innerHTML = esc(txt).replace(/\n/g, '<br>'); el.setAttribute('data-idx', String(idx)); el.style.opacity = '1'; }, 160);
+      setTimeout(function () { el.innerHTML = slideHtml(txt); el.setAttribute('data-idx', String(idx)); el.style.opacity = '1'; }, 160);
     });
   }
   function render(lt) {

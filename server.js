@@ -438,7 +438,12 @@ const MIME = {
 function serveFile(res, file) {
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404); res.end('Not found'); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+    const ext = path.extname(file);
+    const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+    // Never cache the app code/markup — a live graphics tool must always run the latest JS,
+    // or an operator's stale browser tab silently runs an old build (missing new layer types, etc).
+    if (ext === '.html' || ext === '.js' || ext === '.css') headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    res.writeHead(200, headers);
     res.end(buf);
   });
 }
@@ -553,7 +558,7 @@ server.listen(PORT, () => {
   console.log(`\n  StreamGraphics is running.  Open the control panels in your browser:`);
   console.log(`  ---------------------------------------------------------------`);
   console.log(`  Home (all graphics):         http://localhost:${PORT}/`);
-  console.log(`  TIMER control:               http://localhost:${PORT}/control          · output: /output`);
+  console.log(`  PRESENTER'S TIMER control:   http://localhost:${PORT}/control          · output: /output`);
   console.log(`  BEACH VOLLEYBALL SCOREBOARD: http://localhost:${PORT}/scoreboard       · output: /scoreboard-output`);
   console.log(`  LOWER THIRD / GRAPHICS:      http://localhost:${PORT}/lowerthird       · output: /lowerthird-output`);
   console.log(`  ---------------------------------------------------------------`);
