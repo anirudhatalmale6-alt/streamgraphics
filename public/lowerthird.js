@@ -677,7 +677,14 @@
   $('btnHide').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_hide' }) }); };
   $('saveToLib').onclick = saveToLibrary;
   $('newDesign').onclick = function () { if (confirm('Start a new blank design? (Save to Library first if you want to keep the current one.)')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '' }) }); };
-  $('chroma').onchange = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_chroma', value: $('chroma').checked ? 'green' : '' }) }); };
+  function sendChroma() {
+    var v = $('chromaSel').value;
+    $('chromaColor').style.display = (v === 'custom') ? '' : 'none';
+    if (v === 'custom') v = $('chromaColor').value;
+    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_chroma', value: v }) });
+  }
+  $('chromaSel').onchange = sendChroma;
+  $('chromaColor').oninput = sendChroma;
   $('copyBtn').onclick = function () {
     var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
     if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok, ok);
@@ -694,7 +701,11 @@
         if (m.state) { showsMeta = m.state.shows || []; if (m.state.lowerthird) editingShowId = m.state.lowerthird.editingShowId || ''; }
         if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
         $('airState').textContent = lt.visible ? 'ON AIR' : 'OFF AIR'; $('airState').classList.toggle('live', !!lt.visible);
-        $('chroma').checked = !!lt.chroma;
+        if (document.activeElement !== $('chromaSel') && document.activeElement !== $('chromaColor')) {
+          var cv = lt.chroma || '', preset = ['', '#00b140', '#0047ff', '#ff00ff', '#ffffff', '#000000', '#ff0000'];
+          if (preset.indexOf(cv) >= 0) { $('chromaSel').value = cv; $('chromaColor').style.display = 'none'; }
+          else { $('chromaSel').value = 'custom'; $('chromaColor').value = cv; $('chromaColor').style.display = ''; }
+        }
         if (!loaded) { loaded = true; layers = (lt.layers || []).map(function (l) { return l; }); if (layers.length) selId = layers[0].id; renderCanvas(); renderList(); syncProps(); }
         else if (JSON.stringify(lt.layers) !== JSON.stringify(layers) && !drag) {
           // reset (or another operator) changed layers — reload

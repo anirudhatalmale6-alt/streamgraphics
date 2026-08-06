@@ -26,6 +26,21 @@
     if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
     return rows.filter(function (r) { return r.some(function (c) { return String(c).trim() !== ''; }); });
   }
+  function closeManual() { $('manualModal').style.display = 'none'; }
+  function openManual(id, it) {
+    function build(cols) {
+      if (!cols.length) { alert('This graphic has no fillable fields yet.\n\nIn the Graphics Builder, select a text or image layer and set its "CSV field" name (e.g. PlayerName), then try again.'); return; }
+      $('manTitle').textContent = 'Manual Add — ' + it.name;
+      $('manFields').innerHTML = cols.map(function (c) { return '<div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"><label style="color:var(--muted);font-size:12px">' + esc(c) + '</label><input class="inp" data-col="' + esc(c) + '" style="width:100%"></div>'; }).join('');
+      $('manSave').onclick = function () { var r = {}; $('manFields').querySelectorAll('[data-col]').forEach(function (inp) { r[inp.dataset.col] = inp.value; }); post({ type: 'show_addrow', id: id, row: r }); closeManual(); };
+      $('manualModal').style.display = 'flex';
+    }
+    if (it.columns && it.columns.length) { build(it.columns); return; }
+    fetch('/show-payload?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (res) {
+      var flds = []; if (res.ok && res.payload && res.payload.layers) res.payload.layers.forEach(function (l) { if (l.field && flds.indexOf(l.field) < 0) flds.push(l.field); });
+      build(flds);
+    }).catch(function () { build([]); });
+  }
   function importCsv(id, file) {
     if (!file) return;
     var r = new FileReader();
@@ -50,7 +65,8 @@
         + '<div class="sw' + (it.on ? ' on' : '') + '" data-act="toggle" title="on / off air"></div>'
         + '<div class="nm">' + esc(it.name) + (rowCount ? ' <span class="kind" style="color:#7c9cff">' + rowCount + ' rows</span>' : '') + '</div>'
         + '<label class="minibtn" title="attach a CSV to mail-merge into this graphic">Import CSV<input type="file" accept=".csv,text/csv" data-act="csvfile" style="display:none"></label>'
-        + '<button class="minibtn" data-act="load" title="open this preset in the Graphics Builder to edit">Edit</button>'
+        + '<button class="minibtn" data-act="manual" title="add one entry by hand (fill the fields)">Manual Add</button>'
+        + '<button class="minibtn" data-act="load" title="open this preset in the Graphics Builder to edit its design">Edit Preset</button>'
         + '<button class="minibtn" data-act="rename">Rename</button>'
         + '<button class="minibtn danger" data-act="delete">Delete</button>'
         + '</div>';
@@ -77,6 +93,7 @@
       var pv = row.querySelector('[data-act="prev"]'); if (pv) pv.onclick = function () { post({ type: 'show_rowselect', id: id, cmd: 'prev' }); };
       var nx = row.querySelector('[data-act="next"]'); if (nx) nx.onclick = function () { post({ type: 'show_rowselect', id: id, cmd: 'next' }); };
       var rs = row.querySelector('[data-act="rowsel"]'); if (rs) rs.onchange = function () { post({ type: 'show_rowselect', id: id, cmd: 'goto', n: +rs.value }); };
+      row.querySelector('[data-act="manual"]').onclick = function () { openManual(id, it); };
       var an = row.querySelector('[data-act="anim"]'); if (an) an.onchange = function () { post({ type: 'show_rowmode', id: id, mode: an.checked ? 'reanimate' : 'cut' }); };
       var cc = row.querySelector('[data-act="clearcsv"]'); if (cc) cc.onclick = function () { if (confirm('Remove the CSV from "' + it.name + '"?')) post({ type: 'show_clear_csv', id: id }); };
       row.querySelector('[data-act="load"]').onclick = function () {
@@ -96,6 +113,8 @@
   }
 
   $('allOff').onclick = function () { post({ type: 'show_alloff' }); };
+  $('manCancel').onclick = closeManual;
+  $('manualModal').onclick = function (e) { if (e.target === $('manualModal')) closeManual(); };
   $('copyBtn').onclick = function () {
     var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
     if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok, ok);

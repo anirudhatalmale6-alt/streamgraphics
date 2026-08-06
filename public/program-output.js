@@ -165,7 +165,13 @@
       if (!l.field) return l;
       var v = val(l.field); if (v == null) return l;
       if (l.type === 'text') return Object.assign({}, l, { text: v });
-      if (l.type === 'image') return Object.assign({}, l, { src: v });
+      if (l.type === 'image') {
+        var s = String(v);
+        // A browser can't load a local path like C:\...\pic.jpg. If it's not a URL/absolute
+        // path, treat it as a filename served from the app's /media folder.
+        if (s && !/^(https?:|data:|\/)/i.test(s)) s = '/media/' + s.split(/[\\/]/).pop();
+        return Object.assign({}, l, { src: s });
+      }
       return l;
     });
   }

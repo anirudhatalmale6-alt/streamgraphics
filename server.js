@@ -503,6 +503,16 @@ function applyAction(action) {
     }
     case 'show_setkey': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowKey = String(action.key || ''); saveShows(); } break; }
     case 'show_rowmode': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowTransition = (action.mode === 'reanimate') ? 'reanimate' : 'cut'; saveShows(); } break; }
+    case 'show_addrow': { // add ONE entry by hand (no CSV needed) — great for a handful of manual items
+      const it = state.shows.find(x => x.id === action.id); if (!it) break;
+      const row = (action.row && typeof action.row === 'object') ? action.row : {};
+      if (!it.rows) it.rows = [];
+      if (!it.columns || !it.columns.length) it.columns = Object.keys(row).slice(0, 60);
+      const o = {}; it.columns.forEach(c => { o[c] = String(row[c] == null ? '' : row[c]).slice(0, 600); });
+      if (it.rows.length < 3000) { it.rows.push(o); it.rowIndex = it.rows.length - 1; }
+      if (!it.rowKey) it.rowKey = it.columns[0] || '';
+      saveShows(); break;
+    }
     case 'show_clear_csv': { const it = state.shows.find(x => x.id === action.id); if (it) { delete it.rows; delete it.columns; delete it.rowKey; it.rowIndex = 0; saveShows(); } break; }
 
     default:
