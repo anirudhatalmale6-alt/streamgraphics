@@ -248,6 +248,49 @@ function builtinTemplates() {
     { id: 'bt_bug', name: 'Corner LIVE Bug', kind: 'lowerthird', builtin: true, layers: [
       Object.assign({ id: 'bx', type: 'box', x: 1690, y: 40, w: 160, h: 58, z: 1, fill: '#000000', opacity: 45, radius: 10 }, an('fade', 'fade')),
       Object.assign({ id: 'lv', type: 'text', x: 1706, y: 50, w: 130, h: 38, z: 2, text: '● LIVE', font: "'Segoe UI', Arial, sans-serif", size: 26, bold: true, color: '#ff3b30', align: 'left' }, an('fade', 'fade'))
+    ] },
+    // --- more lower thirds (varied colours) ---
+    { id: 'bt_lt_red', name: 'Lower Third — Crimson', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bg', type: 'box', x: 150, y: 915, w: 620, h: 96, z: 1, fill: '#1a1518', opacity: 93, radius: 12 }, an('slide-up', 'slide-up')),
+      Object.assign({ id: 'ac', type: 'box', x: 150, y: 915, w: 8, h: 96, z: 2, fill: '#e23b3b', opacity: 100, radius: 12 }, an('slide-up', 'fade')),
+      Object.assign({ id: 'nm', type: 'text', x: 182, y: 928, w: 560, h: 42, z: 3, text: 'First Last', field: 'Name', font: "'Segoe UI', Arial, sans-serif", size: 34, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'slide-left', inDelay: 220, inDur: 480, outAnim: 'fade', outDur: 250 }),
+      Object.assign({ id: 'tt', type: 'text', x: 182, y: 972, w: 560, h: 28, z: 4, text: 'TITLE / ROLE', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 17, color: '#e23b3b', align: 'left' }, { inAnim: 'slide-left', inDelay: 300, inDur: 480, outAnim: 'fade', outDur: 250 })
+    ] },
+    { id: 'bt_lt_teal', name: 'Lower Third — Teal', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bg', type: 'box', x: 150, y: 915, w: 620, h: 96, z: 1, fill: '#0c2b2f', opacity: 93, radius: 12 }, an('fly-left', 'fly-left')),
+      Object.assign({ id: 'ac', type: 'box', x: 150, y: 915, w: 8, h: 96, z: 2, fill: '#17b0a3', opacity: 100, radius: 12 }, { inAnim: 'none', outAnim: 'none' }),
+      Object.assign({ id: 'nm', type: 'text', x: 182, y: 928, w: 560, h: 42, z: 3, text: 'First Last', field: 'Name', font: "'Segoe UI', Arial, sans-serif", size: 34, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'none', outAnim: 'none' }),
+      Object.assign({ id: 'tt', type: 'text', x: 182, y: 972, w: 560, h: 28, z: 4, text: 'TITLE / ROLE', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 17, color: '#17b0a3', align: 'left' }, { inAnim: 'none', outAnim: 'none' })
+    ] },
+    { id: 'bt_lt_wide', name: 'Lower Third — Wide Bar', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bar', type: 'box', x: 0, y: 980, w: 1920, h: 100, z: 1, fill: '#0b1f3a', opacity: 94, radius: 0 }, an('slide-up', 'slide-up')),
+      Object.assign({ id: 'nm', type: 'text', x: 120, y: 992, w: 1000, h: 44, z: 2, text: 'First Last', field: 'Name', font: "'Segoe UI', Arial, sans-serif", size: 36, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'fade', inDelay: 150, inDur: 400, outAnim: 'fade', outDur: 250 }),
+      Object.assign({ id: 'tt', type: 'text', x: 120, y: 1036, w: 1000, h: 30, z: 3, text: 'TITLE / ROLE', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 18, color: '#e7b53c', align: 'left' }, { inAnim: 'fade', inDelay: 220, inDur: 400, outAnim: 'fade', outDur: 250 })
+    ] },
+    // --- big screens / full frames ---
+    { id: 'bt_fs_navy', name: 'Full Screen — Navy Title', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bgf', type: 'box', x: 0, y: 0, w: 1920, h: 1080, z: 1, fill: '#0b1f3a', opacity: 100, radius: 0 }, an('fade', 'fade')),
+      Object.assign({ id: 'ti', type: 'text', x: 260, y: 430, w: 1400, h: 150, z: 2, text: 'MAIN TITLE', field: 'Title', font: 'Impact, Haettenschweiler, sans-serif', size: 100, bold: true, color: '#ffffff', align: 'center' }, an('pop', 'fade')),
+      Object.assign({ id: 'su', type: 'text', x: 260, y: 596, w: 1400, h: 50, z: 3, text: 'subtitle goes here', field: 'Subtitle', font: "'Segoe UI', Arial, sans-serif", size: 34, color: '#e7b53c', align: 'center' }, { inAnim: 'fade', inDelay: 180, inDur: 500, outAnim: 'fade', outDur: 300 })
+    ] },
+    { id: 'bt_fs_color', name: 'Full Screen — Colour Background', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bgf', type: 'box', x: 0, y: 0, w: 1920, h: 1080, z: 1, fill: '#6d5cf6', opacity: 100, radius: 0 }, an('fade', 'fade')),
+      Object.assign({ id: 'ti', type: 'text', x: 260, y: 470, w: 1400, h: 150, z: 2, text: 'YOUR MESSAGE', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 96, bold: true, color: '#ffffff', align: 'center' }, an('scale', 'fade'))
+    ] },
+    { id: 'bt_fs_photo', name: 'Full Screen — Photo Background', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'ph', type: 'image', x: 0, y: 0, w: 1920, h: 1080, z: 1, src: '', field: 'Background', shape: 'none', fit: 'cover' }, an('fade', 'fade')),
+      Object.assign({ id: 'ov', type: 'box', x: 0, y: 700, w: 1920, h: 380, z: 2, fill: '#000000', opacity: 55, radius: 0 }, an('fade', 'fade')),
+      Object.assign({ id: 'ti', type: 'text', x: 120, y: 800, w: 1680, h: 120, z: 3, text: 'MAIN TITLE', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 84, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'slide-up', inDelay: 120, inDur: 500, outAnim: 'fade', outDur: 300 })
+    ] },
+    { id: 'bt_next', name: 'Coming Up Next', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bx', type: 'box', x: 150, y: 840, w: 940, h: 180, z: 1, fill: '#101418', opacity: 90, radius: 14 }, an('slide-up', 'slide-up')),
+      Object.assign({ id: 'lb', type: 'text', x: 182, y: 862, w: 880, h: 34, z: 2, text: 'COMING UP NEXT', font: "'Segoe UI', Arial, sans-serif", size: 22, bold: true, color: '#e7b53c', align: 'left' }, an('fade', 'fade')),
+      Object.assign({ id: 'ti', type: 'text', x: 182, y: 902, w: 880, h: 90, z: 3, text: 'Next segment title', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 46, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'slide-left', inDelay: 150, inDur: 450, outAnim: 'fade', outDur: 250 })
+    ] },
+    { id: 'bt_sponsor', name: 'Sponsor Bar', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bar', type: 'box', x: 0, y: 985, w: 1920, h: 95, z: 1, fill: '#ffffff', opacity: 100, radius: 0 }, an('slide-up', 'slide-up')),
+      Object.assign({ id: 'lb', type: 'text', x: 120, y: 1012, w: 700, h: 42, z: 2, text: 'SPONSORED BY', font: "'Segoe UI', Arial, sans-serif", size: 26, bold: true, color: '#111111', align: 'left' }, an('fade', 'fade')),
+      Object.assign({ id: 'lg', type: 'image', x: 1470, y: 998, w: 330, h: 70, z: 3, src: '', field: 'Logo', shape: 'none', fit: 'contain' }, an('fade', 'fade'))
     ] }
   ];
 }
@@ -267,7 +310,7 @@ function wireState() {
     // OFF: metadata only + light row info (labels for the picker), but not the heavy payload/rows.
     return {
       id: it.id, name: it.name, kind: it.kind, on: it.on,
-      columns: it.columns || [], rowKey: it.rowKey || '', rowIndex: it.rowIndex || 0, rowTransition: it.rowTransition || 'cut',
+      columns: it.columns || [], rowKey: it.rowKey || '', rowIndex: it.rowIndex || 0, rowTransition: it.rowTransition || 'cut', rowDelay: it.rowDelay == null ? 1000 : it.rowDelay,
       rowCount: it.rows ? it.rows.length : 0,
       rowLabels: it.rows ? it.rows.map(function (r) { return it.rowKey ? (r[it.rowKey] || '') : (r[Object.keys(r)[0]] || ''); }) : []
     };
@@ -592,6 +635,7 @@ function applyAction(action) {
     }
     case 'show_setkey': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowKey = String(action.key || ''); saveShows(); } break; }
     case 'show_rowmode': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowTransition = (action.mode === 'reanimate') ? 'reanimate' : 'cut'; saveShows(); } break; }
+    case 'show_rowdelay': { const it = state.shows.find(x => x.id === action.id); if (it) { let ms = parseInt(action.ms, 10); if (isNaN(ms)) ms = 1000; it.rowDelay = Math.max(0, Math.min(8000, ms)); saveShows(); } break; }
     case 'show_addrow': { // add ONE entry by hand (no CSV needed) — great for a handful of manual items
       const it = state.shows.find(x => x.id === action.id); if (!it) break;
       const row = (action.row && typeof action.row === 'object') ? action.row : {};

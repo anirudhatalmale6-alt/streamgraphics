@@ -80,6 +80,7 @@
           + '<button class="minibtn" data-act="next" title="next row">▶</button>'
           + '<span class="mono" style="color:var(--muted)">' + (idx + 1) + ' / ' + rowCount + '</span>'
           + '<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)" title="off = cut instantly to the next entry; on = animate off, change, animate back on"><input type="checkbox" data-act="anim"' + (it.rowTransition === 'reanimate' ? ' checked' : '') + '> animate change</label>'
+          + '<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)" title="pause between the old graphic leaving and the new one arriving (animated change)">delay <input class="inp t" data-act="delay" type="number" min="0" max="8000" step="100" value="' + (it.rowDelay == null ? 1000 : it.rowDelay) + '" style="width:64px"> ms</label>'
           + '<button class="minibtn danger" data-act="clearcsv" title="remove the CSV">Clear CSV</button>'
           + '</div>';
       }
@@ -95,6 +96,7 @@
       var rs = row.querySelector('[data-act="rowsel"]'); if (rs) rs.onchange = function () { post({ type: 'show_rowselect', id: id, cmd: 'goto', n: +rs.value }); };
       row.querySelector('[data-act="manual"]').onclick = function () { openManual(id, it); };
       var an = row.querySelector('[data-act="anim"]'); if (an) an.onchange = function () { post({ type: 'show_rowmode', id: id, mode: an.checked ? 'reanimate' : 'cut' }); };
+      var dl = row.querySelector('[data-act="delay"]'); if (dl) dl.onchange = function () { post({ type: 'show_rowdelay', id: id, ms: +dl.value }); };
       var cc = row.querySelector('[data-act="clearcsv"]'); if (cc) cc.onclick = function () { if (confirm('Remove the CSV from "' + it.name + '"?')) post({ type: 'show_clear_csv', id: id }); };
       row.querySelector('[data-act="load"]').onclick = function () {
         var b = row.querySelector('[data-act="load"]'); b.textContent = '…';

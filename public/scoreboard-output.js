@@ -143,19 +143,25 @@
     setVisible(!!sb.visible);
   }
 
-  // When the event logo is a free overlay on the SAME side as the board, shift the board over
-  // so the logo sits beside it (not hidden behind it) — matching the sample layout.
+  // Shift the board aside only when the free-overlay logo would actually COLLIDE with it —
+  // i.e. same vertical band (top/mid/bottom) AND same side (left/right). A top-left logo must
+  // NOT push a bottom-left board. Always resets first, so changing placement moves it back.
+  var logoGen = 0;
+  function band(p) { return p.indexOf('top') >= 0 ? 'top' : (p.indexOf('bottom') >= 0 ? 'bottom' : 'mid'); }
+  function side(p) { return p.indexOf('left') >= 0 ? 'left' : (p.indexOf('right') >= 0 ? 'right' : 'center'); }
   function layoutLogoBoard(sb) {
-    var floatLogo = document.getElementById('floatLogo');
+    var myGen = ++logoGen, floatLogo = document.getElementById('floatLogo');
     card.style.marginLeft = ''; card.style.marginRight = '';
     var placement = sb.eventLogoPlacement || 'inline';
     if (!sb.eventLogoUrl || placement === 'inline') return;
     var boardPos = (sb.style && sb.style.position) || 'bottom-left';
+    var s = side(placement);
+    if (band(placement) !== band(boardPos) || (s !== 'left' && s !== 'right') || side(boardPos) !== s) return;
     var gap = 30;
     var apply = function () {
+      if (myGen !== logoGen) return;   // a newer render happened; don't re-apply a stale shift
       var w = floatLogo.offsetWidth || Math.round((sb.eventLogoSize || 150) * 1.4);
-      if (placement.indexOf('left') >= 0 && boardPos.indexOf('left') >= 0) card.style.marginLeft = (w + gap) + 'px';
-      else if (placement.indexOf('right') >= 0 && boardPos.indexOf('right') >= 0) card.style.marginRight = (w + gap) + 'px';
+      if (s === 'left') card.style.marginLeft = (w + gap) + 'px'; else card.style.marginRight = (w + gap) + 'px';
     };
     if (floatLogo.complete && floatLogo.offsetWidth) apply();
     else floatLogo.onload = apply;

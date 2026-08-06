@@ -209,9 +209,10 @@
         var rowChanged = (a.rowSig !== rowSig);
         a.sig = sig; a.rowSig = rowSig;
         if (rowChanged && it.rowTransition === 'reanimate') {
-          // Animate OFF, swap to the new row, animate back ON (instead of a hard cut).
+          // Animate OFF, hold for the configured delay, swap, animate back ON — a smoother change.
           var mx = animatePreset(a.el, 'out'), el2 = a.el, ly2 = layers;
-          setTimeout(function () { buildInto(el2, ly2); tagTimers(el2, ly2); requestAnimationFrame(function () { animatePreset(el2, 'in'); }); }, mx + 60);
+          var hold = it.rowDelay == null ? 1000 : it.rowDelay;
+          setTimeout(function () { buildInto(el2, ly2); tagTimers(el2, ly2); requestAnimationFrame(function () { animatePreset(el2, 'in'); }); }, mx + hold);
         } else {
           buildInto(a.el, layers); tagTimers(a.el, layers);   // hard cut (default) or a live edit
         }
