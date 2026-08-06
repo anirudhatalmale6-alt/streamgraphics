@@ -375,11 +375,35 @@ function applyAction(action) {
     case 'lt_vcmd': // video play/pause/restart command to a specific video layer
       state.lowerthird.vcmd = { id: String(action.id || ''), cmd: String(action.cmd || ''), seq: (state.lowerthird.vcmd.seq || 0) + 1 };
       break;
+    case 'lt_timer': { // transport for a TIMER layer — time is stamped on the SERVER so every machine agrees
+      const L = (state.lowerthird.layers || []).find(x => x.id === action.id && x.type === 'timer');
+      if (L) {
+        const now = Date.now(), cmd = String(action.cmd || '');
+        if (cmd === 'start') { if (!L.running) { L.running = true; L.anchorServer = now; } }
+        else if (cmd === 'pause') { if (L.running) { L.baseMs = liveTimerMs(L, now); L.running = false; } }
+        else if (cmd === 'reset') { L.running = false; L.baseMs = (L.mode === 'up') ? 0 : (L.durationMs || 0); }
+        else if (cmd === 'set') {
+          const p = action.patch || {};
+          ['mode', 'durationMs', 'targetEpoch', 'showHours', 'overtime', 'use24h'].forEach(k => { if (p[k] !== undefined) L[k] = p[k]; });
+          if (!L.running) { if (L.mode === 'up') L.baseMs = 0; else if (p.durationMs !== undefined) L.baseMs = L.durationMs; }
+        }
+        saveLowerThird();
+      }
+      break;
+    }
 
     default:
       return false;
   }
   return true;
+}
+
+// Live value (ms) of a timer layer at server time `now`. Shared shape with the standalone timer.
+function liveTimerMs(t, now) {
+  if (t.mode === 'up')  return (t.baseMs || 0) + (t.running ? now - t.anchorServer : 0);
+  if (t.mode === 'tod') return Math.max(0, (t.targetEpoch || 0) - now);
+  const rem = (t.baseMs || 0) - (t.running ? now - t.anchorServer : 0);
+  return t.overtime ? rem : Math.max(0, rem);
 }
 
 function clampGame(g) { g = parseInt(g, 10) || 0; return g < 0 ? 0 : (g > 2 ? 2 : g); }

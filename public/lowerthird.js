@@ -18,6 +18,37 @@
   function byId(id) { for (var i = 0; i < layers.length; i++) if (layers[i].id === id) return layers[i]; return null; }
   function selected() { return byId(selId); }
 
+  // ---- timer/clock helpers (same math as the output + server) ----
+  var clockOffset = 0;
+  function serverNow() { return Date.now() + clockOffset; }
+  function liveTimerMs(t, now) {
+    if (t.mode === 'up')  return (t.baseMs || 0) + (t.running ? now - t.anchorServer : 0);
+    if (t.mode === 'tod') return Math.max(0, (t.targetEpoch || 0) - now);
+    var rem = (t.baseMs || 0) - (t.running ? now - t.anchorServer : 0);
+    return t.overtime ? rem : Math.max(0, rem);
+  }
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function fmtDur(ms, showHours) {
+    var neg = ms < 0; if (neg) ms = -ms;
+    var tot = Math.floor(ms / 1000), h = Math.floor(tot / 3600), m = Math.floor((tot % 3600) / 60), s = tot % 60;
+    var str = (showHours || h > 0) ? pad2(h) + ':' + pad2(m) + ':' + pad2(s) : pad2(m) + ':' + pad2(s);
+    return (neg ? '-' : '') + str;
+  }
+  function clockStr(d, use24h) {
+    var h = d.getHours(), m = d.getMinutes(), s = d.getSeconds(), ap = '';
+    if (!use24h) { ap = h < 12 ? ' AM' : ' PM'; h = h % 12; if (h === 0) h = 12; }
+    return (use24h ? pad2(h) : h) + ':' + pad2(m) + ':' + pad2(s) + ap;
+  }
+  function fmtTimer(l, now) {
+    now = now || serverNow();
+    if (l.mode === 'clock') return clockStr(new Date(now), !!l.use24h);
+    return fmtDur(liveTimerMs(l, now), !!l.showHours);
+  }
+  function timerCmd(cmd, patch) {
+    if (!selId) return; var l = byId(selId); if (!l || l.type !== 'timer') return;
+    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_timer', id: selId, cmd: cmd, patch: patch || null }) }).catch(function () {});
+  }
+
   function push() {
     fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: layers }) }).catch(function () {});
   }
@@ -45,6 +76,12 @@
       var tk = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
       return '<div class="li" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px;overflow:hidden;display:flex;align-items:center;padding:0 12px"><span style="white-space:nowrap;' + tk + '">' + esc(l.text || 'scrolling text') + '</span></div>';
     }
+    if (l.type === 'timer') {
+      var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
+        + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
+        + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start')) + ';font-variant-numeric:tabular-nums';
+      return '<div class="li ly-timer" style="' + tmst + '">' + esc(fmtTimer(l)) + '</div>';
+    }
     return '';
   }
   function renderCanvas() {
@@ -67,6 +104,7 @@
   function layerName(l) {
     if (l.name) return l.name;
     if (l.type === 'text' || l.type === 'ticker') return l.text || (l.type === 'ticker' ? 'Ticker' : 'Text');
+    if (l.type === 'timer') return l.mode === 'clock' ? 'Clock' : (l.mode === 'up' ? 'Count-up' : l.mode === 'tod' ? 'Countdown to' : 'Countdown');
     return l.type === 'box' ? 'Box' : l.type === 'video' ? 'Video' : 'Image';
   }
   function renderList() {
@@ -155,17 +193,32 @@
     if (multi) {
       var grouped = selIds.every(function (id) { var m = byId(id); return m && m.group && m.group === l.group; });
       $('propTitle').textContent = selIds.length + ' layers selected' + (grouped ? ' (grouped)' : '');
-      show('.only-text', false); show('.only-box', false); show('.only-image', false); show('.only-video', false); show('.only-ticker', false);
+      show('.only-text', false); show('.only-box', false); show('.only-image', false); show('.only-video', false); show('.only-ticker', false); show('.only-timer', false);
     } else {
       $('propTitle').textContent = l.type.charAt(0).toUpperCase() + l.type.slice(1) + ' layer' + (l.group ? ' (grouped)' : '');
       show('.only-text', l.type === 'text'); show('.only-box', l.type === 'box'); show('.only-image', l.type === 'image');
-      show('.only-video', l.type === 'video'); show('.only-ticker', l.type === 'ticker');
+      show('.only-video', l.type === 'video'); show('.only-ticker', l.type === 'ticker'); show('.only-timer', l.type === 'timer');
     }
     if (l.type === 'text') { $('pText').value = l.text || ''; $('pFont').value = l.font || "'Segoe UI', Arial, sans-serif"; $('pSize').value = l.size || 34; $('pBold').checked = !!l.bold; $('pItalic').checked = !!l.italic; $('pColor').value = l.color || '#ffffff'; $('pAlign').value = l.align || 'left'; }
     if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
     if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; }
     if (l.type === 'video') { $('pVSrc').value = l.src || ''; $('pAutoplay').checked = l.autoplay !== false; $('pLoop').checked = !!l.loop; $('pMuted').checked = l.muted !== false; $('pVFit').value = l.fit || 'contain'; $('pWhenDone').value = l.whenDone || 'hold'; }
     if (l.type === 'ticker') { $('pTkText').value = l.text || ''; $('pTkSpeed').value = l.speed == null ? 120 : l.speed; $('pTkSpeedV').textContent = l.speed == null ? 120 : l.speed; $('pTkDir').value = l.dir || 'left'; $('pTkColor').value = l.color || '#ffffff'; $('pTkSize').value = l.size || 28; $('pTkBold').checked = !!l.bold; $('pTkFill').value = l.fill || '#0b1f3a'; $('pTkOpacity').value = l.opacity == null ? 90 : l.opacity; $('pTkRadius').value = l.radius || 0; }
+    if (l.type === 'timer') {
+      var mode = l.mode || 'down';
+      $('pTmMode').value = mode;
+      var dm = Math.max(0, Math.floor((l.durationMs || 0) / 60000)), ds = Math.floor(((l.durationMs || 0) % 60000) / 1000);
+      $('pTmMin').value = dm; $('pTmSec').value = pad2(ds);
+      if (l.targetEpoch) { var td = new Date(l.targetEpoch); $('pTmTod').value = pad2(td.getHours()) + ':' + pad2(td.getMinutes()) + ':' + pad2(td.getSeconds()); }
+      $('pTmHours').checked = !!l.showHours; $('pTmOver').checked = !!l.overtime; $('pTm24').checked = !!l.use24h;
+      $('pTmColor').value = l.color || '#ffffff'; $('pTmSize').value = l.size || 110; $('pTmBold').checked = l.bold !== false; $('pTmAlign').value = l.align || 'center'; $('pTmFont').value = l.font || "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+      // show only the sub-rows relevant to the chosen mode
+      $('pTmDurRow').style.display = (mode === 'down' || mode === 'up') ? '' : 'none';
+      $('pTmTodRow').style.display = (mode === 'tod') ? '' : 'none';
+      $('pTmRunRow').style.display = (mode === 'clock') ? 'none' : '';
+      $('pTmOverLbl').style.display = (mode === 'down') ? '' : 'none';
+      $('pTm24Lbl').style.display = (mode === 'clock') ? '' : 'none';
+    }
     $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h;
     $('pInAnim').value = l.inAnim || 'fade'; $('pInDelay').value = l.inDelay || 0; $('pInDur').value = l.inDur == null ? 500 : l.inDur;
     $('pOutAnim').value = l.outAnim || 'fade'; $('pOutDelay').value = l.outDelay || 0; $('pOutDur').value = l.outDur == null ? 350 : l.outDur;
@@ -224,6 +277,26 @@
   $('pTkFill').oninput = function () { mutate(function (l) { l.fill = $('pTkFill').value; }); };
   $('pTkOpacity').oninput = function () { mutate(function (l) { l.opacity = +$('pTkOpacity').value; }); };
   $('pTkRadius').oninput = function () { mutate(function (l) { l.radius = +$('pTkRadius').value; }); };
+  /* ---- timer layer: transport (server-stamped) + look ---- */
+  $('pTmMode').onchange = function () { var m = $('pTmMode').value; timerCmd('set', { mode: m }); mutate(function (l) { l.mode = m; }); syncProps(); };
+  $('pTmSetDur').onclick = function () { var ms = ((+$('pTmMin').value || 0) * 60 + (+$('pTmSec').value || 0)) * 1000; timerCmd('set', { durationMs: ms }); mutate(function (l) { l.durationMs = ms; if (!l.running) l.baseMs = ms; }); };
+  $('pTmSetTod').onclick = function () {
+    var parts = ($('pTmTod').value || '12:00:00').split(':'), d = new Date();
+    d.setHours(+parts[0] || 0, +parts[1] || 0, +parts[2] || 0, 0);
+    var ep = d.getTime(); if (ep <= serverNow()) ep += 86400000;   // already passed today -> tomorrow
+    timerCmd('set', { targetEpoch: ep }); mutate(function (l) { l.targetEpoch = ep; });
+  };
+  $('pTmStart').onclick = function () { timerCmd('start'); };
+  $('pTmPause').onclick = function () { timerCmd('pause'); };
+  $('pTmReset').onclick = function () { timerCmd('reset'); };
+  $('pTmHours').onchange = function () { timerCmd('set', { showHours: $('pTmHours').checked }); mutate(function (l) { l.showHours = $('pTmHours').checked; }); };
+  $('pTmOver').onchange = function () { timerCmd('set', { overtime: $('pTmOver').checked }); mutate(function (l) { l.overtime = $('pTmOver').checked; }); };
+  $('pTm24').onchange = function () { timerCmd('set', { use24h: $('pTm24').checked }); mutate(function (l) { l.use24h = $('pTm24').checked; }); };
+  $('pTmColor').oninput = function () { mutate(function (l) { l.color = $('pTmColor').value; }); };
+  $('pTmSize').oninput = function () { mutate(function (l) { l.size = +$('pTmSize').value; }); };
+  $('pTmBold').onchange = function () { mutate(function (l) { l.bold = $('pTmBold').checked; }); };
+  $('pTmAlign').onchange = function () { mutate(function (l) { l.align = $('pTmAlign').value; }); };
+  $('pTmFont').onchange = function () { mutate(function (l) { l.font = $('pTmFont').value; }); };
   ['pX', 'pY', 'pW', 'pH'].forEach(function (id) { $(id).oninput = function () { mutate(function (l) { l[id.slice(1).toLowerCase()] = Math.round(+$(id).value); }); }; });
   $('pInAnim').onchange = function () { mutateSel(function (l) { l.inAnim = $('pInAnim').value; }); };
   $('pInDelay').oninput = function () { mutateSel(function (l) { l.inDelay = +$('pInDelay').value; }); };
@@ -258,6 +331,7 @@
   $('addImage').onclick = function () { add(merge({ type: 'image', x: 120, y: 860, w: 140, h: 140, src: '', shape: 'circle', fit: 'contain' }, A('scale'))); };
   $('addVideo').onclick = function () { add(merge({ type: 'video', x: 660, y: 340, w: 600, h: 338, src: '', autoplay: true, loop: false, muted: true, fit: 'contain', shape: 'none' }, A('fade'))); };
   $('addTicker').onclick = function () { add(merge({ type: 'ticker', x: 0, y: 1000, w: 1920, h: 60, text: 'BREAKING: your scrolling headline goes here', speed: 120, dir: 'left', font: 'Arial, Helvetica, sans-serif', size: 30, bold: true, color: '#ffffff', fill: '#0b1f3a', opacity: 92, radius: 0 }, A('slide-up'))); };
+  $('addTimer').onclick = function () { add(merge({ type: 'timer', x: 710, y: 440, w: 500, h: 160, mode: 'down', durationMs: 300000, baseMs: 300000, running: false, anchorServer: 0, targetEpoch: 0, showHours: false, overtime: false, use24h: false, font: "'Segoe UI', Arial, sans-serif", size: 110, bold: true, italic: false, color: '#ffffff', align: 'center' }, A('fade'))); };
   // full-screen background colour box (goes to the very back)
   $('addBg').onclick = function () {
     var bg = merge({ type: 'box', x: 0, y: 0, w: 1920, h: 1080, fill: '#0b1f3a', opacity: 100, radius: 0 }, A('fade'));
@@ -444,7 +518,9 @@
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
     es.onmessage = function (e) {
       try {
-        var m = JSON.parse(e.data); if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
+        var m = JSON.parse(e.data);
+        if (m.serverTime) { var meas = m.serverTime - Date.now(); clockOffset = clockOffset === 0 ? meas : Math.round(clockOffset * 0.7 + meas * 0.3); }
+        if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
         $('airState').textContent = lt.visible ? 'ON AIR' : 'OFF AIR'; $('airState').classList.toggle('live', !!lt.visible);
         $('chroma').checked = !!lt.chroma;
         if (!loaded) { loaded = true; layers = (lt.layers || []).map(function (l) { return l; }); if (layers.length) selId = layers[0].id; renderCanvas(); renderList(); syncProps(); }
@@ -457,5 +533,11 @@
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();
+  // Keep timer/clock previews ticking live in the builder canvas (same clock as the output).
+  (function builderTick() {
+    var els = cstage.querySelectorAll('.ly-timer');
+    if (els.length) { var now = serverNow(); els.forEach(function (el) { var l = byId(el.parentNode.dataset.id); if (l) el.textContent = fmtTimer(l, now); }); }
+    requestAnimationFrame(builderTick);
+  })();
   $('outUrl').textContent = location.protocol + '//' + location.host + '/lowerthird-output';
 })();

@@ -4,7 +4,8 @@
 (function () {
   'use strict';
   var stage = document.getElementById('stage');
-  var visibleNow = false, sig = '', LMAP = {};
+  var visibleNow = false, sig = '', LMAP = {}, clockOffset = 0;
+  function serverNow() { return Date.now() + clockOffset; }
   var CMAP = { green: '#00b140', magenta: '#ff00ff', blue: '#0000ff' };
   var EASE = 'cubic-bezier(.16,1,.3,1)';
   var urlChroma = (function () { var m = new URLSearchParams(location.search).get('bg'); return m ? (CMAP[m] || m) : null; })();
@@ -18,6 +19,31 @@
     var r = parseInt(hex.slice(0, 2), 16) || 0, g = parseInt(hex.slice(2, 4), 16) || 0, b = parseInt(hex.slice(4, 6), 16) || 0;
     return 'rgba(' + r + ',' + g + ',' + b + ',' + (pct == null ? 1 : pct / 100) + ')';
   }
+  // ---- timer layer math (shared shape with the standalone timer + server) ----
+  function liveTimerMs(t, now) {
+    if (t.mode === 'up')  return (t.baseMs || 0) + (t.running ? now - t.anchorServer : 0);
+    if (t.mode === 'tod') return Math.max(0, (t.targetEpoch || 0) - now);
+    var rem = (t.baseMs || 0) - (t.running ? now - t.anchorServer : 0);
+    return t.overtime ? rem : Math.max(0, rem);
+  }
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function fmtDur(ms, showHours) {
+    var neg = ms < 0; if (neg) ms = -ms;
+    var tot = Math.floor(ms / 1000), h = Math.floor(tot / 3600), m = Math.floor((tot % 3600) / 60), s = tot % 60;
+    var str = (showHours || h > 0) ? pad2(h) + ':' + pad2(m) + ':' + pad2(s) : pad2(m) + ':' + pad2(s);
+    return (neg ? '-' : '') + str;
+  }
+  function clockStr(d, use24h) {
+    var h = d.getHours(), m = d.getMinutes(), s = d.getSeconds(), ap = '';
+    if (!use24h) { ap = h < 12 ? ' AM' : ' PM'; h = h % 12; if (h === 0) h = 12; }
+    return (use24h ? pad2(h) : h) + ':' + pad2(m) + ':' + pad2(s) + ap;
+  }
+  function fmtTimer(l, now) {
+    now = now || serverNow();
+    if (l.mode === 'clock') return clockStr(new Date(now), !!l.use24h);
+    return fmtDur(liveTimerMs(l, now), !!l.showHours);
+  }
+
   // the "hidden" state (from-state for ON, to-state for OFF) of an animation type
   var BOUNCE = 'cubic-bezier(.34,1.62,.5,1)';   // overshoot for bounce/pop
   function hidden(type) {
@@ -62,6 +88,12 @@
         var ts = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
         var gap = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
         inner = '<div class="li ly-ticker" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px;overflow:hidden;display:flex;align-items:center">' + '<div class="tick-track" style="display:inline-flex;white-space:nowrap;will-change:transform;' + ts + '">' + '<span class="tc">' + esc(l.text || '') + gap + '</span><span class="tc">' + esc(l.text || '') + gap + '</span></div></div>';
+      } else if (l.type === 'timer') {
+        var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
+          + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
+          + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start'))
+          + ';font-variant-numeric:tabular-nums;font-feature-settings:\'tnum\' 1;text-shadow:0 2px 8px rgba(0,0,0,.35)';
+        inner = '<div class="li ly-timer" style="' + tmst + '">' + esc(fmtTimer(l)) + '</div>';
       }
       html += '<div class="ly" data-id="' + l.id + '" style="' + box + '">' + inner + '</div>';
     });
@@ -101,6 +133,9 @@
   var lastT = 0;
   function tickLoop(t) {
     var dt = lastT ? (t - lastT) / 1000 : 0; lastT = t;
+    // Live timer/clock layers — recompute their text every frame from the server-anchored clock.
+    var tnow = serverNow(), tmr = stage.querySelectorAll('.ly-timer');
+    if (tmr.length) tmr.forEach(function (el) { var l = LMAP[el.parentNode.dataset.id]; if (l) el.textContent = fmtTimer(l, tnow); });
     tickers.forEach(function (tk) {
       tk.off += tk.dir * tk.speed * dt;
       if (tk.off <= -tk.copyW) tk.off += tk.copyW;
@@ -164,5 +199,11 @@
   }
 
   var es = new EventSource('/events');
-  es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state && m.state.lowerthird) render(m.state.lowerthird); } catch (x) {} };
+  es.onmessage = function (e) {
+    try {
+      var m = JSON.parse(e.data);
+      if (m.serverTime) { var meas = m.serverTime - Date.now(); clockOffset = clockOffset === 0 ? meas : Math.round(clockOffset * 0.7 + meas * 0.3); }
+      if (m.state && m.state.lowerthird) render(m.state.lowerthird);
+    } catch (x) {}
+  };
 })();

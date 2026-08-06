@@ -86,6 +86,7 @@
             <button class="btn" id="addImage">＋ Image</button>
             <button class="btn" id="addVideo">＋ Video</button>
             <button class="btn" id="addTicker">＋ Ticker</button>
+            <button class="btn" id="addTimer" title="live clock / countdown / count-up as a layer">＋ Timer</button>
             <button class="btn" id="addBg" title="full-screen background colour">＋ BG</button>
           </div>
         </section>
@@ -159,6 +160,46 @@
             </div>
             <div class="row only-ticker"><label>Text</label><input type="color" id="pTkColor" value="#ffffff"><input class="inp t" id="pTkSize" type="number" min="8" max="120" value="28" title="size"><label style="width:auto"><input type="checkbox" id="pTkBold"> B</label></div>
             <div class="row only-ticker"><label>Fill</label><input type="color" id="pTkFill" value="#0b1f3a"><input class="inp s" id="pTkOpacity" type="number" min="0" max="100" value="90" title="opacity %"> %<input class="inp t" id="pTkRadius" type="number" min="0" max="60" value="0" title="radius"></div>
+
+            <div class="row only-timer"><label>Type</label>
+              <select class="inp" id="pTmMode" style="width:auto">
+                <option value="down">Countdown</option><option value="up">Count up</option>
+                <option value="tod">Countdown to a time</option><option value="clock">Clock (time of day)</option>
+              </select>
+            </div>
+            <div class="row only-timer" id="pTmDurRow"><label>Duration</label>
+              <input class="inp t" id="pTmMin" type="number" min="0" max="999" value="5"> :
+              <input class="inp t" id="pTmSec" type="number" min="0" max="59" value="00">
+              <button class="btn ghost" id="pTmSetDur" style="font-size:12px">Set</button>
+            </div>
+            <div class="row only-timer" id="pTmTodRow" style="display:none"><label>Count to</label>
+              <input class="inp" id="pTmTod" type="time" step="1" value="12:00:00"><button class="btn ghost" id="pTmSetTod" style="font-size:12px">Set</button>
+            </div>
+            <div class="row only-timer" id="pTmRunRow"><label>Run</label>
+              <button class="btn go" id="pTmStart" style="font-size:12px">Start</button>
+              <button class="btn ghost" id="pTmPause" style="font-size:12px">Pause</button>
+              <button class="btn ghost" id="pTmReset" style="font-size:12px">Reset</button>
+            </div>
+            <div class="row only-timer" style="gap:14px;flex-wrap:wrap">
+              <label style="width:auto"><input type="checkbox" id="pTmHours"> Show hours</label>
+              <label style="width:auto" id="pTmOverLbl"><input type="checkbox" id="pTmOver"> Overtime (go negative)</label>
+              <label style="width:auto" id="pTm24Lbl"><input type="checkbox" id="pTm24"> 24-hour</label>
+            </div>
+            <div class="row only-timer"><label>Look</label>
+              <input type="color" id="pTmColor" value="#ffffff">
+              <input class="inp t" id="pTmSize" type="number" min="16" max="400" value="110" title="size">
+              <label style="width:auto"><input type="checkbox" id="pTmBold"> B</label>
+              <select class="inp" id="pTmAlign" style="width:auto"><option value="center">Center</option><option value="left">Left</option><option value="right">Right</option></select>
+            </div>
+            <div class="row only-timer"><label>Font</label>
+              <select class="inp" id="pTmFont" style="width:auto">
+                <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Clean</option>
+                <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
+                <option value="Georgia, 'Times New Roman', serif">Serif</option>
+                <option value="'Courier New', ui-monospace, monospace">Mono</option>
+                <option value="Impact, Haettenschweiler, sans-serif">Impact</option>
+              </select>
+            </div>
 
             <div class="multi-only cap" style="text-align:left;color:#8ab4ff;font-size:11px;margin:4px 0">Multiple layers selected — Animate settings below apply to all of them. Use Group to link them.</div>
             <hr style="border:none;border-top:1px solid var(--line);margin:10px 0" class="single-only">
