@@ -23,6 +23,7 @@ const path = require('path');
 
 const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+let VERSION = '?'; try { VERSION = require('./package.json').version; } catch (e) {}
 const UPLOAD_DIR = path.join(PUBLIC_DIR, 'uploads');
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
 let uploadSeq = 0;
@@ -191,7 +192,14 @@ function saveShows() { writeJson(SHOWS_FILE, function () { return { items: state
 // needs names + on/off. Full payloads are fetched on demand (GET /show-payload?id=).
 function wireState() {
   const shows = (state.shows || []).map(function (it) {
-    return it.on ? it : { id: it.id, name: it.name, kind: it.kind, on: it.on };
+    if (it.on) return it; // ON presets travel in full (payload + rows) for the Program output
+    // OFF: metadata only + light row info (labels for the picker), but not the heavy payload/rows.
+    return {
+      id: it.id, name: it.name, kind: it.kind, on: it.on,
+      columns: it.columns || [], rowKey: it.rowKey || '', rowIndex: it.rowIndex || 0,
+      rowCount: it.rows ? it.rows.length : 0,
+      rowLabels: it.rows ? it.rows.map(function (r) { return it.rowKey ? (r[it.rowKey] || '') : (r[Object.keys(r)[0]] || ''); }) : []
+    };
   });
   return Object.assign({}, state, { shows: shows });
 }
@@ -202,7 +210,7 @@ function wireState() {
 const clients = new Set();
 
 function broadcast() {
-  const payload = JSON.stringify({ serverTime: Date.now(), state: wireState() });
+  const payload = JSON.stringify({ serverTime: Date.now(), version: VERSION, state: wireState() });
   const frame = `data: ${payload}\n\n`;
   for (const res of clients) {
     try { res.write(frame); } catch (e) { /* dropped; cleaned on close */ }
@@ -474,6 +482,28 @@ function applyAction(action) {
     case 'show_toggle': { const it = state.shows.find(x => x.id === action.id); if (it) { it.on = (action.on == null ? !it.on : !!action.on); saveShows(); } break; }
     case 'show_alloff': state.shows.forEach(x => { x.on = false; }); saveShows(); break;
 
+    /* ---- CSV mail-merge: attach a spreadsheet to a graphic, one row = one filled version ---- */
+    case 'show_import_csv': {
+      const it = state.shows.find(x => x.id === action.id); if (!it) break;
+      const cols = (Array.isArray(action.columns) ? action.columns : []).map(c => String(c).slice(0, 80)).filter(Boolean);
+      const rows = (Array.isArray(action.rows) ? action.rows : []).slice(0, 3000).map(r => {
+        const o = {}; cols.forEach(c => { o[c] = String(r[c] == null ? '' : r[c]).slice(0, 600); }); return o;
+      });
+      it.columns = cols; it.rows = rows; it.rowIndex = 0;
+      it.rowKey = (it.rowKey && cols.indexOf(it.rowKey) >= 0) ? it.rowKey : (cols[0] || '');
+      saveShows(); break;
+    }
+    case 'show_rowselect': {
+      const it = state.shows.find(x => x.id === action.id); if (!it || !it.rows || !it.rows.length) break;
+      const n = it.rows.length; let i = it.rowIndex || 0; const cmd = String(action.cmd || 'goto');
+      if (cmd === 'next') i = Math.min(n - 1, i + 1);
+      else if (cmd === 'prev') i = Math.max(0, i - 1);
+      else { i = parseInt(action.n, 10); if (isNaN(i)) i = 0; i = Math.max(0, Math.min(n - 1, i)); }
+      it.rowIndex = i; saveShows(); break;
+    }
+    case 'show_setkey': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowKey = String(action.key || ''); saveShows(); } break; }
+    case 'show_clear_csv': { const it = state.shows.find(x => x.id === action.id); if (it) { delete it.rows; delete it.columns; delete it.rowKey; it.rowIndex = 0; saveShows(); } break; }
+
     default:
       return false;
   }
@@ -527,7 +557,7 @@ const server = http.createServer((req, res) => {
       'Access-Control-Allow-Origin': '*'
     });
     res.write('retry: 2000\n\n');
-    res.write(`data: ${JSON.stringify({ serverTime: Date.now(), state: wireState() })}\n\n`);
+    res.write(`data: ${JSON.stringify({ serverTime: Date.now(), version: VERSION, state: wireState() })}\n\n`);
     clients.add(res);
     const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch (e) {} }, 15000);
     req.on('close', () => { clearInterval(ping); clients.delete(res); });
@@ -579,6 +609,13 @@ const server = http.createServer((req, res) => {
   if (pathname === '/state') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ serverTime: Date.now(), state }));
+    return;
+  }
+
+  // --- app version (shown in the UI so you know if you're on the latest) ---
+  if (pathname === '/version') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ version: VERSION }));
     return;
   }
 

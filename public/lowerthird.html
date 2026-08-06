@@ -135,6 +135,11 @@
             </div>
             <div class="row only-text"><label>Colour</label><input type="color" id="pColor" value="#ffffff"></div>
 
+            <div class="row fieldrow" style="border-top:1px dashed var(--line);padding-top:10px"><label style="width:auto;color:#7c9cff">CSV field</label>
+              <input class="inp" id="pField" placeholder="e.g. PlayerName — matches a spreadsheet column" style="flex:1;min-width:0">
+            </div>
+            <div class="fieldrow mini" style="color:var(--muted2);font-size:11px;margin:-4px 0 8px">Name this a field to fill it from a CSV column in the Show Library (leave blank for fixed text).</div>
+
             <div class="row only-box"><label>Fill</label><input type="color" id="pFill" value="#0b1f3a"><input class="inp s" id="pOpacity" type="number" min="0" max="100" value="95" title="opacity %"> %</div>
             <div class="row only-box"><label>Radius</label><input class="range" id="pRadius" type="range" min="0" max="120" value="12"><span id="pRadiusV" class="mono">12</span></div>
 
@@ -304,5 +309,6 @@
   </div>
 
   <script src="/lowerthird.js"></script>
+  <script src="/ver.js"></script>
 </body>
 </html>

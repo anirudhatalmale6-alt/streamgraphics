@@ -147,6 +147,20 @@
     timerLayers.forEach(function (l, i) { if (els[i]) els[i].setAttribute('data-t', JSON.stringify(l)); });
   }
 
+  // Mail-merge: fill a template's field-layers (l.field) from a CSV row (matched by column name).
+  function fillLayers(layers, row) {
+    if (!row) return layers;
+    var keys = Object.keys(row);
+    function val(field) { var f = String(field || '').toLowerCase(); for (var i = 0; i < keys.length; i++) if (keys[i].toLowerCase() === f) return row[keys[i]]; return null; }
+    return layers.map(function (l) {
+      if (!l.field) return l;
+      var v = val(l.field); if (v == null) return l;
+      if (l.type === 'text') return Object.assign({}, l, { text: v });
+      if (l.type === 'image') return Object.assign({}, l, { src: v });
+      return l;
+    });
+  }
+
   var active = {};   // id -> { el, sig }
   function applyChroma(c) {
     var col = urlChroma || (c ? (CMAP[c] || c) : '');
@@ -161,17 +175,18 @@
     shows.forEach(function (it) {
       if (!it.on || it.kind !== 'lowerthird' || !it.payload || !Array.isArray(it.payload.layers)) return;
       onIds[it.id] = true;
-      var sig = JSON.stringify(it.payload.layers);
+      var row = (it.rows && it.rows.length) ? it.rows[Math.max(0, Math.min(it.rows.length - 1, it.rowIndex || 0))] : null;
+      var layers = fillLayers(it.payload.layers, row);
+      var sig = JSON.stringify(layers), rowSig = it.rowIndex || 0;
       var a = active[it.id];
       if (!a) {
         var el = document.createElement('div'); el.className = 'preset in'; el.setAttribute('data-id', it.id);
-        stage.appendChild(el); buildInto(el, it.payload.layers); tagTimers(el, it.payload.layers);
-        active[it.id] = { el: el, sig: sig };
-        // Play each layer's own Animate-ON (fly/bounce/stagger), not just a block fade.
-        requestAnimationFrame(function () { animatePreset(el, 'in'); });
+        stage.appendChild(el); buildInto(el, layers); tagTimers(el, layers);
+        active[it.id] = { el: el, sig: sig, rowSig: rowSig };
+        requestAnimationFrame(function () { animatePreset(el, 'in'); });   // play each layer's Animate-ON
       } else if (a.sig !== sig) {
-        buildInto(a.el, it.payload.layers); tagTimers(a.el, it.payload.layers); a.sig = sig;
-        requestAnimationFrame(function () { animatePreset(a.el, 'in'); });
+        // Already on air (row step or live edit): swap contents in place, no re-animation.
+        buildInto(a.el, layers); tagTimers(a.el, layers); a.sig = sig; a.rowSig = rowSig;
       }
     });
     // Turn OFF: play each layer's Animate-OFF, then remove after the longest exit finishes.
