@@ -867,7 +867,7 @@ server.listen(PORT, () => {
       if (ni.family === 'IPv4' && !ni.internal) { lan = ni.address; break; }
     }
   }
-  console.log(`\n  StreamGraphics is running.  Open the control panels in your browser:`);
+  console.log(`\n  StreamGraphics Pro is running.  Open the control panels in your browser:`);
   console.log(`  ---------------------------------------------------------------`);
   console.log(`  Home (all graphics):         http://localhost:${PORT}/`);
   console.log(`  PRESENTER'S TIMER control:   http://localhost:${PORT}/control          · output: /output`);
