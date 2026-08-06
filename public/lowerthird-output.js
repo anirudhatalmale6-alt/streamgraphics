@@ -23,6 +23,20 @@
   function slideHtml(txt) {
     return esc(txt).replace(/\s*\/\/\s*/g, '\n').replace(/\n/g, '<br>').replace(/(^|<br>)\s*[-*•]\s+/g, '$1• ');
   }
+  function slideJustify(l) { return l.align === 'left' ? 'flex-start' : (l.align === 'right' ? 'flex-end' : 'center'); }
+  // The visible slide card — hugs its text, optional rgba background/padding/radius, never clips.
+  function slideBoxStyle(l) {
+    var bgc = (l.bgOpacity > 0 && l.bg) ? rgba(l.bg, l.bgOpacity) : 'transparent';
+    var shadow = (l.bgOpacity > 0) ? '' : ';text-shadow:0 2px 8px rgba(0,0,0,.45)';
+    return 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 54) + 'px;color:' + esc(l.color || '#fff')
+      + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
+      + ';line-height:1.22;background:' + bgc + ';padding:' + (l.pad == null ? 0 : l.pad) + 'px;border-radius:' + (l.radius || 0) + 'px;max-width:100%;display:inline-block;box-sizing:border-box' + shadow;
+  }
+  function slideWrap(l, idx, innerHtmlStr) {
+    var hide = innerHtmlStr ? '' : 'display:none;';
+    return '<div class="li ly-slide" data-idx="' + idx + '" style="overflow:visible;display:flex;align-items:center;justify-content:' + slideJustify(l) + ';width:100%;height:100%">'
+      + '<div class="slide-inner" style="' + hide + slideBoxStyle(l) + ';transition:opacity .3s ease">' + innerHtmlStr + '</div></div>';
+  }
 
   // ---- timer layer math (shared shape with the standalone timer + server) ----
   function liveTimerMs(t, now) {
@@ -94,13 +108,9 @@
         var gap = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
         inner = '<div class="li ly-ticker" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px;overflow:hidden;display:flex;align-items:center">' + '<div class="tick-track" style="display:inline-flex;white-space:nowrap;will-change:transform;' + ts + '">' + '<span class="tc">' + esc(l.text || '') + gap + '</span><span class="tc">' + esc(l.text || '') + gap + '</span></div></div>';
       } else if (l.type === 'slides') {
-        var sst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 54) + 'px;color:' + esc(l.color || '#fff')
-          + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
-          + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start'))
-          + ';justify-content:center;line-height:1.18;text-shadow:0 2px 8px rgba(0,0,0,.4);transition:opacity .3s ease';
         var sidx = (l.index == null ? -1 : l.index);
         var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
-        inner = '<div class="li ly-slide" data-idx="' + sidx + '" style="' + sst + '">' + slideHtml(stxt) + '</div>';
+        inner = slideWrap(l, sidx, slideHtml(stxt));
       } else if (l.type === 'timer') {
         var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
           + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
@@ -209,11 +219,13 @@
     (lt.layers || []).forEach(function (l) {
       if (l.type !== 'slides') return;
       var el = stage.querySelector('.ly[data-id="' + l.id + '"] .ly-slide'); if (!el) return;
+      var inner = el.querySelector('.slide-inner'); if (!inner) return;
       var idx = (l.index == null ? -1 : l.index);
       if (String(idx) === el.getAttribute('data-idx')) return;
       var txt = (idx >= 0 && l.slides && l.slides[idx] != null) ? l.slides[idx] : '';
-      el.style.opacity = '0';
-      setTimeout(function () { el.innerHTML = slideHtml(txt); el.setAttribute('data-idx', String(idx)); el.style.opacity = '1'; }, 160);
+      var html = slideHtml(txt);
+      inner.style.opacity = '0';
+      setTimeout(function () { inner.innerHTML = html; inner.style.display = html ? '' : 'none'; el.setAttribute('data-idx', String(idx)); inner.style.opacity = '1'; }, 160);
     });
   }
   function render(lt) {
