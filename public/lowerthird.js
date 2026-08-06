@@ -6,7 +6,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var SCALE = 0.375;                 // canvas is 1920x1080 shown at 720x405
   var layers = [], selId = null, selIds = [], loaded = false, seq = 0;
-  var showsMeta = [], editingShowId = '';   // Show-Library metadata + which preset we're editing
+  var showsMeta = [], editingShowId = '', templates = [];   // Show-Library metadata, editing link, Templates list
   var cstage = $('cstage');
 
   function uid() { return 'L' + Date.now().toString(36) + (seq++); }
@@ -442,6 +442,50 @@
     while (guard++ < 12 && layers.some(function (o) { return Math.abs((o.x || 0) - l.x) < 18 && Math.abs((o.y || 0) - l.y) < 18; })) { l.x += 40; l.y += 40; }
     layers.push(l); selId = l.id; selIds = [l.id]; renderCanvas(); renderList(); syncProps(); push();
   }
+  /* ---- Templates (starting designs) ---- */
+  function tplAct(a) { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {}); }
+  function renderTemplates() {
+    var box = $('tplList');
+    box.innerHTML = templates.map(function (t) {
+      return '<div style="display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 12px" data-id="' + t.id + '">'
+        + '<div style="flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.name) + (t.builtin ? ' <span class="mini2" style="color:var(--muted)">built-in</span>' : '') + '</div>'
+        + '<button class="btn ghost tuse" style="font-size:12px">Use</button>'
+        + '<button class="btn ghost texp" style="font-size:12px">Export</button>'
+        + (t.builtin ? '' : '<button class="btn ghost tdel" style="font-size:12px;color:#e06">Delete</button>')
+        + '</div>';
+    }).join('') || '<div class="mini" style="color:var(--muted)">No templates yet.</div>';
+    box.querySelectorAll('[data-id]').forEach(function (row) {
+      var id = row.dataset.id, t = templates.filter(function (x) { return x.id === id; })[0] || {};
+      row.querySelector('.tuse').onclick = function () { if (!confirm('Load "' + t.name + '" into the builder? Your current design will be replaced (Save to Library first if you want to keep it).')) return; tplAct({ type: 'tpl_load', id: id }); closeTpl(); };
+      row.querySelector('.texp').onclick = function () { exportTemplate(id); };
+      var d = row.querySelector('.tdel'); if (d) d.onclick = function () { if (confirm('Delete template "' + t.name + '"?')) tplAct({ type: 'tpl_delete', id: id }); };
+    });
+  }
+  function openTpl() { renderTemplates(); $('tplModal').style.display = 'flex'; }
+  function closeTpl() { $('tplModal').style.display = 'none'; }
+  function exportTemplate(id) {
+    fetch('/template-payload?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res.ok) return;
+      var data = JSON.stringify({ streamgraphicsTemplate: 1, name: res.template.name, kind: res.template.kind, layers: res.template.layers }, null, 2);
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      a.download = (res.template.name || 'template').replace(/[^a-z0-9._-]+/gi, '_') + '.sgtemplate.json'; a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    });
+  }
+  $('tplBtn').onclick = openTpl;
+  $('tplClose').onclick = closeTpl;
+  $('tplModal').onclick = function (e) { if (e.target === $('tplModal')) closeTpl(); };
+  $('tplSaveCur').onclick = function () {
+    var name = prompt('Save the current design as a template named:', 'My Template'); if (name == null) return;
+    tplAct({ type: 'tpl_save', name: name.trim() || 'My Template', kind: 'lowerthird', layers: layers });
+    var b = $('tplSaveCur'), o = b.textContent; b.textContent = 'Saved ✓'; setTimeout(function () { b.textContent = o; }, 1400);
+  };
+  $('tplImport').onchange = function () {
+    var f = this.files[0]; this.value = ''; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () { try { var j = JSON.parse(r.result); var lys = j.layers || (j.template && j.template.layers); if (!Array.isArray(lys)) throw 0; tplAct({ type: 'tpl_save', name: j.name || 'Imported Template', kind: j.kind || 'lowerthird', layers: lys }); } catch (e) { alert("That doesn't look like a valid template file."); } };
+    r.readAsText(f);
+  };
   function saveToLibrary() {
     // If we loaded a preset (or already saved one), offer to UPDATE it instead of making a copy.
     var linked = editingShowId ? showsMeta.filter(function (s) { return s.id === editingShowId; })[0] : null;
@@ -698,7 +742,7 @@
       try {
         var m = JSON.parse(e.data);
         if (m.serverTime) { var meas = m.serverTime - Date.now(); clockOffset = clockOffset === 0 ? meas : Math.round(clockOffset * 0.7 + meas * 0.3); }
-        if (m.state) { showsMeta = m.state.shows || []; if (m.state.lowerthird) editingShowId = m.state.lowerthird.editingShowId || ''; }
+        if (m.state) { showsMeta = m.state.shows || []; templates = m.state.templates || []; if (m.state.lowerthird) editingShowId = m.state.lowerthird.editingShowId || ''; if ($('tplModal').style.display === 'flex') renderTemplates(); }
         if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
         $('airState').textContent = lt.visible ? 'ON AIR' : 'OFF AIR'; $('airState').classList.toggle('live', !!lt.visible);
         if (document.activeElement !== $('chromaSel') && document.activeElement !== $('chromaColor')) {

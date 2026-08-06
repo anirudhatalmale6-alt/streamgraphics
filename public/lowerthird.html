@@ -56,6 +56,7 @@
       <button class="btn big show" id="btnShow">Take to air ▸</button>
       <button class="btn big hide" id="btnHide">◂ Off air</button>
       <div class="airstate" id="airState" style="min-width:90px">OFF AIR</div>
+      <button class="btn ghost" id="tplBtn" style="font-size:12px" title="start from a template">▤ Templates</button>
       <button class="btn" id="saveToLib" style="background:#7c5cff;border:none;color:#fff;font-weight:800" title="save this design as a preset in the Show Library">＋ Save to Library</button>
       <button class="btn ghost" id="newDesign" style="font-size:12px" title="start a fresh, empty design">New</button>
       <span style="flex:1"></span>
@@ -324,6 +325,21 @@
       <p class="mini" style="margin-top:8px;color:var(--muted2)">Updates the scrolling ticker live as you edit. It scrolls as one line, so line breaks become spaces.</p>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
         <button class="btn ghost" id="tkModalClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tplModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:560px;width:94%;max-height:86vh;overflow:auto">
+      <h3 style="margin-bottom:4px">Templates</h3>
+      <p class="mini" style="color:var(--muted);margin-bottom:12px">Start from a design, then customise it and Save to Library. Your own can be exported/imported to share.</p>
+      <div id="tplList" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost" id="tplSaveCur" style="font-size:12px">＋ Save current as Template</button>
+          <label class="btn ghost" style="font-size:12px;cursor:pointer">Import template file<input type="file" id="tplImport" accept=".json,application/json" style="display:none"></label>
+        </div>
+        <button class="btn ghost" id="tplClose" style="font-size:12px">Close</button>
       </div>
     </div>
   </div>

@@ -133,7 +133,9 @@ function defaultState() {
     },
 
     // The Show Library — saved named graphics, recallable and toggleable on the Program output.
-    shows: []
+    shows: [],
+    // User-made / imported Templates (built-ins are added on top in wireState/allTemplates).
+    userTemplates: []
   };
 }
 
@@ -214,6 +216,47 @@ const SHOWS_FILE = path.join(DATA_DIR, 'shows.json');
 })();
 function saveShows() { writeJson(SHOWS_FILE, function () { return { items: state.shows }; }); }
 
+// TEMPLATES — reusable starting designs you load into the Graphics Builder (distinct from the
+// Show Library, which holds finished on-air graphics). Built-ins ship with the app; user-made and
+// imported templates persist. Each: { id, name, kind, layers, builtin }.
+const TPL_FILE = path.join(DATA_DIR, 'templates.json');
+function builtinTemplates() {
+  const an = (i, o) => ({ inAnim: i || 'fade', inDelay: 0, inDur: 500, outAnim: o || 'fade', outDelay: 0, outDur: 350 });
+  return [
+    { id: 'bt_lower3', name: 'Lower Third — Clean', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bg', type: 'box', x: 150, y: 915, w: 620, h: 96, z: 1, fill: '#0b1f3a', opacity: 92, radius: 12 }, an('slide-up', 'slide-up')),
+      Object.assign({ id: 'ac', type: 'box', x: 150, y: 915, w: 8, h: 96, z: 2, fill: '#e7b53c', opacity: 100, radius: 12 }, { inAnim: 'slide-up', inDelay: 80, inDur: 500, outAnim: 'fade', outDelay: 60, outDur: 300 }),
+      Object.assign({ id: 'nm', type: 'text', x: 182, y: 928, w: 560, h: 42, z: 3, text: 'First Last', field: 'Name', font: "'Segoe UI', Arial, sans-serif", size: 34, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'slide-left', inDelay: 220, inDur: 480, outAnim: 'fade', outDelay: 0, outDur: 250 }),
+      Object.assign({ id: 'tt', type: 'text', x: 182, y: 972, w: 560, h: 28, z: 4, text: 'TITLE / ROLE', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 17, color: '#e7b53c', align: 'left' }, { inAnim: 'slide-left', inDelay: 300, inDur: 480, outAnim: 'fade', outDelay: 0, outDur: 250 })
+    ] },
+    { id: 'bt_namebar', name: 'Name Bar — Minimal', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bg', type: 'box', x: 150, y: 958, w: 540, h: 72, z: 1, fill: '#111418', opacity: 88, radius: 8 }, an('fly-left', 'fly-left')),
+      Object.assign({ id: 'nm', type: 'text', x: 176, y: 970, w: 500, h: 48, z: 2, text: 'First Last', field: 'Name', font: "'Segoe UI', Arial, sans-serif", size: 30, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'none', inDur: 500, outAnim: 'none', outDur: 350 })
+    ] },
+    { id: 'bt_title', name: 'Title Card — Centered', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'ti', type: 'text', x: 260, y: 420, w: 1400, h: 120, z: 2, text: 'MAIN TITLE', field: 'Title', font: 'Impact, Haettenschweiler, sans-serif', size: 92, bold: true, color: '#ffffff', align: 'center' }, an('pop', 'fade')),
+      Object.assign({ id: 'su', type: 'text', x: 260, y: 556, w: 1400, h: 50, z: 3, text: 'subtitle goes here', field: 'Subtitle', font: "'Segoe UI', Arial, sans-serif", size: 32, color: '#e7b53c', align: 'center' }, { inAnim: 'fade', inDelay: 180, inDur: 500, outAnim: 'fade', outDelay: 0, outDur: 300 })
+    ] },
+    { id: 'bt_countdown', name: 'Countdown Card', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bx', type: 'box', x: 760, y: 410, w: 400, h: 250, z: 1, fill: '#101418', opacity: 88, radius: 16 }, an('scale', 'scale')),
+      Object.assign({ id: 'lb', type: 'text', x: 760, y: 436, w: 400, h: 40, z: 2, text: 'STARTING IN', font: "'Segoe UI', Arial, sans-serif", size: 24, color: '#9fb0c8', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'tm', type: 'timer', x: 760, y: 480, w: 400, h: 150, z: 3, mode: 'down', durationMs: 300000, baseMs: 300000, running: false, anchorServer: 0, showHours: false, font: "'Segoe UI', Arial, sans-serif", size: 96, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade'))
+    ] },
+    { id: 'bt_ticker', name: 'News Ticker', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'tk', type: 'ticker', x: 0, y: 1000, w: 1920, h: 60, z: 1, text: 'BREAKING: your scrolling headline goes here', speed: 120, dir: 'left', font: 'Arial, sans-serif', size: 30, bold: true, color: '#ffffff', fill: '#0b1f3a', opacity: 92, radius: 0 }, an('slide-up', 'slide-up'))
+    ] },
+    { id: 'bt_bug', name: 'Corner LIVE Bug', kind: 'lowerthird', builtin: true, layers: [
+      Object.assign({ id: 'bx', type: 'box', x: 1690, y: 40, w: 160, h: 58, z: 1, fill: '#000000', opacity: 45, radius: 10 }, an('fade', 'fade')),
+      Object.assign({ id: 'lv', type: 'text', x: 1706, y: 50, w: 130, h: 38, z: 2, text: '● LIVE', font: "'Segoe UI', Arial, sans-serif", size: 26, bold: true, color: '#ff3b30', align: 'left' }, an('fade', 'fade'))
+    ] }
+  ];
+}
+(function () {
+  try { if (fs.existsSync(TPL_FILE)) { const j = JSON.parse(fs.readFileSync(TPL_FILE, 'utf8')); if (j && Array.isArray(j.items)) state.userTemplates = j.items; } } catch (e) {}
+})();
+function saveTemplates() { writeJson(TPL_FILE, function () { return { items: state.userTemplates }; }); }
+function allTemplates() { return builtinTemplates().concat(state.userTemplates || []); }
+
 // A lighter view of state for the SSE stream: OFF presets travel as metadata only (no big
 // payload), so toggling/saving stays snappy no matter how large the library grows. The
 // Program output only needs the payloads of presets that are ON; the Library list only
@@ -229,7 +272,9 @@ function wireState() {
       rowLabels: it.rows ? it.rows.map(function (r) { return it.rowKey ? (r[it.rowKey] || '') : (r[Object.keys(r)[0]] || ''); }) : []
     };
   });
-  return Object.assign({}, state, { shows: shows, media: mediaIndex });
+  // Templates travel as metadata only (name/kind/builtin); the layers are fetched on demand.
+  const templates = allTemplates().map(function (t) { return { id: t.id, name: t.name, kind: t.kind, builtin: !!t.builtin }; });
+  return Object.assign({}, state, { shows: shows, media: mediaIndex, templates: templates });
 }
 
 /* ------------------------------------------------------------------ *
@@ -510,6 +555,22 @@ function applyAction(action) {
     case 'show_toggle': { const it = state.shows.find(x => x.id === action.id); if (it) { it.on = (action.on == null ? !it.on : !!action.on); saveShows(); } break; }
     case 'show_alloff': state.shows.forEach(x => { x.on = false; }); saveShows(); break;
 
+    /* ---- Templates (starting designs) ---- */
+    case 'tpl_save': { // save a design as a reusable template (or import one)
+      const name = String(action.name || 'Template').slice(0, 120);
+      const kind = String(action.kind || 'lowerthird');
+      const layers = Array.isArray(action.layers) ? action.layers.slice(0, 100) : [];
+      if (!state.userTemplates) state.userTemplates = [];
+      if (state.userTemplates.length < 500) state.userTemplates.push({ id: 'ut_' + Date.now().toString(36) + state.userTemplates.length, name, kind, layers });
+      saveTemplates(); break;
+    }
+    case 'tpl_delete': state.userTemplates = (state.userTemplates || []).filter(x => x.id !== action.id); saveTemplates(); break;
+    case 'tpl_load': { // load a template's design into the Graphics Builder
+      const t = allTemplates().find(x => x.id === action.id);
+      if (t && Array.isArray(t.layers)) { state.lowerthird.layers = JSON.parse(JSON.stringify(t.layers)); state.lowerthird.editingShowId = ''; saveLowerThird(); }
+      break;
+    }
+
     /* ---- CSV mail-merge: attach a spreadsheet to a graphic, one row = one filled version ---- */
     case 'show_import_csv': {
       const it = state.shows.find(x => x.id === action.id); if (!it) break;
@@ -659,10 +720,10 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // --- current state (handy for debugging) — full state incl. all payloads ---
+  // --- current state (handy for debugging) — full state incl. all payloads + derived lists ---
   if (pathname === '/state') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ serverTime: Date.now(), state }));
+    res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex }) }));
     return;
   }
 
@@ -707,6 +768,15 @@ const server = http.createServer((req, res) => {
   if (pathname === '/version') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ version: VERSION }));
+    return;
+  }
+
+  // --- one template's full layers on demand (for loading / exporting) ---
+  if (pathname === '/template-payload') {
+    const id = url.searchParams.get('id');
+    const t = allTemplates().find(x => x.id === id);
+    res.writeHead(t ? 200 : 404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify(t ? { ok: true, template: { name: t.name, kind: t.kind, layers: t.layers || [] } } : { ok: false }));
     return;
   }
 
