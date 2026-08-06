@@ -14,6 +14,7 @@
   .safe{position:absolute;border:1px dashed rgba(255,255,255,.18);pointer-events:none;inset:5% 5%}
   .cstage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform:scale(.375);transform-origin:top left}
   .ly{position:absolute;cursor:move;outline:2px solid transparent}
+  .ly:hover{outline-color:rgba(120,170,255,.55)}
   .ly.sel{outline:2px solid var(--accent);outline-offset:1px}
   .ly .li{width:100%;height:100%;pointer-events:none;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
   .ly-text{white-space:pre-wrap;line-height:1.08}
@@ -92,7 +93,7 @@
         <section class="panel" style="padding:14px">
           <h3 style="margin-bottom:8px">Layers</h3>
           <div class="layerlist" id="layerList"></div>
-          <p class="mini" style="margin:8px 0 6px;color:var(--muted2)">Shift/Ctrl-click rows to select several (then Group). Double-click a name to rename. 👁 shows/hides a layer.</p>
+          <p class="mini" style="margin:8px 0 6px;color:var(--muted2)">Shift/Ctrl-click rows to select several (then Group). Double-click a name to rename. 👁 show/hide · 🔒 lock. Tip: on the canvas, Alt-click to reach a layer hidden underneath another. You can also just click its row here to select it.</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn ghost" id="btnGroup" style="font-size:12px">⧉ Group</button>
             <button class="btn ghost" id="btnUngroup" style="font-size:12px">Ungroup</button>

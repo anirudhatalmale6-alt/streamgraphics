@@ -37,7 +37,9 @@
     }
     if (l.type === 'video') {
       if (!l.src) return '<div class="li" style="width:100%;height:100%;border:2px dashed #6b7a90;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#9fb0c8;font-size:26px">▶ VIDEO</div>';
-      return '<video class="li" src="' + esc(l.src) + '" muted autoplay' + (l.loop ? ' loop' : '') + ' playsinline style="width:100%;height:100%;object-fit:' + (l.fit === 'cover' ? 'cover' : 'contain') + '"></video>';
+      // Builder preview shows the video PAUSED on its first frame — it doesn't play in the
+      // editor. Live playback only happens on the output. This keeps the canvas snappy.
+      return '<video class="li libvid" src="' + esc(l.src) + '" muted preload="auto" playsinline style="width:100%;height:100%;object-fit:' + (l.fit === 'cover' ? 'cover' : 'contain') + '"></video>';
     }
     if (l.type === 'ticker') {
       var tk = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
@@ -55,6 +57,11 @@
       return '<div class="ly' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + (l.locked ? ' locked' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + hid + clickthru + '">' + innerHtml(l) + '</div>';
     }).join('');
     cstage.querySelectorAll('.ly').forEach(function (el) { el.addEventListener('mousedown', startDrag); });
+    // Paint the first frame of each builder-preview video, then keep it paused (no continuous decode).
+    cstage.querySelectorAll('video.libvid').forEach(function (v) {
+      var f = function () { try { v.pause(); if (v.currentTime < 0.05) v.currentTime = 0.05; } catch (e) {} };
+      if (v.readyState >= 2) f(); else v.addEventListener('loadeddata', f, { once: true });
+    });
     renderHandles();
   }
   function layerName(l) {
@@ -279,6 +286,7 @@
   var drag = null;
   function startDrag(e) {
     var id = e.currentTarget.dataset.id;
+    if (e.altKey) { cycleUnder(e); e.preventDefault(); return; }         // alt-click digs to the layer beneath
     if (e.shiftKey) { select(id, true); e.preventDefault(); return; }   // shift-click toggles selection, no drag
     if (selIds.indexOf(id) < 0) select(id, false);                       // selects the layer (or its whole group)
     var ids = selIds.slice(), orig = {};
@@ -286,9 +294,21 @@
     drag = { ids: ids, orig: orig, sx: e.clientX, sy: e.clientY };
     e.preventDefault();
   }
+  // Alt-click cycles through layers stacked under the pointer (top -> next down -> ... -> wrap).
+  function cycleUnder(e) {
+    var r = canvasEl.getBoundingClientRect();
+    var wx = (e.clientX - r.left) / SCALE, wy = (e.clientY - r.top) / SCALE;
+    var hits = layers.filter(function (l) { return wx >= l.x && wx <= l.x + l.w && wy >= l.y && wy <= l.y + l.h; })
+      .sort(function (a, b) { return (b.z || 0) - (a.z || 0); });   // topmost first
+    if (!hits.length) return;
+    var cur = selId || (selIds.length ? selIds[selIds.length - 1] : null);
+    var i = -1; for (var k = 0; k < hits.length; k++) if (hits[k].id === cur) i = k;
+    select(hits[(i + 1) % hits.length].id, false);
+  }
   document.addEventListener('mousemove', function (e) {
     if (!drag) return;
     var dx = (e.clientX - drag.sx) / SCALE, dy = (e.clientY - drag.sy) / SCALE;
+    if (Math.abs(e.clientX - drag.sx) > 2 || Math.abs(e.clientY - drag.sy) > 2) drag.moved = true;
     drag.ids.forEach(function (lid) {
       var l = byId(lid); if (!l || !drag.orig[lid]) return;
       l.x = Math.round(drag.orig[lid].x + dx); l.y = Math.round(drag.orig[lid].y + dy);
@@ -298,7 +318,7 @@
     if (selId) { var pl = byId(selId); if (pl) { $('pX').value = pl.x; $('pY').value = pl.y; } }
     renderHandles();
   });
-  document.addEventListener('mouseup', function () { if (drag) { drag = null; push(); } });
+  document.addEventListener('mouseup', function () { if (drag) { var moved = drag.moved; drag = null; if (moved) push(); } });   // a plain click just selects — no state push, no network churn
 
   /* ---- select / resize / rotate handles on the canvas ---- */
   var canvasEl = $('canvas');
