@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var shows = [], ltLayers = [];
+  var shows = [], ltLayers = [], lastSig = '';
 
   function post(action) {
     return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action) }).catch(function () {});
@@ -28,10 +28,12 @@
       var id = row.dataset.id, it = shows.filter(function (x) { return x.id === id; })[0];
       row.querySelector('[data-act="toggle"]').onclick = function () { post({ type: 'show_toggle', id: id, on: !it.on }); };
       row.querySelector('[data-act="load"]').onclick = function () {
-        if (!it.payload || !Array.isArray(it.payload.layers)) { alert('This preset has no editable layers.'); return; }
-        post({ type: 'lt_layers', layers: it.payload.layers }).then(function () {
-          var b = row.querySelector('[data-act="load"]'); b.textContent = 'Loaded ✓'; setTimeout(function () { b.textContent = 'Load'; }, 1400);
-        });
+        var b = row.querySelector('[data-act="load"]'); b.textContent = '…';
+        // OFF presets don't carry their payload over the live stream — fetch it on demand.
+        fetch('/show-payload?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (res) {
+          if (!res.ok || !res.payload || !Array.isArray(res.payload.layers)) { alert('This preset has no editable layers.'); b.textContent = 'Load'; return; }
+          post({ type: 'show_load', id: id }).then(function () { b.textContent = 'Loaded ✓'; setTimeout(function () { b.textContent = 'Load'; }, 1400); });
+        }).catch(function () { b.textContent = 'Load'; });
       };
       row.querySelector('[data-act="rename"]').onclick = function () { var n = prompt('Rename preset:', it.name); if (n != null && n.trim()) post({ type: 'show_rename', id: id, name: n.trim() }); };
       row.querySelector('[data-act="delete"]').onclick = function () { if (confirm('Delete "' + it.name + '" from the library?')) post({ type: 'show_delete', id: id }); };
@@ -63,7 +65,9 @@
         ltLayers = (m.state.lowerthird && m.state.lowerthird.layers) || [];
         var n = ltLayers.length;
         $('saveHint').textContent = 'Snapshots the Graphics Builder — currently ' + n + ' layer' + (n === 1 ? '' : 's') + '.';
-        render();
+        // Only rebuild the list when the library actually changed (not on every unrelated update).
+        var sig = shows.map(function (x) { return x.id + '|' + x.name + '|' + (x.on ? 1 : 0); }).join(',');
+        if (sig !== lastSig) { lastSig = sig; render(); }
       } catch (x) {}
     };
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };

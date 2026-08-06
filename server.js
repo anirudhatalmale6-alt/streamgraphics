@@ -99,6 +99,7 @@ function defaultState() {
       chroma: '',
       w: 1920, h: 1080,
       vcmd: { id: '', cmd: '', seq: 0 },   // transient video playback command (play/pause/restart)
+      editingShowId: '',                   // which library preset (if any) the builder is currently editing
       layers: defaultLowerThirdLayers()
     },
 
@@ -147,9 +148,16 @@ function loadLibrary() {
   }
   return [];
 }
-function saveLibrary() {
-  try { fs.writeFileSync(LIB_FILE, JSON.stringify({ teams: state.library.teams }, null, 2)); } catch (e) {}
+// Debounced async disk writes — never block the request/broadcast hot path (saving a big
+// preset or toggling on/off used to stall while a synchronous write finished).
+const _writeTimers = {};
+function writeJson(file, getObj) {
+  clearTimeout(_writeTimers[file]);
+  _writeTimers[file] = setTimeout(function () {
+    try { fs.writeFile(file, JSON.stringify(getObj(), null, 2), function () {}); } catch (e) {}
+  }, 300);
 }
+function saveLibrary() { writeJson(LIB_FILE, function () { return { teams: state.library.teams }; }); }
 state.library = { teams: loadLibrary() };
 
 // Persist the lower-third design so a saved layout survives a restart.
@@ -162,9 +170,7 @@ const LT_FILE = path.join(DATA_DIR, 'lowerthird.json');
     }
   } catch (e) {}
 })();
-function saveLowerThird() {
-  try { fs.writeFileSync(LT_FILE, JSON.stringify({ layers: state.lowerthird.layers }, null, 2)); } catch (e) {}
-}
+function saveLowerThird() { writeJson(LT_FILE, function () { return { layers: state.lowerthird.layers }; }); }
 
 // The SHOW LIBRARY — saved, named graphics ("presets") that can be recalled or toggled on air.
 // Each item: { id, name, kind, payload, on }. Persisted so the library survives restarts.
@@ -177,8 +183,17 @@ const SHOWS_FILE = path.join(DATA_DIR, 'shows.json');
     }
   } catch (e) {}
 })();
-function saveShows() {
-  try { fs.writeFileSync(SHOWS_FILE, JSON.stringify({ items: state.shows }, null, 2)); } catch (e) {}
+function saveShows() { writeJson(SHOWS_FILE, function () { return { items: state.shows }; }); }
+
+// A lighter view of state for the SSE stream: OFF presets travel as metadata only (no big
+// payload), so toggling/saving stays snappy no matter how large the library grows. The
+// Program output only needs the payloads of presets that are ON; the Library list only
+// needs names + on/off. Full payloads are fetched on demand (GET /show-payload?id=).
+function wireState() {
+  const shows = (state.shows || []).map(function (it) {
+    return it.on ? it : { id: it.id, name: it.name, kind: it.kind, on: it.on };
+  });
+  return Object.assign({}, state, { shows: shows });
 }
 
 /* ------------------------------------------------------------------ *
@@ -187,7 +202,7 @@ function saveShows() {
 const clients = new Set();
 
 function broadcast() {
-  const payload = JSON.stringify({ serverTime: Date.now(), state });
+  const payload = JSON.stringify({ serverTime: Date.now(), state: wireState() });
   const frame = `data: ${payload}\n\n`;
   for (const res of clients) {
     try { res.write(frame); } catch (e) { /* dropped; cleaned on close */ }
@@ -383,6 +398,7 @@ function applyAction(action) {
     case 'lt_layers': // control panel sends the full layer array on any edit
       if (Array.isArray(action.layers)) {
         state.lowerthird.layers = action.layers.slice(0, 100);
+        if (action.editingShowId !== undefined) state.lowerthird.editingShowId = String(action.editingShowId || '');
         saveLowerThird();
       }
       break;
@@ -432,12 +448,25 @@ function applyAction(action) {
       const kind = String(action.kind || 'lowerthird');
       const payload = action.payload && typeof action.payload === 'object' ? action.payload : {};
       const existing = action.id ? state.shows.find(x => x.id === action.id) : null;
-      if (existing) { existing.name = name; existing.kind = kind; existing.payload = payload; }
+      let savedId;
+      if (existing) { existing.name = name; existing.kind = kind; existing.payload = payload; savedId = existing.id; }
       else {
         if (state.shows.length >= 300) break;
-        state.shows.push({ id: 'S' + Date.now().toString(36) + (state.shows.length), name, kind, payload, on: false });
+        savedId = 'S' + Date.now().toString(36) + (state.shows.length);
+        state.shows.push({ id: savedId, name, kind, payload, on: false });
       }
+      // Link the builder to the preset it just saved, so its next "Save" updates the same one.
+      if (kind === 'lowerthird') state.lowerthird.editingShowId = savedId;
       saveShows();
+      break;
+    }
+    case 'show_load': { // pull a preset's design into the Graphics Builder for editing
+      const it = state.shows.find(x => x.id === action.id);
+      if (it && it.payload && Array.isArray(it.payload.layers)) {
+        state.lowerthird.layers = JSON.parse(JSON.stringify(it.payload.layers));
+        state.lowerthird.editingShowId = it.id;
+        saveLowerThird();
+      }
       break;
     }
     case 'show_delete': state.shows = state.shows.filter(x => x.id !== action.id); saveShows(); break;
@@ -498,7 +527,7 @@ const server = http.createServer((req, res) => {
       'Access-Control-Allow-Origin': '*'
     });
     res.write('retry: 2000\n\n');
-    res.write(`data: ${JSON.stringify({ serverTime: Date.now(), state })}\n\n`);
+    res.write(`data: ${JSON.stringify({ serverTime: Date.now(), state: wireState() })}\n\n`);
     clients.add(res);
     const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch (e) {} }, 15000);
     req.on('close', () => { clearInterval(ping); clients.delete(res); });
@@ -546,10 +575,19 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // --- current state (handy for debugging) ---
+  // --- current state (handy for debugging) — full state incl. all payloads ---
   if (pathname === '/state') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ serverTime: Date.now(), state }));
+    return;
+  }
+
+  // --- one preset's full payload on demand (used by Load, since OFF presets omit payload over SSE) ---
+  if (pathname === '/show-payload') {
+    const id = url.searchParams.get('id');
+    const it = (state.shows || []).find(x => x.id === id);
+    res.writeHead(it ? 200 : 404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify(it ? { ok: true, payload: it.payload || {} } : { ok: false }));
     return;
   }
 

@@ -6,6 +6,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var SCALE = 0.375;                 // canvas is 1920x1080 shown at 720x405
   var layers = [], selId = null, selIds = [], loaded = false, seq = 0;
+  var showsMeta = [], editingShowId = '';   // Show-Library metadata + which preset we're editing
   var cstage = $('cstage');
 
   function uid() { return 'L' + Date.now().toString(36) + (seq++); }
@@ -428,15 +429,24 @@
     layers.push(l); selId = l.id; selIds = [l.id]; renderCanvas(); renderList(); syncProps(); push();
   }
   function saveToLibrary() {
-    var suggested = '';
-    for (var i = 0; i < layers.length; i++) { if (layers[i].type === 'text' && layers[i].text) { suggested = layers[i].text; break; } }
-    var name = prompt('Save this design to the Show Library as:', suggested || 'Untitled graphic');
-    if (name == null) return; name = name.trim() || 'Untitled graphic';
-    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'show_save', name: name, kind: 'lowerthird', payload: { layers: layers } }) })
+    // If we loaded a preset (or already saved one), offer to UPDATE it instead of making a copy.
+    var linked = editingShowId ? showsMeta.filter(function (s) { return s.id === editingShowId; })[0] : null;
+    var updateId = null, name;
+    if (linked && confirm('Update the existing preset "' + linked.name + '"?\n\nOK = update it   ·   Cancel = save as a new copy')) {
+      updateId = linked.id; name = linked.name;
+    } else {
+      var suggested = linked ? linked.name : '';
+      if (!suggested) for (var i = 0; i < layers.length; i++) { if (layers[i].type === 'text' && layers[i].text) { suggested = layers[i].text; break; } }
+      name = prompt('Save this design to the Show Library as:', suggested || 'Untitled graphic');
+      if (name == null) return; name = name.trim() || 'Untitled graphic';
+    }
+    var act = { type: 'show_save', name: name, kind: 'lowerthird', payload: { layers: layers } };
+    if (updateId) act.id = updateId;
+    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(act) })
       .then(function () {
-        var b = $('saveToLib'), old = b.textContent; b.textContent = 'Saved ✓'; setTimeout(function () { b.textContent = old; }, 1500);
-        if (confirm('Saved "' + name + '" to the Show Library.\n\nStart a new blank design so you can build the next one?')) {
-          fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [] }) });
+        var b = $('saveToLib'), old = b.textContent; b.textContent = updateId ? 'Updated ✓' : 'Saved ✓'; setTimeout(function () { b.textContent = old; }, 1500);
+        if (!updateId && confirm('Saved "' + name + '" to the Show Library.\n\nStart a new blank design so you can build the next one?')) {
+          fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '' }) });
         }
       }).catch(function () { alert('Save failed — is the server running?'); });
   }
@@ -624,7 +634,7 @@
   $('btnShow').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_show' }) }); };
   $('btnHide').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_hide' }) }); };
   $('saveToLib').onclick = saveToLibrary;
-  $('newDesign').onclick = function () { if (confirm('Start a new blank design? (Save to Library first if you want to keep the current one.)')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [] }) }); };
+  $('newDesign').onclick = function () { if (confirm('Start a new blank design? (Save to Library first if you want to keep the current one.)')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '' }) }); };
   $('chroma').onchange = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_chroma', value: $('chroma').checked ? 'green' : '' }) }); };
   $('copyBtn').onclick = function () {
     var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
@@ -639,6 +649,7 @@
       try {
         var m = JSON.parse(e.data);
         if (m.serverTime) { var meas = m.serverTime - Date.now(); clockOffset = clockOffset === 0 ? meas : Math.round(clockOffset * 0.7 + meas * 0.3); }
+        if (m.state) { showsMeta = m.state.shows || []; if (m.state.lowerthird) editingShowId = m.state.lowerthird.editingShowId || ''; }
         if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
         $('airState').textContent = lt.visible ? 'ON AIR' : 'OFF AIR'; $('airState').classList.toggle('live', !!lt.visible);
         $('chroma').checked = !!lt.chroma;
