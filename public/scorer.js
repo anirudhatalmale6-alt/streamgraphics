@@ -41,8 +41,6 @@
   $('startNext').onclick = function () { if (!sb) return; var g = Math.min((sb.gamesCount || 3) - 1, (sb.activeGame | 0) + 1); post({ type: 'sb_startGame', game: g }); };
   $('backGame').onclick = function () { post({ type: 'sb_backGame' }); };
   $('restart').onclick = function () { if (confirm('Restart the whole match? All scores reset.')) post({ type: 'sb_restart' }); };
-  $('btnShow').onclick = function () { post({ type: 'sb_show' }); };
-  $('btnHide').onclick = function () { post({ type: 'sb_hide' }); };
 
   function connect() {
     var es = new EventSource('/events');

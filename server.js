@@ -196,7 +196,7 @@ function wireState() {
     // OFF: metadata only + light row info (labels for the picker), but not the heavy payload/rows.
     return {
       id: it.id, name: it.name, kind: it.kind, on: it.on,
-      columns: it.columns || [], rowKey: it.rowKey || '', rowIndex: it.rowIndex || 0,
+      columns: it.columns || [], rowKey: it.rowKey || '', rowIndex: it.rowIndex || 0, rowTransition: it.rowTransition || 'cut',
       rowCount: it.rows ? it.rows.length : 0,
       rowLabels: it.rows ? it.rows.map(function (r) { return it.rowKey ? (r[it.rowKey] || '') : (r[Object.keys(r)[0]] || ''); }) : []
     };
@@ -502,6 +502,7 @@ function applyAction(action) {
       it.rowIndex = i; saveShows(); break;
     }
     case 'show_setkey': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowKey = String(action.key || ''); saveShows(); } break; }
+    case 'show_rowmode': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowTransition = (action.mode === 'reanimate') ? 'reanimate' : 'cut'; saveShows(); } break; }
     case 'show_clear_csv': { const it = state.shows.find(x => x.id === action.id); if (it) { delete it.rows; delete it.columns; delete it.rowKey; it.rowIndex = 0; saveShows(); } break; }
 
     default:

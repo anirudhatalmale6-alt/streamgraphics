@@ -635,13 +635,41 @@
   document.addEventListener('mouseup', function () { if (hop) { hop = null; push(); } });
   function syncNum(l) { if (selId === l.id) { $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h; } }
 
-  // Delete key removes the selected layer (when not typing in a field)
+  // Delete removes the selected layer; arrow keys nudge it (Shift = 10px). Not while typing.
   document.addEventListener('keydown', function (e) {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && (selIds.length || selId)) {
-      var t = document.activeElement && document.activeElement.tagName;
-      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
-      e.preventDefault(); deleteSelected();
+    var t = document.activeElement && document.activeElement.tagName;
+    if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && (selIds.length || selId)) { e.preventDefault(); deleteSelected(); return; }
+    var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (d && (selIds.length || selId)) {
+      e.preventDefault(); var step = e.shiftKey ? 10 : 1;
+      mutateSel(function (l) { l.x = Math.round((l.x || 0) + d[0] * step); l.y = Math.round((l.y || 0) + d[1] * step); });
     }
+  });
+  // Align the selected layer(s): to the whole 1920x1080 frame when one is selected,
+  // or relative to the selection's bounding box when several are selected.
+  function align(edge) {
+    var ids = selIds.length ? selIds : (selId ? [selId] : []); if (!ids.length) return;
+    var b;
+    if (ids.length > 1) {
+      var xs = [], ys = [], xe = [], ye = [];
+      ids.forEach(function (id) { var m = byId(id); if (!m) return; xs.push(m.x); ys.push(m.y); xe.push(m.x + m.w); ye.push(m.y + m.h); });
+      b = { x: Math.min.apply(null, xs), y: Math.min.apply(null, ys), w: Math.max.apply(null, xe) - Math.min.apply(null, xs), h: Math.max.apply(null, ye) - Math.min.apply(null, ys) };
+    } else { b = { x: 0, y: 0, w: 1920, h: 1080 }; }
+    ids.forEach(function (id) {
+      var l = byId(id); if (!l) return;
+      if (edge === 'left') l.x = Math.round(b.x);
+      else if (edge === 'hcenter') l.x = Math.round(b.x + (b.w - l.w) / 2);
+      else if (edge === 'right') l.x = Math.round(b.x + b.w - l.w);
+      else if (edge === 'top') l.y = Math.round(b.y);
+      else if (edge === 'vmiddle') l.y = Math.round(b.y + (b.h - l.h) / 2);
+      else if (edge === 'bottom') l.y = Math.round(b.y + b.h - l.h);
+    });
+    renderCanvas(); renderList(); push();
+  }
+  ['alL', 'alC', 'alR', 'alT', 'alM', 'alB'].forEach(function (id, i) {
+    var edges = ['left', 'hcenter', 'right', 'top', 'vmiddle', 'bottom'];
+    if ($(id)) $(id).onclick = function () { align(edges[i]); };
   });
 
   /* ---- air / chroma / copy ---- */

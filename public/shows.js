@@ -63,6 +63,7 @@
           + '<select class="inp" data-act="rowsel" style="min-width:180px">' + labels.map(function (lb, i) { return '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + esc(lb || ('Row ' + (i + 1))) + '</option>'; }).join('') + '</select>'
           + '<button class="minibtn" data-act="next" title="next row">▶</button>'
           + '<span class="mono" style="color:var(--muted)">' + (idx + 1) + ' / ' + rowCount + '</span>'
+          + '<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)" title="off = cut instantly to the next entry; on = animate off, change, animate back on"><input type="checkbox" data-act="anim"' + (it.rowTransition === 'reanimate' ? ' checked' : '') + '> animate change</label>'
           + '<button class="minibtn danger" data-act="clearcsv" title="remove the CSV">Clear CSV</button>'
           + '</div>';
       }
@@ -76,6 +77,7 @@
       var pv = row.querySelector('[data-act="prev"]'); if (pv) pv.onclick = function () { post({ type: 'show_rowselect', id: id, cmd: 'prev' }); };
       var nx = row.querySelector('[data-act="next"]'); if (nx) nx.onclick = function () { post({ type: 'show_rowselect', id: id, cmd: 'next' }); };
       var rs = row.querySelector('[data-act="rowsel"]'); if (rs) rs.onchange = function () { post({ type: 'show_rowselect', id: id, cmd: 'goto', n: +rs.value }); };
+      var an = row.querySelector('[data-act="anim"]'); if (an) an.onchange = function () { post({ type: 'show_rowmode', id: id, mode: an.checked ? 'reanimate' : 'cut' }); };
       var cc = row.querySelector('[data-act="clearcsv"]'); if (cc) cc.onclick = function () { if (confirm('Remove the CSV from "' + it.name + '"?')) post({ type: 'show_clear_csv', id: id }); };
       row.querySelector('[data-act="load"]').onclick = function () {
         var b = row.querySelector('[data-act="load"]'); b.textContent = '…';
@@ -110,7 +112,7 @@
         var n = ltLayers.length;
         $('saveHint').textContent = 'Snapshots the Graphics Builder — currently ' + n + ' layer' + (n === 1 ? '' : 's') + '.';
         // Only rebuild the list when the library actually changed (not on every unrelated update).
-        var sig = shows.map(function (x) { return x.id + '|' + x.name + '|' + (x.on ? 1 : 0) + '|' + (x.rowCount != null ? x.rowCount : (x.rows ? x.rows.length : 0)) + '|' + (x.rowIndex || 0) + '|' + (x.rowKey || ''); }).join(',');
+        var sig = shows.map(function (x) { return x.id + '|' + x.name + '|' + (x.on ? 1 : 0) + '|' + (x.rowCount != null ? x.rowCount : (x.rows ? x.rows.length : 0)) + '|' + (x.rowIndex || 0) + '|' + (x.rowKey || '') + '|' + (x.rowTransition || 'cut'); }).join(',');
         if (sig !== lastSig) { lastSig = sig; render(); }
       } catch (x) {}
     };

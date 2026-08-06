@@ -194,8 +194,15 @@
         active[it.id] = { el: el, sig: sig, rowSig: rowSig };
         requestAnimationFrame(function () { animatePreset(el, 'in'); });   // play each layer's Animate-ON
       } else if (a.sig !== sig) {
-        // Already on air (row step or live edit): swap contents in place, no re-animation.
-        buildInto(a.el, layers); tagTimers(a.el, layers); a.sig = sig; a.rowSig = rowSig;
+        var rowChanged = (a.rowSig !== rowSig);
+        a.sig = sig; a.rowSig = rowSig;
+        if (rowChanged && it.rowTransition === 'reanimate') {
+          // Animate OFF, swap to the new row, animate back ON (instead of a hard cut).
+          var mx = animatePreset(a.el, 'out'), el2 = a.el, ly2 = layers;
+          setTimeout(function () { buildInto(el2, ly2); tagTimers(el2, ly2); requestAnimationFrame(function () { animatePreset(el2, 'in'); }); }, mx + 60);
+        } else {
+          buildInto(a.el, layers); tagTimers(a.el, layers);   // hard cut (default) or a live edit
+        }
       }
     });
     // Turn OFF: play each layer's Animate-OFF, then remove after the longest exit finishes.

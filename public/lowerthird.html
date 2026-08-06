@@ -250,7 +250,16 @@
             </div>
 
             <div class="multi-only cap" style="text-align:left;color:#8ab4ff;font-size:11px;margin:4px 0">Multiple layers selected — Animate settings below apply to all of them. Use Group to link them. Tip: inside a group, set a layer's animation to "None" and it will follow the group's animation (so a background box flies in with the group instead of just popping on).</div>
-            <hr style="border:none;border-top:1px solid var(--line);margin:10px 0" class="single-only">
+            <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+            <div class="cap" style="text-align:left;color:var(--muted);font-size:11px;margin-bottom:4px">Align <span style="color:var(--muted2)">— to frame (or to selection when several are picked) · arrow keys nudge, Shift = 10px</span></div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
+              <button class="btn ghost" id="alL" title="align left" style="font-size:12px;padding:6px 9px">⇤ L</button>
+              <button class="btn ghost" id="alC" title="center horizontally" style="font-size:12px;padding:6px 9px">↔ C</button>
+              <button class="btn ghost" id="alR" title="align right" style="font-size:12px;padding:6px 9px">R ⇥</button>
+              <button class="btn ghost" id="alT" title="align top" style="font-size:12px;padding:6px 9px">⤒ T</button>
+              <button class="btn ghost" id="alM" title="center vertically" style="font-size:12px;padding:6px 9px">↕ M</button>
+              <button class="btn ghost" id="alB" title="align bottom" style="font-size:12px;padding:6px 9px">B ⤓</button>
+            </div>
             <div class="cap single-only" style="text-align:left;color:var(--muted);font-size:11px;margin-bottom:4px">Position &amp; size (px)</div>
             <div class="grid4 single-only">
               <input class="inp" id="pX" type="number" title="X"><input class="inp" id="pY" type="number" title="Y">
