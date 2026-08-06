@@ -23,20 +23,29 @@
   function slideHtml(txt) {
     return esc(txt).replace(/\s*\/\/\s*/g, '\n').replace(/\n/g, '<br>').replace(/(^|<br>)\s*[-*•]\s+/g, '$1• ');
   }
-  function slideJustify(l) { return l.align === 'left' ? 'flex-start' : (l.align === 'right' ? 'flex-end' : 'center'); }
-  // The visible slide card — hugs its text, optional rgba background/padding/radius, never clips.
-  function slideBoxStyle(l) {
-    var bgc = (l.bgOpacity > 0 && l.bg) ? rgba(l.bg, l.bgOpacity) : 'transparent';
+  // The text block inside a slide — fills the (fixed) background box, aligned + padded.
+  function slideTextStyle(l) {
     var shadow = (l.bgOpacity > 0) ? '' : ';text-shadow:0 2px 8px rgba(0,0,0,.45)';
-    return 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 54) + 'px;color:' + esc(l.color || '#fff')
-      + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
-      + ';line-height:1.22;background:' + bgc + ';padding:' + (l.pad == null ? 0 : l.pad) + 'px;border-radius:' + (l.radius || 0) + 'px;max-width:100%;display:inline-block;box-sizing:border-box' + shadow;
+    var av = l.align === 'left' ? 'flex-start' : (l.align === 'right' ? 'flex-end' : 'center');
+    return 'position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:' + av
+      + ';text-align:' + (l.align || 'center') + ';padding:' + (l.pad == null ? 0 : l.pad) + 'px;box-sizing:border-box;overflow:visible'
+      + ';font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 54) + 'px;color:' + esc(l.color || '#fff')
+      + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';line-height:1.22' + shadow;
+  }
+  // The background PANEL is fixed (sized by the layer box) and stays put; only the text animates between slides.
+  function slideBgHtml(l) {
+    if (!(l.bgOpacity > 0 && l.bg)) return '';
+    return '<div class="slide-bg" style="position:absolute;inset:0;background:' + rgba(l.bg, l.bgOpacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>';
   }
   function slideWrap(l, idx, innerHtmlStr) {
     var hide = innerHtmlStr ? '' : 'display:none;';
-    return '<div class="li ly-slide" data-idx="' + idx + '" style="overflow:visible;display:flex;align-items:center;justify-content:' + slideJustify(l) + ';width:100%;height:100%">'
-      + '<div class="slide-inner" style="' + hide + slideBoxStyle(l) + ';transition:opacity .3s ease">' + innerHtmlStr + '</div></div>';
+    return '<div class="li ly-slide" data-idx="' + idx + '" style="position:relative;overflow:visible;width:100%;height:100%">'
+      + slideBgHtml(l)
+      + '<div class="slide-text" style="' + hide + slideTextStyle(l) + ';transition:transform .22s ease,opacity .22s ease">' + innerHtmlStr + '</div></div>';
   }
+  // Between-slide transition offsets (text only): out-state and in-from-state.
+  function transOut(tr) { return tr === 'slide-up' ? 'translateY(-26px)' : tr === 'slide-down' ? 'translateY(26px)' : tr === 'slide-left' ? 'translateX(-44px)' : tr === 'slide-right' ? 'translateX(44px)' : 'none'; }
+  function transIn(tr) { return tr === 'slide-up' ? 'translateY(26px)' : tr === 'slide-down' ? 'translateY(-26px)' : tr === 'slide-left' ? 'translateX(44px)' : tr === 'slide-right' ? 'translateX(-44px)' : 'none'; }
 
   // ---- timer layer math (shared shape with the standalone timer + server) ----
   function liveTimerMs(t, now) {
@@ -219,13 +228,21 @@
     (lt.layers || []).forEach(function (l) {
       if (l.type !== 'slides') return;
       var el = stage.querySelector('.ly[data-id="' + l.id + '"] .ly-slide'); if (!el) return;
-      var inner = el.querySelector('.slide-inner'); if (!inner) return;
+      var text = el.querySelector('.slide-text'); if (!text) return;
       var idx = (l.index == null ? -1 : l.index);
       if (String(idx) === el.getAttribute('data-idx')) return;
       var txt = (idx >= 0 && l.slides && l.slides[idx] != null) ? l.slides[idx] : '';
-      var html = slideHtml(txt);
-      inner.style.opacity = '0';
-      setTimeout(function () { inner.innerHTML = html; inner.style.display = html ? '' : 'none'; el.setAttribute('data-idx', String(idx)); inner.style.opacity = '1'; }, 160);
+      var html = slideHtml(txt), tr = l.trans || 'fade';
+      // Animate the TEXT out (background panel stays put), swap, animate the new text in.
+      text.style.transition = 'transform .2s ease, opacity .2s ease';
+      text.style.opacity = '0'; text.style.transform = transOut(tr);
+      setTimeout(function () {
+        text.innerHTML = html; text.style.display = html ? '' : 'none';
+        text.style.transition = 'none'; text.style.opacity = '0'; text.style.transform = transIn(tr); void text.offsetWidth;
+        text.style.transition = 'transform .24s ease, opacity .24s ease';
+        text.style.opacity = '1'; text.style.transform = 'none';
+        el.setAttribute('data-idx', String(idx));
+      }, 200);
     });
   }
   function render(lt) {

@@ -93,13 +93,15 @@
         </section>
 
         <section class="panel" style="padding:14px">
-          <h3 style="margin-bottom:8px">Layers</h3>
-          <div class="layerlist" id="layerList"></div>
-          <p class="mini" style="margin:8px 0 6px;color:var(--muted2)">Shift/Ctrl-click rows to select several (then Group). Double-click a name to rename. 👁 show/hide · 🔒 lock. Tip: on the canvas, Alt-click to reach a layer hidden underneath another. You can also just click its row here to select it.</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn ghost" id="btnGroup" style="font-size:12px">⧉ Group</button>
-            <button class="btn ghost" id="btnUngroup" style="font-size:12px">Ungroup</button>
-            <button class="btn ghost" id="btnReset" style="font-size:12px">Reset</button>
+          <h3 style="margin-bottom:8px;cursor:pointer;user-select:none" id="layersToggle" title="click to collapse / expand"><span id="layersCaret">▾</span> Layers</h3>
+          <div id="layersBody">
+            <div class="layerlist" id="layerList" style="max-height:230px;overflow:auto"></div>
+            <p class="mini" style="margin:8px 0 6px;color:var(--muted2)">Shift/Ctrl-click rows to select several (then Group). Double-click a name to rename. 👁 show/hide · 🔒 lock. Tip: on the canvas, Alt-click to reach a layer hidden underneath another. You can also just click its row here to select it.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn ghost" id="btnGroup" style="font-size:12px">⧉ Group</button>
+              <button class="btn ghost" id="btnUngroup" style="font-size:12px">Ungroup</button>
+              <button class="btn ghost" id="btnReset" style="font-size:12px">Reset</button>
+            </div>
           </div>
         </section>
 
@@ -224,6 +226,10 @@
               <input class="inp s" id="pSlBgA" type="number" min="0" max="100" value="0" title="opacity % — 0 = no background"> %
               <input class="inp t" id="pSlPad" type="number" min="0" max="200" value="28" title="padding px">
               <input class="inp t" id="pSlRadius" type="number" min="0" max="120" value="14" title="corner radius px">
+            </div>
+            <div class="row only-slides"><label>Between slides</label>
+              <select class="inp" id="pSlTrans" style="width:auto"><option value="fade">Fade</option><option value="slide-up">Slide up</option><option value="slide-down">Slide down</option><option value="slide-left">Slide left</option><option value="slide-right">Slide right</option></select>
+              <span class="mini2" style="color:var(--muted2);font-size:11px">background stays; only the text animates</span>
             </div>
             <div class="row only-slides"><label>Font</label>
               <select class="inp" id="pSlFont" style="width:auto">

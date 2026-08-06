@@ -19,13 +19,17 @@
   function selected() { return byId(selId); }
   // Slide text: "//" or a real newline = line break; a line starting with - or * = bullet.
   function slideHtml(txt) { return esc(txt).replace(/\s*\/\/\s*/g, '\n').replace(/\n/g, '<br>').replace(/(^|<br>)\s*[-*•]\s+/g, '$1• '); }
-  function slideJustify(l) { return l.align === 'left' ? 'flex-start' : (l.align === 'right' ? 'flex-end' : 'center'); }
-  function slideBoxStyle(l) {
-    var bgc = (l.bgOpacity > 0 && l.bg) ? rgba(l.bg, l.bgOpacity) : 'transparent';
+  function slideTextStyle(l) {
     var shadow = (l.bgOpacity > 0) ? '' : ';text-shadow:0 2px 8px rgba(0,0,0,.45)';
-    return 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 54) + 'px;color:' + esc(l.color || '#fff')
-      + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
-      + ';line-height:1.22;background:' + bgc + ';padding:' + (l.pad == null ? 0 : l.pad) + 'px;border-radius:' + (l.radius || 0) + 'px;max-width:100%;display:inline-block;box-sizing:border-box' + shadow;
+    var av = l.align === 'left' ? 'flex-start' : (l.align === 'right' ? 'flex-end' : 'center');
+    return 'position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:' + av
+      + ';text-align:' + (l.align || 'center') + ';padding:' + (l.pad == null ? 0 : l.pad) + 'px;box-sizing:border-box;overflow:visible'
+      + ';font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 54) + 'px;color:' + esc(l.color || '#fff')
+      + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';line-height:1.22' + shadow;
+  }
+  function slideBgHtml(l) {
+    if (!(l.bgOpacity > 0 && l.bg)) return '';
+    return '<div style="position:absolute;inset:0;background:' + rgba(l.bg, l.bgOpacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>';
   }
 
   // ---- timer/clock helpers (same math as the output + server) ----
@@ -139,9 +143,9 @@
     if (l.type === 'slides') {
       var sidx = (l.index == null ? -1 : l.index);
       var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
-      var wrap = 'width:100%;height:100%;overflow:visible;display:flex;align-items:center;justify-content:' + slideJustify(l);
-      if (!stxt) return '<div class="li" style="' + wrap + ';color:#6b7a90;font-size:26px">(blank — Next to show a slide)</div>';
-      return '<div class="li ly-slide" style="' + wrap + '"><div class="slide-inner" style="' + slideBoxStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
+      var swrap = 'position:relative;width:100%;height:100%;overflow:visible';
+      if (!stxt) return '<div class="li" style="' + swrap + '">' + slideBgHtml(l) + '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#6b7a90;font-size:26px">(blank — Next to show a slide)</div></div>';
+      return '<div class="li ly-slide" style="' + swrap + '">' + slideBgHtml(l) + '<div class="slide-text" style="' + slideTextStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
     }
     if (l.type === 'timer') {
       var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
@@ -291,6 +295,7 @@
       $('pSlText').value = (l.slides || []).join('\n\n');
       $('pSlColor').value = l.color || '#ffffff'; $('pSlSize').value = l.size || 54; $('pSlBold').checked = l.bold !== false; $('pSlAlign').value = l.align || 'center'; $('pSlFont').value = l.font || "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
       $('pSlBg').value = l.bg || '#0b1f3a'; $('pSlBgA').value = l.bgOpacity == null ? 0 : l.bgOpacity; $('pSlPad').value = l.pad == null ? 28 : l.pad; $('pSlRadius').value = l.radius || 0;
+      $('pSlTrans').value = l.trans || 'fade';
       updateSlideIdxLabel();
     }
     $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h;
@@ -386,6 +391,7 @@
   $('pSlBgA').oninput = function () { mutate(function (l) { l.bgOpacity = +$('pSlBgA').value; }); };
   $('pSlPad').oninput = function () { mutate(function (l) { l.pad = +$('pSlPad').value; }); };
   $('pSlRadius').oninput = function () { mutate(function (l) { l.radius = +$('pSlRadius').value; }); };
+  $('pSlTrans').onchange = function () { mutate(function (l) { l.trans = $('pSlTrans').value; }); };
   ['pX', 'pY', 'pW', 'pH'].forEach(function (id) { $(id).oninput = function () { mutate(function (l) { l[id.slice(1).toLowerCase()] = Math.round(+$(id).value); }); }; });
   $('pInAnim').onchange = function () { mutateSel(function (l) { l.inAnim = $('pInAnim').value; }); };
   $('pInDelay').oninput = function () { mutateSel(function (l) { l.inDelay = +$('pInDelay').value; }); };
@@ -422,7 +428,7 @@
   $('addVideo').onclick = function () { add(merge({ type: 'video', x: 660, y: 340, w: 600, h: 338, src: '', autoplay: true, loop: false, muted: true, fit: 'contain', shape: 'none' }, A('fade'))); };
   $('addTicker').onclick = function () { add(merge({ type: 'ticker', x: 0, y: 1000, w: 1920, h: 60, text: 'BREAKING: your scrolling headline goes here', speed: 120, dir: 'left', font: 'Arial, Helvetica, sans-serif', size: 30, bold: true, color: '#ffffff', fill: '#0b1f3a', opacity: 92, radius: 0 }, A('slide-up'))); };
   $('addTimer').onclick = function () { add(merge({ type: 'timer', x: 710, y: 440, w: 500, h: 160, mode: 'down', durationMs: 300000, baseMs: 300000, running: false, anchorServer: 0, targetEpoch: 0, showHours: false, overtime: false, use24h: false, font: "'Segoe UI', Arial, sans-serif", size: 110, bold: true, italic: false, color: '#ffffff', align: 'center' }, A('fade'))); };
-  $('addSlides').onclick = function () { add(merge({ type: 'slides', x: 360, y: 300, w: 1200, h: 480, slides: ['Amazing grace, how sweet the sound', 'That saved a wretch like me', 'I once was lost, but now am found'], index: 0, font: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif", size: 64, bold: true, italic: false, color: '#ffffff', align: 'center', bg: '#0b1f3a', bgOpacity: 0, pad: 28, radius: 14 }, A('fade'))); };
+  $('addSlides').onclick = function () { add(merge({ type: 'slides', x: 360, y: 300, w: 1200, h: 480, slides: ['Amazing grace, how sweet the sound', 'That saved a wretch like me', 'I once was lost, but now am found'], index: 0, font: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif", size: 64, bold: true, italic: false, color: '#ffffff', align: 'center', bg: '#0b1f3a', bgOpacity: 0, pad: 28, radius: 14, trans: 'fade' }, A('fade'))); };
   // full-screen background colour box (goes to the very back)
   $('addBg').onclick = function () {
     var bg = merge({ type: 'box', x: 0, y: 0, w: 1920, h: 1080, fill: '#0b1f3a', opacity: 100, radius: 0 }, A('fade'));
@@ -624,6 +630,14 @@
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();
+  // Collapsible Layers panel — frees vertical room so the long properties + canvas stay in view.
+  (function () {
+    var t = $('layersToggle'), body = $('layersBody'), caret = $('layersCaret'); if (!t) return;
+    var collapsed = false; try { collapsed = localStorage.getItem('lt_layers_collapsed') === '1'; } catch (e) {}
+    function apply() { body.style.display = collapsed ? 'none' : ''; caret.textContent = collapsed ? '▸' : '▾'; }
+    apply();
+    t.onclick = function () { collapsed = !collapsed; try { localStorage.setItem('lt_layers_collapsed', collapsed ? '1' : '0'); } catch (e) {} apply(); };
+  })();
   // Keep timer/clock previews ticking live in the builder canvas (same clock as the output).
   (function builderTick() {
     var els = cstage.querySelectorAll('.ly-timer');
