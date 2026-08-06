@@ -62,6 +62,15 @@
   </header>
 
   <main>
+    <div class="boardbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px">
+      <span class="mini" style="color:var(--muted);font-weight:700">Scoreboard:</span>
+      <select class="inp" id="boardSel" style="width:auto"></select>
+      <button class="btn ghost" id="boardRename" style="font-size:12px">Rename</button>
+      <button class="btn ghost" id="boardNew" style="font-size:12px">＋ New board</button>
+      <button class="btn ghost" id="boardDelete" style="font-size:12px;color:#e06">Delete</button>
+      <span style="flex:1"></span>
+      <span class="mini" style="color:var(--muted)">Big-button scorer:</span><a id="scorerLink" href="/scorer" target="_blank" style="color:#7c9cff;font-weight:700">open ↗</a>
+    </div>
     <section class="panel hero">
       <div class="preview" style="align-items:flex-start;justify-content:center">
         <div style="width:100%;max-width:520px">

@@ -62,6 +62,31 @@ refreshMediaIndex();
  *  countdown-to-clock-time). State is stored generically so more graphics
  *  and more feeds can be added later without changing the transport.
  * ------------------------------------------------------------------ */
+let boardSeq = 0;
+function defaultScoreboard(name) {
+  return {
+    id: 'brd' + (Date.now().toString(36)) + (boardSeq++),
+    name: String(name || 'Scoreboard'),
+    visible: false,
+    title: 'HERMOSA BEACH OPEN 2025',
+    presenter: 'WEDBUSH',
+    bracketLabel: "MEN'S CONTENDER'S BRACKET",
+    eventLogoUrl: '', eventLogoPlacement: 'inline', eventLogoSize: 150,
+    gamesCount: 3,
+    activeGame: 0,
+    teams: [
+      { p1: 'Terese Cannon', p2: 'Megan Kraft', seed: '1', color: '#f5c518', rowColor: '', textColor: '', logoUrl: '', games: [0, null, null] },
+      { p1: 'Kelly Cheng',   p2: 'Molly Shaw',  seed: '2', color: '#1f7a8c', rowColor: '', textColor: '', logoUrl: '', games: [0, null, null] }
+    ],
+    style: { position: 'bottom-left', animation: 'slide-up', accent: '#1e64d2', bracketColor: '#7a1420', backdropUrl: '', chroma: '' }
+  };
+}
+// Resolve a board by id (from an action / URL) — falls back to the first board.
+function boardOf(id) {
+  const list = state.scoreboards || [];
+  return (id && list.find(b => b.id === id)) || list[0];
+}
+
 function defaultState() {
   return {
     timer: {
@@ -95,29 +120,9 @@ function defaultState() {
     // The scoreboard graphic. General-purpose (any 2-side match with up to 3 games),
     // shipped configured for the beach-volley board but reusable. Each game score is
     // either a number or null (null renders as "--", i.e. that game hasn't started).
-    scoreboard: {
-      visible: false,
-      title: 'HERMOSA BEACH OPEN 2025',
-      presenter: 'WEDBUSH',
-      bracketLabel: "MEN'S CONTENDER'S BRACKET",
-      eventLogoUrl: '',        // big event logo (e.g. the Hermosa Beach Open mark)
-      eventLogoPlacement: 'inline', // 'inline' (inside the board) OR one of the 9 screen anchors = free overlay
-      eventLogoSize: 150,      // px height when used as a free overlay
-      gamesCount: 3,
-      activeGame: 0,           // which game column is "current" (highlighted)
-      teams: [
-        { p1: 'Terese Cannon', p2: 'Megan Kraft', seed: '1', color: '#f5c518', rowColor: '', textColor: '', logoUrl: '', games: [0, null, null] },
-        { p1: 'Kelly Cheng',   p2: 'Molly Shaw',  seed: '2', color: '#1f7a8c', rowColor: '', textColor: '', logoUrl: '', games: [0, null, null] }
-      ],
-      style: {
-        position: 'bottom-left',
-        animation: 'slide-up',
-        accent: '#1e64d2',       // active-cell highlight
-        bracketColor: '#7a1420', // the round-label strip
-        backdropUrl: '',         // optional Photoshop backdrop image (replaces the coded frame)
-        chroma: ''               // '' = transparent (OBS/vMix key) | 'green'|'magenta'|'blue'|#hex for a hardware switcher
-      }
-    },
+    // Multiple independent scoreboards ("courts"), each with its own control + output URL
+    // (…/scoreboard?board=<id> and …/scoreboard-output?board=<id>). Starts with one.
+    scoreboards: [defaultScoreboard('Court 1')],
 
     // The lower-third BUILDER: a free-form canvas (1920x1080) of independent
     // layers (text / box / image). Each layer is positioned + sized by pixel,
@@ -426,76 +431,61 @@ function applyAction(action) {
       break;
 
     /* -------- scoreboard graphic -------- */
-    case 'sb_show': state.scoreboard.visible = true;  break;
-    case 'sb_hide': state.scoreboard.visible = false; break;
+    case 'sb_show': { const sb = boardOf(action.board); if (sb) sb.visible = true; break; }
+    case 'sb_hide': { const sb = boardOf(action.board); if (sb) sb.visible = false; break; }
 
-    case 'sb_restart': // "Restart Match": game 1 -> 0, later games -> "--"
-      state.scoreboard.teams.forEach(function (tm) {
-        tm.games = [0, null, null].slice(0, state.scoreboard.gamesCount);
-      });
-      state.scoreboard.activeGame = 0;
-      break;
+    case 'sb_restart': { const sb = boardOf(action.board); if (sb) { // "Restart Match": game 1 -> 0, later games -> "--"
+      sb.teams.forEach(function (tm) { tm.games = [0, null, null].slice(0, sb.gamesCount); });
+      sb.activeGame = 0;
+    } break; }
 
-    case 'sb_startGame': { // bring a "--" game to 0 for both teams and make it active
+    case 'sb_startGame': { const sb = boardOf(action.board); if (sb) { // bring a "--" game to 0 for both teams, make active
       const g = clampGame(action.game);
-      state.scoreboard.teams.forEach(function (tm) { if (tm.games[g] == null) tm.games[g] = 0; });
-      state.scoreboard.activeGame = g;
-      break;
-    }
+      sb.teams.forEach(function (tm) { if (tm.games[g] == null) tm.games[g] = 0; });
+      sb.activeGame = g;
+    } break; }
 
-    case 'sb_backGame': { // undo Start Next Game — reset the active game to "--" and step back
-      const g = state.scoreboard.activeGame | 0;
-      if (g > 0) {
-        state.scoreboard.teams.forEach(function (tm) { tm.games[g] = null; });
-        state.scoreboard.activeGame = g - 1;
-      }
-      break;
-    }
+    case 'sb_backGame': { const sb = boardOf(action.board); if (sb) { // undo Start Next Game
+      const g = sb.activeGame | 0;
+      if (g > 0) { sb.teams.forEach(function (tm) { tm.games[g] = null; }); sb.activeGame = g - 1; }
+    } break; }
 
-    case 'sb_score': { // +/- a started game's score (null games ignored)
-      const g = clampGame(action.game);
-      const tm = state.scoreboard.teams[action.team === 1 ? 1 : 0];
+    case 'sb_score': { const sb = boardOf(action.board); if (sb) { // +/- a started game's score
+      const g = clampGame(action.game), tm = sb.teams[action.team === 1 ? 1 : 0];
       if (tm.games[g] == null) tm.games[g] = 0;
-      let v = tm.games[g] + (Number(action.delta) || 0);
-      if (v < 0) v = 0;
-      tm.games[g] = v;
-      break;
-    }
+      let v = tm.games[g] + (Number(action.delta) || 0); if (v < 0) v = 0; tm.games[g] = v;
+    } break; }
 
-    case 'sb_setScore': { // direct set; value '' or '--' clears to null
-      const g = clampGame(action.game);
-      const tm = state.scoreboard.teams[action.team === 1 ? 1 : 0];
-      const raw = String(action.value).trim();
+    case 'sb_setScore': { const sb = boardOf(action.board); if (sb) { // direct set; '' or '--' clears to null
+      const g = clampGame(action.game), tm = sb.teams[action.team === 1 ? 1 : 0], raw = String(action.value).trim();
       tm.games[g] = (raw === '' || raw === '--') ? null : Math.max(0, parseInt(raw, 10) || 0);
-      break;
-    }
+    } break; }
 
-    case 'sb_setActive': state.scoreboard.activeGame = clampGame(action.game); break;
+    case 'sb_setActive': { const sb = boardOf(action.board); if (sb) sb.activeGame = clampGame(action.game); break; }
 
-    case 'sb_team': { // edit a team's name/seed/colour/logo fields
-      const tm = state.scoreboard.teams[action.team === 1 ? 1 : 0];
-      ['p1', 'p2', 'seed', 'color', 'rowColor', 'textColor', 'logoUrl'].forEach(function (k) {
-        if (action[k] != null) tm[k] = String(action[k]).slice(0, 300);
-      });
-      break;
-    }
+    case 'sb_team': { const sb = boardOf(action.board); if (sb) { // edit a team's name/seed/colour/logo
+      const tm = sb.teams[action.team === 1 ? 1 : 0];
+      ['p1', 'p2', 'seed', 'color', 'rowColor', 'textColor', 'logoUrl'].forEach(function (k) { if (action[k] != null) tm[k] = String(action[k]).slice(0, 300); });
+    } break; }
 
-    case 'sb_meta': // title / presenter / bracket label / event logo
-      if (action.title != null)     state.scoreboard.title = String(action.title).slice(0, 80);
-      if (action.presenter != null) state.scoreboard.presenter = String(action.presenter).slice(0, 40);
-      if (action.bracketLabel != null) state.scoreboard.bracketLabel = String(action.bracketLabel).slice(0, 80);
-      if (action.eventLogoUrl != null) state.scoreboard.eventLogoUrl = String(action.eventLogoUrl).slice(0, 500);
+    case 'sb_meta': { const sb = boardOf(action.board); if (sb) { // title / presenter / bracket / event logo
+      if (action.title != null)     sb.title = String(action.title).slice(0, 80);
+      if (action.presenter != null) sb.presenter = String(action.presenter).slice(0, 40);
+      if (action.bracketLabel != null) sb.bracketLabel = String(action.bracketLabel).slice(0, 80);
+      if (action.eventLogoUrl != null) sb.eventLogoUrl = String(action.eventLogoUrl).slice(0, 500);
       if (action.eventLogoPlacement != null) {
-        var ok = ['inline','top-left','top-center','top-right','mid-left','mid-center','mid-right','bottom-left','bottom-center','bottom-right'];
-        if (ok.indexOf(action.eventLogoPlacement) >= 0) state.scoreboard.eventLogoPlacement = action.eventLogoPlacement;
+        const ok = ['inline','top-left','top-center','top-right','mid-left','mid-center','mid-right','bottom-left','bottom-center','bottom-right'];
+        if (ok.indexOf(action.eventLogoPlacement) >= 0) sb.eventLogoPlacement = action.eventLogoPlacement;
       }
-      if (action.eventLogoSize != null) {
-        var sz = parseInt(action.eventLogoSize, 10) || 150;
-        state.scoreboard.eventLogoSize = Math.max(40, Math.min(600, sz));
-      }
-      break;
+      if (action.eventLogoSize != null) sb.eventLogoSize = Math.max(40, Math.min(600, parseInt(action.eventLogoSize, 10) || 150));
+    } break; }
 
-    case 'sb_style': Object.assign(state.scoreboard.style, action.style || {}); break;
+    case 'sb_style': { const sb = boardOf(action.board); if (sb) Object.assign(sb.style, action.style || {}); break; }
+
+    /* ---- board management (create / rename / delete scoreboards) ---- */
+    case 'sb_board_add': { if ((state.scoreboards || []).length < 24) state.scoreboards.push(defaultScoreboard(String(action.name || ('Court ' + (state.scoreboards.length + 1))).slice(0, 60))); break; }
+    case 'sb_board_rename': { const sb = boardOf(action.board); if (sb && action.name != null) sb.name = String(action.name).slice(0, 60); break; }
+    case 'sb_board_delete': { if ((state.scoreboards || []).length > 1) state.scoreboards = state.scoreboards.filter(b => b.id !== action.board); break; }
 
     /* -------- team library (mail-merge) -------- */
     case 'lib_import': { // replace the library with an imported list of teams

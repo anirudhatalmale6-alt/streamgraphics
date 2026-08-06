@@ -3,8 +3,11 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var sb = null, editing = null; // id of a field being edited (don't clobber it)
+  var BOARD = new URLSearchParams(location.search).get('board') || '';   // which scoreboard this panel drives
+  function pickBoard(state) { var list = (state && state.scoreboards) || []; return (BOARD && list.filter(function (b) { return b.id === BOARD; })[0]) || list[0] || null; }
 
   function send(a) {
+    if (a && a.board === undefined && String(a.type || '').indexOf('sb_') === 0) a.board = (sb && sb.id) || BOARD;   // target this board
     return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {});
   }
   function fmt(v) { return v == null ? '--' : String(v); }
@@ -319,11 +322,36 @@
   function connect() {
     var es = new EventSource('/events');
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
-    es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state && m.state.scoreboard) reflect(m.state.scoreboard); if (m.state && m.state.library) reflectLibrary(m.state.library); } catch (x) {} };
+    es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state) { var bd = pickBoard(m.state); if (bd) reflect(bd); reflectBoards(m.state.scoreboards || []); } if (m.state && m.state.library) reflectLibrary(m.state.library); } catch (x) {} };
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();
   $('outUrl').textContent = location.protocol + '//' + location.host + '/scoreboard-output';
+
+  /* ---- multiple scoreboards ("courts") ---- */
+  function escH(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function reflectBoards(boards) {
+    var selEl = $('boardSel'); if (!selEl) return;
+    var cur = (sb && sb.id) || BOARD || (boards[0] && boards[0].id) || '';
+    selEl.innerHTML = boards.map(function (b) { return '<option value="' + b.id + '"' + (b.id === cur ? ' selected' : '') + '>' + escH(b.name) + '</option>'; }).join('');
+    $('boardDelete').disabled = boards.length <= 1;
+    $('scorerLink').href = '/scorer?board=' + encodeURIComponent(cur);
+    $('outUrl').textContent = location.protocol + '//' + location.host + '/scoreboard-output?board=' + encodeURIComponent(cur);
+  }
+  function goBoard(id) { location.search = '?board=' + encodeURIComponent(id); }
+  $('boardSel').onchange = function () { goBoard($('boardSel').value); };
+  $('boardRename').onclick = function () { var n = prompt('Rename this scoreboard:', (sb && sb.name) || ''); if (n != null && n.trim()) send({ type: 'sb_board_rename', board: (sb && sb.id) || BOARD, name: n.trim() }); };
+  $('boardDelete').onclick = function () {
+    if (!confirm('Delete this scoreboard? Its scores are lost.')) return;
+    var delId = (sb && sb.id) || BOARD;
+    send({ type: 'sb_board_delete', board: delId }).then(function () { fetch('/state').then(function (r) { return r.json(); }).then(function (s) { var b = (s.state.scoreboards || [])[0]; if (b) goBoard(b.id); }); });
+  };
+  $('boardNew').onclick = function () {
+    var n = prompt('New scoreboard name:', 'Court ' + Date.now().toString().slice(-3)); if (n == null) return;
+    send({ type: 'sb_board_add', name: n.trim() || 'Court' }).then(function () {
+      fetch('/state').then(function (r) { return r.json(); }).then(function (s) { var list = s.state.scoreboards || []; var b = list[list.length - 1]; if (b) goBoard(b.id); });
+    });
+  };
 
   // green-screen toggle + copy link
   $('chroma').onchange = function () { send({ type: 'sb_style', style: { chroma: $('chroma').checked ? 'green' : '' } }); };

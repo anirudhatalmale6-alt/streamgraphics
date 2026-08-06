@@ -5,7 +5,9 @@
   var $ = function (id) { return document.getElementById(id); };
   var sb = null;
 
-  function post(a) { return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {}); }
+  var BOARD = new URLSearchParams(location.search).get('board') || '';
+  function pickBoard(state) { var list = (state && state.scoreboards) || []; return (BOARD && list.filter(function (b) { return b.id === BOARD; })[0]) || list[0] || null; }
+  function post(a) { if (a && String(a.type || '').indexOf('sb_') === 0) a.board = (sb && sb.id) || BOARD; return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {}); }
   function contrast(hex) { hex = String(hex || '#1f7a8c').replace('#', ''); if (hex.length === 3) hex = hex.replace(/(.)/g, '$1$1'); var r = parseInt(hex.slice(0, 2), 16) || 0, g = parseInt(hex.slice(2, 4), 16) || 0, b = parseInt(hex.slice(4, 6), 16) || 0; var L = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; return L > 0.6 ? '#111' : '#fff'; }
 
   function scoreOf(t, g) { var v = sb.teams[t].games[g]; return (v == null) ? '--' : v; }
@@ -45,7 +47,7 @@
   function connect() {
     var es = new EventSource('/events');
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
-    es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state && m.state.scoreboard) { sb = m.state.scoreboard; render(); } } catch (x) {} };
+    es.onmessage = function (e) { try { var m = JSON.parse(e.data); var bd = m.state && pickBoard(m.state); if (bd) { sb = bd; render(); } } catch (x) {} };
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();
