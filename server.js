@@ -20,10 +20,32 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 let VERSION = '?'; try { VERSION = require('./package.json').version; } catch (e) {}
+
+/* ------------------------------------------------------------------ *
+ *  LICENSING — offline, signed keys. The app carries the PUBLIC key and
+ *  verifies a license key locally (no internet needed). Keys are minted by
+ *  the vendor with the matching PRIVATE key (see make-license.js). A valid
+ *  key removes the watermark and unlocks whatever features/add-ons it lists.
+ * ------------------------------------------------------------------ */
+const LICENSE_PUBKEY = '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAxJCY9hxwDyCcX68yfaIsFewPUgFhn9haZeUrMfD7vrc=\n-----END PUBLIC KEY-----\n';
+// A key is "<base64url(payload JSON)>.<base64url(signature)>". Returns the payload if valid, else null.
+function verifyLicense(key) {
+  try {
+    const parts = String(key || '').trim().split('.');
+    if (parts.length !== 2) return null;
+    const payload = Buffer.from(parts[0], 'base64url');
+    const sig = Buffer.from(parts[1], 'base64url');
+    if (!crypto.verify(null, payload, LICENSE_PUBKEY, sig)) return null;
+    const data = JSON.parse(payload.toString('utf8'));
+    if (data.exp && Date.now() > data.exp) return null;   // expired
+    return data;   // { name, tier, features:[], exp }
+  } catch (e) { return null; }
+}
 const UPLOAD_DIR = path.join(PUBLIC_DIR, 'uploads');
 const MEDIA_DIR = path.join(PUBLIC_DIR, 'media');   // CSV images live here, organised in per-show/event subfolders
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
@@ -140,7 +162,9 @@ function defaultState() {
     // The Show Library — saved named graphics, recallable and toggleable on the Program output.
     shows: [],
     // User-made / imported Templates (built-ins are added on top in wireState/allTemplates).
-    userTemplates: []
+    userTemplates: [],
+    // License (free by default → watermark on, add-ons off).
+    license: { active: false, key: '', name: '', tier: 'free', features: [] }
   };
 }
 
@@ -305,6 +329,18 @@ function builtinTemplates() {
 function saveTemplates() { writeJson(TPL_FILE, function () { return { items: state.userTemplates }; }); }
 function allTemplates() { return builtinTemplates().concat(state.userTemplates || []); }
 
+// Apply a license key to state (verifying it). Returns the (public) status.
+const LIC_FILE = path.join(DATA_DIR, 'license.json');
+function applyLicense(key) {
+  const data = verifyLicense(key);
+  if (data) state.license = { active: true, key: key, name: data.name || '', tier: data.tier || 'pro', features: Array.isArray(data.features) ? data.features : [] };
+  else state.license = { active: false, key: '', name: '', tier: 'free', features: [] };
+  return state.license.active;
+}
+(function () { try { if (fs.existsSync(LIC_FILE)) { const j = JSON.parse(fs.readFileSync(LIC_FILE, 'utf8')); if (j && j.key) applyLicense(j.key); } } catch (e) {} })();
+function saveLicense() { writeJson(LIC_FILE, function () { return { key: state.license.key || '' }; }); }
+function hasFeature(f) { return state.license.active && (state.license.features || []).indexOf(f) >= 0; }
+
 // A lighter view of state for the SSE stream: OFF presets travel as metadata only (no big
 // payload), so toggling/saving stays snappy no matter how large the library grows. The
 // Program output only needs the payloads of presets that are ON; the Library list only
@@ -322,7 +358,9 @@ function wireState() {
   });
   // Templates travel as metadata only (name/kind/builtin); the layers are fetched on demand.
   const templates = allTemplates().map(function (t) { return { id: t.id, name: t.name, kind: t.kind, builtin: !!t.builtin }; });
-  return Object.assign({}, state, { shows: shows, media: mediaIndex, templates: templates });
+  // License: expose whether we're licensed + public info (never the key itself) — drives the watermark + gating.
+  const lic = { active: !!state.license.active, name: state.license.name || '', tier: state.license.tier || 'free', features: state.license.features || [] };
+  return Object.assign({}, state, { license: lic, licensed: lic.active, shows: shows, media: mediaIndex, templates: templates });
 }
 
 /* ------------------------------------------------------------------ *
@@ -757,7 +795,8 @@ const server = http.createServer((req, res) => {
   // --- current state (handy for debugging) — full state incl. all payloads + derived lists ---
   if (pathname === '/state') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex }) }));
+    const lic = { active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features };
+    res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex, license: lic, licensed: lic.active }) }));
     return;
   }
 
@@ -795,6 +834,29 @@ const server = http.createServer((req, res) => {
       res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ ok: ok }));
     });
+    return;
+  }
+
+  // --- license status (GET) + activate/clear (POST) ---
+  if (pathname === '/license') {
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', c => { body += c; if (body.length > 1e5) req.destroy(); });
+      req.on('end', () => {
+        let ok = false;
+        try {
+          const j = JSON.parse(body || '{}');
+          if (j.clear) { state.license = { active: false, key: '', name: '', tier: 'free', features: [] }; ok = true; }
+          else { ok = applyLicense(String(j.key || '')); }
+          saveLicense(); broadcast();
+        } catch (e) {}
+        res.writeHead(ok || true ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: !!state.license.active, active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features, error: (!state.license.active) ? 'invalid or expired key' : '' }));
+      });
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features }));
     return;
   }
 

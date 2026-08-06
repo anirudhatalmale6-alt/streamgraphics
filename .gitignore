@@ -8,3 +8,7 @@ public/logos/*
 !public/logos/README.txt
 public/media/*
 !public/media/README.txt
+
+# vendor license signing key — never commit
+.license-private-key.pem
+data/license.json
