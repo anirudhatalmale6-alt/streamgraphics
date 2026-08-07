@@ -71,6 +71,21 @@
     if (l.mode === 'clock') return clockStr(new Date(now), !!l.use24h);
     return fmtDur(liveTimerMs(l, now), !!l.showHours);
   }
+  // Countdown warning: as a down/target timer nears zero it turns red and flashes, and
+  // stays red (flashing faster) once it runs into overtime — so "time's up" reads on air.
+  // Returns {color, opacity} to apply this frame, or null for the normal look.
+  function timerWarn(l, now) {
+    if (!l || l.type !== 'timer' || (l.mode !== 'down' && l.mode !== 'tod')) return null;
+    var warnMs = (l.warnMs == null ? 10000 : l.warnMs);
+    if (warnMs <= 0) return null;
+    var rem = liveTimerMs(l, now);                 // down: negative in overtime; tod: clamped >=0
+    if (rem > warnMs) return null;                 // not in the warning window yet
+    var over = (l.mode === 'down') && rem <= 0;
+    var flash = (l.flash !== false);               // flashing on by default
+    var period = over ? 300 : 450;                 // faster blink once time is up
+    var on = flash ? (Math.floor(now / period) % 2 === 0) : true;
+    return { color: (l.warnColor || '#ff3b30'), opacity: on ? 1 : 0.28 };
+  }
 
   // the "hidden" state (from-state for ON, to-state for OFF) of an animation type
   var BOUNCE = 'cubic-bezier(.34,1.62,.5,1)';   // overshoot for bounce/pop
@@ -167,7 +182,13 @@
     var dt = lastT ? (t - lastT) / 1000 : 0; lastT = t;
     // Live timer/clock layers — recompute their text every frame from the server-anchored clock.
     var tnow = serverNow(), tmr = stage.querySelectorAll('.ly-timer');
-    if (tmr.length) tmr.forEach(function (el) { var l = LMAP[el.parentNode.dataset.id]; if (l) el.textContent = fmtTimer(l, tnow); });
+    if (tmr.length) tmr.forEach(function (el) {
+      var l = LMAP[el.parentNode.dataset.id]; if (!l) return;
+      el.textContent = fmtTimer(l, tnow);
+      var w = timerWarn(l, tnow);
+      if (w) { el.style.color = w.color; el.style.opacity = w.opacity; }
+      else { el.style.color = (l.color || '#fff'); el.style.opacity = 1; }
+    });
     tickers.forEach(function (tk) {
       tk.off += tk.dir * tk.speed * dt;
       if (tk.off <= -tk.copyW) tk.off += tk.copyW;

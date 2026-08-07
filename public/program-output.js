@@ -31,6 +31,19 @@
   function fmtDur(ms, sh) { var neg = ms < 0; if (neg) ms = -ms; var tot = Math.floor(ms / 1000), h = Math.floor(tot / 3600), m = Math.floor((tot % 3600) / 60), s = tot % 60; var str = (sh || h > 0) ? pad2(h) + ':' + pad2(m) + ':' + pad2(s) : pad2(m) + ':' + pad2(s); return (neg ? '-' : '') + str; }
   function clockStr(d, u) { var h = d.getHours(), m = d.getMinutes(), s = d.getSeconds(), ap = ''; if (!u) { ap = h < 12 ? ' AM' : ' PM'; h = h % 12; if (h === 0) h = 12; } return (u ? pad2(h) : h) + ':' + pad2(m) + ':' + pad2(s) + ap; }
   function fmtTimer(l, now) { now = now || serverNow(); if (l.mode === 'clock') return clockStr(new Date(now), !!l.use24h); return fmtDur(liveTimerMs(l, now), !!l.showHours); }
+  // Countdown warning (matches on-air output): red + flash near/after zero.
+  function timerWarn(l, now) {
+    if (!l || (l.mode !== 'down' && l.mode !== 'tod')) return null;
+    var warnMs = (l.warnMs == null ? 10000 : l.warnMs);
+    if (warnMs <= 0) return null;
+    var rem = liveTimerMs(l, now);
+    if (rem > warnMs) return null;
+    var over = (l.mode === 'down') && rem <= 0;
+    var flash = (l.flash !== false);
+    var period = over ? 300 : 450;
+    var on = flash ? (Math.floor(now / period) % 2 === 0) : true;
+    return { color: (l.warnColor || '#ff3b30'), opacity: on ? 1 : 0.28 };
+  }
 
   function slideTextStyle(l) {
     var shadow = (l.bgOpacity > 0) ? '' : ';text-shadow:0 2px 8px rgba(0,0,0,.45)';
@@ -142,7 +155,13 @@
   function tick(t) {
     var dt = lastT ? (t - lastT) / 1000 : 0; lastT = t;
     var now = serverNow();
-    stage.querySelectorAll('.ly-timer').forEach(function (el) { var d = el.getAttribute('data-t'); if (d) el.textContent = fmtTimer(JSON.parse(d), now); });
+    stage.querySelectorAll('.ly-timer').forEach(function (el) {
+      var d = el.getAttribute('data-t'); if (!d) return;
+      var l = JSON.parse(d); el.textContent = fmtTimer(l, now);
+      var w = timerWarn(l, now);
+      if (w) { el.style.color = w.color; el.style.opacity = w.opacity; }
+      else { el.style.color = (l.color || '#fff'); el.style.opacity = 1; }
+    });
     tickers = tickers.filter(function (tk) { return tk.track.isConnected; });
     tickers.forEach(function (tk) { tk.off -= 120 * dt; if (tk.off <= -tk.copyW) tk.off += tk.copyW; tk.track.style.transform = 'translateX(' + tk.off + 'px)'; });
     requestAnimationFrame(tick);

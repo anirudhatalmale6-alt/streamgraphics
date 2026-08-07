@@ -59,6 +59,19 @@
     if (l.mode === 'clock') return clockStr(new Date(now), !!l.use24h);
     return fmtDur(liveTimerMs(l, now), !!l.showHours);
   }
+  // Countdown warning (matches the on-air output): red + flash near/after zero.
+  function timerWarn(l, now) {
+    if (!l || l.type !== 'timer' || (l.mode !== 'down' && l.mode !== 'tod')) return null;
+    var warnMs = (l.warnMs == null ? 10000 : l.warnMs);
+    if (warnMs <= 0) return null;
+    var rem = liveTimerMs(l, now);
+    if (rem > warnMs) return null;
+    var over = (l.mode === 'down') && rem <= 0;
+    var flash = (l.flash !== false);
+    var period = over ? 300 : 450;
+    var on = flash ? (Math.floor(now / period) % 2 === 0) : true;
+    return { color: (l.warnColor || '#ff3b30'), opacity: on ? 1 : 0.28 };
+  }
   function timerCmd(cmd, patch) {
     if (!selId) return; var l = byId(selId); if (!l || l.type !== 'timer') return;
     fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_timer', id: selId, cmd: cmd, patch: patch || null }) }).catch(function () {});
@@ -304,6 +317,10 @@
       $('pTmRunRow').style.display = (mode === 'clock') ? 'none' : '';
       $('pTmOverLbl').style.display = (mode === 'down') ? '' : 'none';
       $('pTm24Lbl').style.display = (mode === 'clock') ? '' : 'none';
+      $('pTmFlash').checked = (l.flash !== false);
+      $('pTmWarnSec').value = (l.warnMs == null ? 10 : Math.round(l.warnMs / 1000));
+      $('pTmWarnColor').value = l.warnColor || '#ff3b30';
+      $('pTmWarnRow').style.display = (mode === 'down' || mode === 'tod') ? '' : 'none';
     }
     if (l.type === 'slides') {
       $('pSlText').value = (l.slides || []).join('\n\n');
@@ -386,6 +403,9 @@
   $('pTmHours').onchange = function () { timerCmd('set', { showHours: $('pTmHours').checked }); mutate(function (l) { l.showHours = $('pTmHours').checked; }); };
   $('pTmOver').onchange = function () { timerCmd('set', { overtime: $('pTmOver').checked }); mutate(function (l) { l.overtime = $('pTmOver').checked; }); };
   $('pTm24').onchange = function () { timerCmd('set', { use24h: $('pTm24').checked }); mutate(function (l) { l.use24h = $('pTm24').checked; }); };
+  $('pTmFlash').onchange = function () { mutate(function (l) { l.flash = $('pTmFlash').checked; }); };
+  $('pTmWarnSec').oninput = function () { mutate(function (l) { l.warnMs = Math.max(0, (+$('pTmWarnSec').value || 0)) * 1000; }); };
+  $('pTmWarnColor').oninput = function () { mutate(function (l) { l.warnColor = $('pTmWarnColor').value; }); };
   $('pTmColor').oninput = function () { mutate(function (l) { l.color = $('pTmColor').value; }); };
   $('pTmSize').oninput = function () { mutate(function (l) { l.size = +$('pTmSize').value; }); };
   $('pTmBold').onchange = function () { mutate(function (l) { l.bold = $('pTmBold').checked; }); };
@@ -515,7 +535,7 @@
   $('addImage').onclick = function () { add(merge({ type: 'image', x: 120, y: 860, w: 140, h: 140, src: '', shape: 'circle', fit: 'contain' }, A('scale'))); };
   $('addVideo').onclick = function () { add(merge({ type: 'video', x: 660, y: 340, w: 600, h: 338, src: '', autoplay: true, loop: false, muted: true, fit: 'contain', shape: 'none' }, A('fade'))); };
   $('addTicker').onclick = function () { add(merge({ type: 'ticker', x: 0, y: 1000, w: 1920, h: 60, text: 'BREAKING: your scrolling headline goes here', speed: 120, dir: 'left', font: 'Arial, Helvetica, sans-serif', size: 30, bold: true, color: '#ffffff', fill: '#0b1f3a', opacity: 92, radius: 0 }, A('slide-up'))); };
-  $('addTimer').onclick = function () { add(merge({ type: 'timer', x: 710, y: 440, w: 500, h: 160, mode: 'down', durationMs: 300000, baseMs: 300000, running: false, anchorServer: 0, targetEpoch: 0, showHours: false, overtime: false, use24h: false, font: "'Segoe UI', Arial, sans-serif", size: 110, bold: true, italic: false, color: '#ffffff', align: 'center' }, A('fade'))); };
+  $('addTimer').onclick = function () { add(merge({ type: 'timer', x: 710, y: 440, w: 500, h: 160, mode: 'down', durationMs: 300000, baseMs: 300000, running: false, anchorServer: 0, targetEpoch: 0, showHours: false, overtime: false, use24h: false, warnMs: 10000, warnColor: '#ff3b30', flash: true, font: "'Segoe UI', Arial, sans-serif", size: 110, bold: true, italic: false, color: '#ffffff', align: 'center' }, A('fade'))); };
   $('addSlides').onclick = function () { add(merge({ type: 'slides', x: 360, y: 300, w: 1200, h: 480, slides: ['Amazing grace, how sweet the sound', 'That saved a wretch like me', 'I once was lost, but now am found'], index: 0, font: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif", size: 64, bold: true, italic: false, color: '#ffffff', align: 'center', bg: '#0b1f3a', bgOpacity: 0, pad: 28, radius: 14, trans: 'fade' }, A('fade'))); };
   // full-screen background colour box (goes to the very back)
   $('addBg').onclick = function () {
@@ -771,7 +791,13 @@
   // Keep timer/clock previews ticking live in the builder canvas (same clock as the output).
   (function builderTick() {
     var els = cstage.querySelectorAll('.ly-timer');
-    if (els.length) { var now = serverNow(); els.forEach(function (el) { var l = byId(el.parentNode.dataset.id); if (l) el.textContent = fmtTimer(l, now); }); }
+    if (els.length) { var now = serverNow(); els.forEach(function (el) {
+      var l = byId(el.parentNode.dataset.id); if (!l) return;
+      el.textContent = fmtTimer(l, now);
+      var w = timerWarn(l, now);
+      if (w) { el.style.color = w.color; el.style.opacity = w.opacity; }
+      else { el.style.color = (l.color || '#fff'); el.style.opacity = 1; }
+    }); }
     requestAnimationFrame(builderTick);
   })();
   $('outUrl').textContent = location.protocol + '//' + location.host + '/lowerthird-output';

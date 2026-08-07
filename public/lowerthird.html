@@ -208,6 +208,12 @@
               <label style="width:auto" id="pTmOverLbl"><input type="checkbox" id="pTmOver"> Overtime (go negative)</label>
               <label style="width:auto" id="pTm24Lbl"><input type="checkbox" id="pTm24"> 24-hour</label>
             </div>
+            <div class="row only-timer" id="pTmWarnRow"><label>Warn</label>
+              <label style="width:auto"><input type="checkbox" id="pTmFlash" checked> Flash red</label>
+              <span style="color:var(--muted)">in the last</span>
+              <input class="inp t" id="pTmWarnSec" type="number" min="0" max="600" value="10" title="seconds before zero"> s
+              <input type="color" id="pTmWarnColor" value="#ff3b30" title="warning colour">
+            </div>
             <div class="row only-timer"><label>Look</label>
               <input type="color" id="pTmColor" value="#ffffff">
               <input class="inp t" id="pTmSize" type="number" min="16" max="400" value="110" title="size">

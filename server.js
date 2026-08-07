@@ -49,7 +49,7 @@ function checkUpdate(cb) {
  *  the vendor with the matching PRIVATE key (see make-license.js). A valid
  *  key removes the watermark and unlocks whatever features/add-ons it lists.
  * ------------------------------------------------------------------ */
-const LICENSE_PUBKEY = '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAxJCY9hxwDyCcX68yfaIsFewPUgFhn9haZeUrMfD7vrc=\n-----END PUBLIC KEY-----\n';
+const LICENSE_PUBKEY = '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAhe1xjgid+AD4H9OtYH8de1nOHsefuHDVvIfG+H5euCE=\n-----END PUBLIC KEY-----\n';
 // A key is "<base64url(payload JSON)>.<base64url(signature)>". Returns the payload if valid, else null.
 function verifyLicense(key) {
   try {
