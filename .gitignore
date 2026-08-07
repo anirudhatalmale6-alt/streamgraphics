@@ -12,3 +12,8 @@ public/media/*
 # vendor license signing key — never commit
 .license-private-key.pem
 data/license.json
+
+# Installer build artifacts (large binaries - shipped via GitHub Releases / download host)
+installer/build/
+installer/node-*.exe
+*.exe
