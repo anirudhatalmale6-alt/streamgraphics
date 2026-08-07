@@ -18,6 +18,7 @@
 'use strict';
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -25,6 +26,22 @@ const crypto = require('crypto');
 const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 let VERSION = '?'; try { VERSION = require('./package.json').version; } catch (e) {}
+
+// Update check: the app fetches a small JSON manifest you host (e.g. streamgraphicspro.com/latest.json
+// → {"version":"0.40.0","url":"https://...","notes":"..."}) and shows an in-app banner if newer.
+const UPDATE_MANIFEST = process.env.SG_UPDATE_URL || 'https://streamgraphicspro.com/latest.json';
+let _updCache = { at: 0, data: null };
+function cmpVer(a, b) { const A = String(a).split('.').map(n => parseInt(n, 10) || 0), B = String(b).split('.').map(n => parseInt(n, 10) || 0); for (let i = 0; i < 3; i++) { if ((A[i] || 0) > (B[i] || 0)) return 1; if ((A[i] || 0) < (B[i] || 0)) return -1; } return 0; }
+function checkUpdate(cb) {
+  if (Date.now() - _updCache.at < 6 * 3600 * 1000) { cb(_updCache.data); return; }
+  try {
+    const req = https.get(UPDATE_MANIFEST, { timeout: 4000 }, res => {
+      let d = ''; res.on('data', c => { d += c; if (d.length > 5000) req.destroy(); }); res.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (e) {} _updCache = { at: Date.now(), data: j }; cb(j); });
+    });
+    req.on('error', () => { _updCache = { at: Date.now(), data: null }; cb(null); });
+    req.on('timeout', () => { req.destroy(); cb(null); });
+  } catch (e) { cb(null); }
+}
 
 /* ------------------------------------------------------------------ *
  *  LICENSING — offline, signed keys. The app carries the PUBLIC key and
@@ -857,6 +874,16 @@ const server = http.createServer((req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features }));
+    return;
+  }
+
+  // --- update check: fetch the vendor's version manifest and compare (cached 6h; silent if offline) ---
+  if (pathname === '/update-check') {
+    checkUpdate(function (m) {
+      const latest = m && m.version;
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ current: VERSION, latest: latest || null, url: (m && m.url) || '', notes: (m && m.notes) || '', updateAvailable: latest ? cmpVer(latest, VERSION) > 0 : false }));
+    });
     return;
   }
 
