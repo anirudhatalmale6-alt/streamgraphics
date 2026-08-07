@@ -763,6 +763,26 @@ function applyAction(action) {
     case 'show_toggle': { const it = state.shows.find(x => x.id === action.id); if (it) { it.on = (action.on == null ? !it.on : !!action.on); saveShows(); } break; }
     case 'show_alloff': state.shows.forEach(x => { x.on = false; }); saveShows(); break;
 
+    case 'show_import': { // add presets from an exported .sglib / .sgpreset file (merge — never overwrites)
+      const list = Array.isArray(action.shows) ? action.shows : (action.show ? [action.show] : []);
+      let added = 0;
+      list.forEach(function (raw) {
+        if (!raw || typeof raw !== 'object' || state.shows.length >= 300) return;
+        const name = String(raw.name || 'Imported').slice(0, 120);
+        const kind = String(raw.kind || 'lowerthird');
+        const payload = (raw.payload && typeof raw.payload === 'object') ? raw.payload : { layers: [] };
+        const id = 'S' + Date.now().toString(36) + state.shows.length + '_' + added;
+        const item = { id, name, kind, payload, on: false };
+        if (Array.isArray(raw.columns)) item.columns = raw.columns.slice(0, 80).map(c => String(c).slice(0, 80));
+        if (Array.isArray(raw.rows)) item.rows = raw.rows.slice(0, 3000);
+        if (raw.rowKey) item.rowKey = String(raw.rowKey);
+        item.rowIndex = 0;
+        state.shows.push(item); added++;
+      });
+      if (added) saveShows();
+      break;
+    }
+
     /* ---- Templates (starting designs) ---- */
     case 'tpl_save': { // save a design as a reusable template (or import one)
       const name = String(action.name || 'Template').slice(0, 120);
@@ -851,6 +871,31 @@ function serveFile(res, file) {
     res.writeHead(200, headers);
     res.end(buf);
   });
+}
+
+// --- Export/Import helpers: make a preset PORTABLE by inlining its local images as data URIs,
+//     so a graphic carries its own logos/photos to another install (images only; big files/videos
+//     are left as links to keep the file sane). ---
+const EXPORT_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+function dataUriForLocal(rel) {
+  try {
+    if (!/^\/(uploads|media)\//.test(rel)) return null;
+    const clean = decodeURIComponent(String(rel).replace(/\?.*$/, ''));
+    const full = path.join(PUBLIC_DIR, path.normalize(clean).replace(/^(\.\.[\/\\])+/, ''));
+    if (full.indexOf(PUBLIC_DIR) !== 0) return null;               // stay inside /public
+    const ext = (full.split('.').pop() || '').toLowerCase();
+    const mime = EXPORT_MIME[ext];
+    if (!mime) return null;                                        // inline images only (skip video etc.)
+    const st = fs.statSync(full);
+    if (st.size > 8 * 1024 * 1024) return null;                    // don't bloat the file with huge images
+    return 'data:' + mime + ';base64,' + fs.readFileSync(full).toString('base64');
+  } catch (e) { return null; }
+}
+function inlineMedia(node) {
+  if (Array.isArray(node)) return node.map(inlineMedia);
+  if (node && typeof node === 'object') { const o = {}; for (const k in node) o[k] = inlineMedia(node[k]); return o; }
+  if (typeof node === 'string' && /^\/(uploads|media)\//.test(node)) { return dataUriForLocal(node) || node; }
+  return node;
 }
 
 const server = http.createServer((req, res) => {
@@ -1018,6 +1063,44 @@ const server = http.createServer((req, res) => {
     const covers = licCoversVersion(state.license);
     const lic = { active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers };
     res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex, license: lic, licensed: !!state.license.active && covers }) }));
+    return;
+  }
+
+  // --- Export the whole library (backup / share / archive) — presets with their images bundled in ---
+  if (pathname === '/export/library') {
+    const out = { type: 'streamgraphics-library', app: 'StreamGraphics Pro', version: VERSION, exported: new Date().toISOString(), count: state.shows.length, shows: inlineMedia(state.shows) };
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Content-Disposition': 'attachment; filename="streamgraphics-library-' + stamp + '.sglib"' });
+    res.end(JSON.stringify(out));
+    return;
+  }
+
+  // --- Export one preset as a shareable file ---
+  if (pathname === '/export/preset') {
+    const it = state.shows.find(s => s.id === url.searchParams.get('id'));
+    if (!it) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{"ok":false,"error":"preset not found"}'); return; }
+    const out = { type: 'streamgraphics-preset', app: 'StreamGraphics Pro', version: VERSION, exported: new Date().toISOString(), show: inlineMedia(it) };
+    const safe = String(it.name || 'preset').replace(/[^a-z0-9._-]+/gi, '_').slice(0, 60) || 'preset';
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Content-Disposition': 'attachment; filename="' + safe + '.sgpreset"' });
+    res.end(JSON.stringify(out));
+    return;
+  }
+
+  // --- Import presets from an exported file (own endpoint so bundled images can exceed the /action body cap) ---
+  if (pathname === '/import' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 90e6) req.destroy(); });
+    req.on('end', () => {
+      let ok = false, added = 0;
+      try {
+        const j = JSON.parse(body || '{}');
+        const list = Array.isArray(j.shows) ? j.shows : (j.show ? [j.show] : (Array.isArray(j) ? j : []));
+        if (list.length) { const before = state.shows.length; applyAction({ type: 'show_import', shows: list }); added = state.shows.length - before; ok = added > 0; }
+      } catch (e) { ok = false; }
+      if (ok) broadcast();
+      res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ ok, added }));
+    });
     return;
   }
 

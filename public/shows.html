@@ -33,8 +33,12 @@
 
   <main>
     <section class="panel">
-      <h3 style="display:flex;align-items:center;justify-content:space-between">Library
-        <button class="minibtn" id="allOff" title="turn every preset off air">All off</button>
+      <h3 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">Library
+        <span style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="minibtn" id="exportLib" title="download all presets (with their images) as one file — a backup you can load on another computer">⤓ Export all</button>
+          <label class="minibtn" id="importLibBtn" title="add presets from an exported .sglib / .sgpreset file (never overwrites what you have)" style="cursor:pointer"><span id="importLibTxt">⤒ Import</span><input type="file" id="importLib" accept=".sglib,.sgpreset,.json,application/json" style="display:none"></label>
+          <button class="minibtn" id="allOff" title="turn every preset off air">All off</button>
+        </span>
       </h3>
       <p class="mini" id="saveHint" style="color:var(--muted);margin:2px 0 10px">Save graphics from the Graphics Builder (the purple "＋ Save to Library" button). They appear here to turn on/off, Edit, rename, or delete.</p>
       <div class="lib" id="lib"></div>

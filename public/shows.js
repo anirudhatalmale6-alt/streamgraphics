@@ -67,6 +67,7 @@
         + '<label class="minibtn" title="attach a CSV to mail-merge into this graphic">Import CSV<input type="file" accept=".csv,text/csv" data-act="csvfile" style="display:none"></label>'
         + '<button class="minibtn" data-act="manual" title="add one entry by hand (fill the fields)">Manual Add</button>'
         + '<button class="minibtn" data-act="load" title="open this preset in the Graphics Builder to edit its design">Edit Preset</button>'
+        + '<button class="minibtn" data-act="export" title="download this preset (with its images) as a file to share or back up">Export</button>'
         + '<button class="minibtn" data-act="rename">Rename</button>'
         + '<button class="minibtn danger" data-act="delete">Delete</button>'
         + '</div>';
@@ -109,12 +110,33 @@
           });
         }).catch(function () { b.textContent = 'Edit'; });
       };
+      var ex = row.querySelector('[data-act="export"]'); if (ex) ex.onclick = function () { window.location = '/export/preset?id=' + encodeURIComponent(id); };
       row.querySelector('[data-act="rename"]').onclick = function () { var n = prompt('Rename preset:', it.name); if (n != null && n.trim()) post({ type: 'show_rename', id: id, name: n.trim() }); };
       row.querySelector('[data-act="delete"]').onclick = function () { if (confirm('Delete "' + it.name + '" from the library?')) post({ type: 'show_delete', id: id }); };
     });
   }
 
   $('allOff').onclick = function () { post({ type: 'show_alloff' }); };
+
+  // Export the whole library as one file (backup / move to another computer)
+  $('exportLib').onclick = function () { window.location = '/export/library'; };
+
+  // Import presets from an exported file — merges in, never overwrites
+  $('importLib').onchange = function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      fetch('/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: r.result })
+        .then(function (x) { return x.json(); })
+        .then(function (res) {
+          if (res && res.ok) { var t = $('importLibTxt'); var old = t.textContent; t.textContent = 'Added ' + res.added + ' ✓'; setTimeout(function () { t.textContent = old; }, 1600); }
+          else alert("That doesn't look like a StreamGraphics library or preset file (or it was empty).");
+        })
+        .catch(function () { alert('Import failed.'); });
+      e.target.value = '';
+    };
+    r.readAsText(f);
+  };
   $('manCancel').onclick = closeManual;
   $('manualModal').onclick = function (e) { if (e.target === $('manualModal')) closeManual(); };
 
