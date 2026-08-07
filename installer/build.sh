@@ -30,8 +30,13 @@ fi
 cp "$HERE/node-$NODE_VER.exe" "$ENGINE"
 
 echo ">> guard: verify no secrets staged"
-if grep -rlq "PRIVATE KEY" "$STAGE" 2>/dev/null || find "$STAGE" -name '*private*' -o -name 'make-license*' | grep -q .; then
-  echo "!! ABORT: sensitive file found in stage"; exit 1
+# Check for the actual sensitive FILES (not the string "PRIVATE KEY", which legitimately
+# appears inside the bundled Node/OpenSSL runtime). Also scan TEXT files (never the .exe) for a
+# real PEM private-key header, in case a key was ever pasted into source.
+BAD_FILES="$(find "$STAGE" \( -name '.license-private-key*' -o -name 'make-license*' -o -name 'VENDOR*' -o -name '*.pem' \) -print)"
+BAD_TEXT="$(grep -rIl --exclude='*.exe' -- '-----BEGIN .*PRIVATE KEY-----' "$STAGE" 2>/dev/null || true)"
+if [ -n "$BAD_FILES" ] || [ -n "$BAD_TEXT" ]; then
+  echo "!! ABORT: sensitive item in stage:"; [ -n "$BAD_FILES" ] && echo "$BAD_FILES"; [ -n "$BAD_TEXT" ] && echo "$BAD_TEXT"; exit 1
 fi
 
 echo ">> compiling installer with makensis"
