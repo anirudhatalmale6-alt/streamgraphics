@@ -60,9 +60,18 @@ function verifyLicense(key) {
     if (!crypto.verify(null, payload, LICENSE_PUBKEY, sig)) return null;
     const data = JSON.parse(payload.toString('utf8'));
     if (data.exp && Date.now() > data.exp) return null;   // expired
-    return data;   // { name, tier, features:[], exp }
+    return data;   // { name, tier, features:[], exp, upto? }
   } catch (e) { return null; }
 }
+// A license may cap the MAJOR version it unlocks (data.upto). No upto = covers every version (lifetime).
+// e.g. upto:1 unlocks all 1.x; when the app updates to 2.x the key stops unlocking (watermark returns) until upgraded.
+function licCoversVersion(lic) {
+  if (!lic || lic.upto == null || lic.upto === '') return true;
+  const maj = parseInt(String(VERSION).split('.')[0], 10) || 0;
+  return maj <= (parseInt(lic.upto, 10) || 0);
+}
+// "licensed" = key is valid AND it covers the running version.
+function isLicensed() { return !!state.license.active && licCoversVersion(state.license); }
 const UPLOAD_DIR = path.join(PUBLIC_DIR, 'uploads');
 const MEDIA_DIR = path.join(PUBLIC_DIR, 'media');   // CSV images live here, organised in per-show/event subfolders
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
@@ -350,13 +359,13 @@ function allTemplates() { return builtinTemplates().concat(state.userTemplates |
 const LIC_FILE = path.join(DATA_DIR, 'license.json');
 function applyLicense(key) {
   const data = verifyLicense(key);
-  if (data) state.license = { active: true, key: key, name: data.name || '', tier: data.tier || 'pro', features: Array.isArray(data.features) ? data.features : [] };
-  else state.license = { active: false, key: '', name: '', tier: 'free', features: [] };
+  if (data) state.license = { active: true, key: key, name: data.name || '', tier: data.tier || 'pro', features: Array.isArray(data.features) ? data.features : [], upto: (data.upto != null ? data.upto : null) };
+  else state.license = { active: false, key: '', name: '', tier: 'free', features: [], upto: null };
   return state.license.active;
 }
 (function () { try { if (fs.existsSync(LIC_FILE)) { const j = JSON.parse(fs.readFileSync(LIC_FILE, 'utf8')); if (j && j.key) applyLicense(j.key); } } catch (e) {} })();
 function saveLicense() { writeJson(LIC_FILE, function () { return { key: state.license.key || '' }; }); }
-function hasFeature(f) { return state.license.active && (state.license.features || []).indexOf(f) >= 0; }
+function hasFeature(f) { return isLicensed() && (state.license.features || []).indexOf(f) >= 0; }
 
 // A lighter view of state for the SSE stream: OFF presets travel as metadata only (no big
 // payload), so toggling/saving stays snappy no matter how large the library grows. The
@@ -376,8 +385,9 @@ function wireState() {
   // Templates travel as metadata only (name/kind/builtin); the layers are fetched on demand.
   const templates = allTemplates().map(function (t) { return { id: t.id, name: t.name, kind: t.kind, builtin: !!t.builtin }; });
   // License: expose whether we're licensed + public info (never the key itself) — drives the watermark + gating.
-  const lic = { active: !!state.license.active, name: state.license.name || '', tier: state.license.tier || 'free', features: state.license.features || [] };
-  return Object.assign({}, state, { license: lic, licensed: lic.active, shows: shows, media: mediaIndex, templates: templates });
+  const covers = licCoversVersion(state.license);
+  const lic = { active: !!state.license.active, name: state.license.name || '', tier: state.license.tier || 'free', features: state.license.features || [], upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers };
+  return Object.assign({}, state, { license: lic, licensed: !!state.license.active && covers, shows: shows, media: mediaIndex, templates: templates });
 }
 
 /* ------------------------------------------------------------------ *
@@ -812,8 +822,9 @@ const server = http.createServer((req, res) => {
   // --- current state (handy for debugging) — full state incl. all payloads + derived lists ---
   if (pathname === '/state') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    const lic = { active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features };
-    res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex, license: lic, licensed: lic.active }) }));
+    const covers = licCoversVersion(state.license);
+    const lic = { active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers };
+    res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex, license: lic, licensed: !!state.license.active && covers }) }));
     return;
   }
 
@@ -863,17 +874,22 @@ const server = http.createServer((req, res) => {
         let ok = false;
         try {
           const j = JSON.parse(body || '{}');
-          if (j.clear) { state.license = { active: false, key: '', name: '', tier: 'free', features: [] }; ok = true; }
+          if (j.clear) { state.license = { active: false, key: '', name: '', tier: 'free', features: [], upto: null }; ok = true; }
           else { ok = applyLicense(String(j.key || '')); }
           saveLicense(); broadcast();
         } catch (e) {}
-        res.writeHead(ok || true ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-        res.end(JSON.stringify({ ok: !!state.license.active, active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features, error: (!state.license.active) ? 'invalid or expired key' : '' }));
+        const covers = licCoversVersion(state.license);
+        let err = '';
+        if (!state.license.active) err = 'invalid or expired key';
+        else if (!covers) err = 'This key covers StreamGraphics Pro up to v' + state.license.upto + '.x — you are on v' + VERSION + '. An upgrade is needed to keep the full version license-free.';
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: !!state.license.active && covers, active: !!state.license.active, licensed: !!state.license.active && covers, name: state.license.name, tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, error: err }));
       });
       return;
     }
+    const covers = licCoversVersion(state.license);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features }));
+    res.end(JSON.stringify({ active: !!state.license.active, licensed: !!state.license.active && covers, name: state.license.name, tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers }));
     return;
   }
 
