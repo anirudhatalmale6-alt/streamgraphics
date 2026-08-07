@@ -1,0 +1,171 @@
+StreamGraphics Pro
+IMPORTANT PLEASE READ THE TERMS AND CONDITIONS OF THIS LICENSE AGREEMENT CAREFULLY BEFORE CONTINUING WITH THIS PROGRAM INSTALLATION
+ABOUT SGPro
+We are Manhattan Beach Studios LLC (MBS, we, our, us and other similar terms). We provide a variety of production and other similar services, including the live streaming and production software known as StreamGraphics Pro (SGPro), allowing licensed users to create titles and overlays on their own computer.
+These terms are a legal agreement between you (either an individual or a single entity) and MBS.
+The terms and conditions of this license are set out below. It is your obligation to ensure that you have read, understood and agree to the most recent terms provided when installing SGPro and updating SGPro. 
+By installing, copying, or otherwise using SGPro, you agree to be bound by the terms of this license. This license agreement represents the entire agreement concerning the Agreement between you and MBS, and it supersedes any prior proposal, representation, or understanding between the parties.
+SGPro is protected by copyright laws and international copyright treaties, as well as other intellectual property laws and treaties. SGPro is licensed, not sold.
+1.1 THE LICENSE
+(a) MBS grants the User a non-exclusive, non-transferable and worldwide right to use the version of SGPro which the User procures at the time of checkout, subject to the terms and conditions of this Agreement.
+(b) The License granted in clause 1.1(a) does not include a right to modify the source code.
+1.2 TERM OF LICENSE
+
+The License granted in clause 1.1(a) commences on the Commencement Date and continues for one hundred years unless terminated for a breach in accordance with clause 11.
+1.3 SPECIAL CONDITIONS
+MBS will not accept additions, subtractions or alterations to this agreement, nor may any special conditions be appended. 
+2 TRIAL LICENSE
+(a) MBS offers a single free (Trial License) of SGPro Pro Edition to allow the User to assess the suitability of SGPro for the User’s workflow and hardware. The trial is intended to be perpetual and watermarked and can be discontinued at any time. Trial software may be revised at any time. Not all Users are eligible for a free trial.
+(b) MBS provides the Trial License as is and without warranty or indemnity, to the extent permitted by law, and all other terms of this agreement otherwise apply.
+3 USE OF SGPRO
+3.1 SGPRO LICENSE
+(a) MBS grants the User a non-exclusive, non-transferable, revokable, and worldwide right to use the version of SGPro including any add-ons which the User procures at the time of checkout or thereafter, subject to the terms and conditions of this Agreement. 
+(b) The License granted in clause 3.1(a) does not include a right to modify the source code.
+3.2 ACCOUNT SECURITY AND REGISTRATION KEY
+(a) The User acknowledges and agrees that in order to use SGPro, it is required to provide MBS with Personal Information.
+(b) The User warrants all information supplied is true and accurate and will be kept up to date at all times.
+(c) The User acknowledges and agrees that in order to use SGPro, it requires a valid License Key.
+(c) The User agrees to keep the License Key used to access SGPro confidential.
+(d) The User is solely responsible for protecting their installation of SGPro at all times from unauthorized access, use or damage.
+3.3 MINIMUM SYSTEM REQUIREMENTS
+The User is solely responsible for ensuring that its IT systems, which are used to operate SGPro, satisfies the Minimum System Requirements.
+3.4 CONDUCT WHICH IS EXPRESSLY PROHIBITED
+The User must not:
+(a) use or include SGPro in any service bureau or fee generating service offered to third parties, without MBS’s written authority; 
+(b) intentionally disable or circumvent any licensing mechanism used to activate or de-activate SGPro;
+(c) share Account details or details of its License Key, with any other person;
+(d) use SGPro for any activity which is unlawful in the jurisdiction in which either MBS or the User is registered or conducts business; or
+(e) intentionally disable or circumvent any geographical restrictions imposed when purchasing any SGPro License.
+(f) attempt, facilitate or assist another person to do any of the above acts. 
+4 PAYMENT
+4.1 INVOICING AND PAYMENT
+Invoicing and payments are handled by a MBS-appointed payment provider. Payment provider company details, terms and conditions, and privacy policy are available during the purchase process.
+5 MAINTENANCE
+5.1 OUTAGES AND MAINTENANCE 
+The User acknowledges SGPro is not guaranteed to operate and that SGPro’s sufficiency and operation is to be verified during the trial (free) period. MBS makes no warranty or guarantee with respect to the software. 
+5.2 SGPRO OBLIGATIONS
+MBS is under no obligation to update, repair, patch or otherwise take any action with respect to SGPro. 
+6 VERSION UPDATES
+(a) All SGPro lifetime License includes all updates within the purchased version.
+(b) The Version Updates are made available from time to time at MBS s sole and absolute discretion. 
+(c) The User is solely responsible for downloading an installing Version Updates as they become available, and there is no guarantee that a version will continued to be offered and available.
+7 PRIVACY
+7.1 HANDLING PERSONAL INFORMATION
+(a) The User agrees and consents to MBS s handling of Personal Information in accordance with MBS s Privacy Policy. 
+(b) MBS may amend its Privacy Policy in its sole discretion. Where the Privacy Policy is amended the new version will be posted to the Website.
+7.2 GDPR DATA PROCESSING AGREEMENT
+Where the User is located in the European Economic Area and the GDPR applies to the processing of its Personal Information, then the terms of Schedule 3 Data Processing Agreement apply to this Agreement.
+8 INTELLECTUAL PROPERTY
+8.1 MBS’S WARRANTIES REGARDING INTELLECTUAL PROPERTY
+MBS warrants it owns or has a License to use the Intellectual Property in SGPro and the Support Materials. All title, including but not limited to copyrights, in and to SGPro and any copies thereof are owned by MBS or its suppliers. All title and intellectual property rights in and to the content which may be accessed through use of SGPro is the property of the respective content owner and may be protected by applicable copyright or other intellectual property laws and treaties. This agreement grants you no rights to use such content. All rights not expressly granted are reserved by MBS. This copyright notice excludes all 3rd party libraries including FFmpeg.
+8.2 THE USER’S WARRANTIES REGARDING INTELLECTUAL PROPERTY
+The User warrants it will not do any of the following, or permit any person over whom it has effective control to:
+(a) copy or reproduce, or create an adaptation of, all or part of SGPro in any way, except as authorized by this Agreement;
+(b) sell, license, sublicense, lease, rent, distribute, disclose, permit access to, or transfer to any third party, whether for profit or without charge, any portion of SGPro on any medium, except as authorized by this Agreement; or
+(c) directly or indirectly copy, recreate, decompile, reverse engineer or otherwise obtain, modify or use any source or object code, content, architecture, or algorithms contained in SGPro other than for the sole purpose for which the License was granted.
+(d) use, distribute, copy, recreate or otherwise utilize content, images, text and any other material which violates any copyright or protection.
+8.3 MODIFICATIONS AND FEEDBACK
+(a) The User acknowledges and agrees, MBS is intended to own all Intellectual Property rights in all modifications to SGPro, including those which arise from the User s feedback, commentary or reviews and whether those modifications are provided for, by or on behalf of the User.
+(b) To the extent that the User may at any time acquire any right, title or interest in any part of SGPro, the User immediately assigns to MBS all such right, title and interest.
+8.4 COPIES OF SGPRO
+(a) The User may make such number of copies of SGPro as is necessary to serve its internal needs for system's backup and security. All copies of SGPro will be and remain the property of MBS.
+(b) The User must notify MBS immediately on becoming aware of any unauthorized use or copying of the whole or any part of SGPro or the Support Materials.
+(c) Immediately upon termination of this Agreement, the User must, at MBS’s option, deliver up to MBS or destroy any copy it holds of SGPro (authorized or otherwise) and the Support Materials, whether in their original form or as modified by the User.
+9 WARRANTIES
+9.1 GENERAL WARRANTIES
+(a) The User warrants that SGPro will be operated in accordance with all SGPro documentation and support material, including but not limited to installation and operation on hardware in accordance with Minimum System Requirements. Installation and operation outside of prescribed SGPro documentation shall void any warranties provided by SGPro.
+(b) Subject to clause 9.1(a), MBS has offered SGPro as-is, and provides no other warranty other than that which is required by law, rule or regulation.
+(c) Subject to the Non-excludable Conditions and any other express provision of this Agreement, MBS makes no warranties or guarantees:
+(i) SGPro is fault free; or
+(ii) regarding SGPro’s fitness for any particular purpose which MBS has not expressed; and
+(d) MBS expressly disclaims, to the extent permitted by applicable law, any and all warranties on behalf of any of its licensors.
+9.2 WARRANTIES AS TO CAPACITY
+Each party represents and warrants to the other:
+(a) it has full power and authority to enter into this Agreement and observe and perform all of its obligations herein; and
+(b) it is not aware of any thing, matter or circumstance which may prevent it from fulfilling its obligations under this Agreement.
+10 GENERAL LIMITS ON LIABILITY
+10.1 IMPLIED CONDITIONS
+MBS expressly excludes all conditions, warranties and other terms which might otherwise be implied by any law, regulation, statute, common law or law of equity except any Non-excludable Condition.
+10.2 CONSEQUENTIAL LOSS
+Notwithstanding any other clause in this Agreement, and to the maximum extent permitted at law, neither party is liable to the other for any Consequential Loss.
+10.3 EXCLUSION OF LIABILITY
+Subject to the Non-excludable Conditions, MBS excludes, and User hereby fully releases all other liabilities for any costs, including Consequential Loss, suffered or incurred directly or indirectly by the User in connection with this Agreement, including:
+(a) incorrect or corrupt data, lost data, or any inputs or outputs of SGPro;
+(b) computer virus, trojan and other malware in connection with SGPro;
+(c) failure or inadequacy of any third party component including, without limitation, applications, websites, website content, application programming interfaces, Third Party Infrastructure, hardware, network, or power; or
+(e) the User s participation in any experiments, beta tests, pilots or the use of Trial Services.
+10.4 LIMITS TO LIABILITY 
+To the maximum extent permitted at law, MBS’s aggregate cumulative liability arising out of or related to an issue arising under this Agreement will be limited to: 
+(a) in the case of goods: the re-supply of the goods or payment of the cost of the re-supply of the goods; or the replacement or repair of the goods or payment of the cost of replacement or repair of the goods; and
+(b) in the case of services: the resupply of the services; or the payment of the cost of having the services resupplied.
+11 TERMINATION
+11.1 TERMINATION FOR BREACH
+This Agreement may be terminated and the License to SGPro revoked immediately by either party if:
+(a) the other party commits any material breach of any term of this Agreement and which in the case of a breach capable of being remedied is not remedied within 30 days of a written request to remedy it; or
+(b) the other party breaches a material provision of this Agreement that is not capable of remedy.
+11.2 EFFECT OF TERMINATION
+Upon termination the User must no longer operate SGPro.
+12 GENERAL PROVISIONS
+12.1 ASSIGNMENT
+The parties may only assign, encumber, declare a trust over or otherwise create an interest in their rights under this document with the other party s consent, which must not be unreasonably withheld.
+12.2 ENTIRE AGREEMENT
+The Agreement sets out all the parties’ rights and obligations relating to the subject matter of the Agreement, and it supersedes all previous agreements or understandings between the parties in connection with the relevant subject matter.
+12.3 FORCE MAJEURE
+If a party is affected by a Force Majeure Event, they must immediately notify the other party of the circumstances. The parties' obligations under this Agreement, other than an obligation to pay the License Fees, are suspended for the duration of and to the extent that they are affected by the Force Majeure Event. However, either party may end this Agreement if the Force Majeure Event continues for more than 60 days.
+12.4 GOVERNING LAW
+The Agreement is governed by and is to be construed in accordance with the laws applicable in Los Angeles, California, United States. Each party irrevocably and unconditionally submits to the exclusive jurisdiction of the courts of Los Angeles, CA.
+12.5 NOTICES
+The parties agree all notices, disclosures and other communications (other than the service of initiating applications in a court or tribunal) that are provided in accordance with this clause 12.5, satisfy any legal requirement that such communications be in writing. Any communication under or in connection with this Agreement:
+(a) in the case of a communication sent to the User must be sent to the email address associated with the User s account; and
+(b) in the case of a communication sent to MBS must be:
+(i) sent via MBS’s Contact Us page at https://www.streamgraphicspro.com; or 
+(ii) either delivered or posted by prepaid post to MBS registered address.
+12.6 RIGHTS CUMULATIVE
+Except as expressly stated otherwise in the Agreement, the rights of a party under the Agreement are cumulative and are in addition to any other rights of that party.
+12.7 SURVIVAL
+Clauses 7, 8, 10 and any other clause in the Agreement which is expressed to survive or by its nature should survive, will survive termination or expiry of the Agreement for any reason.
+12.8 VARIATIONS
+This Agreement may not be modified by User without the express written consent of all parties. MBS may modify this Agreement at any time in accordance with and only limited by applicable law, rules and regulations. 
+12.9 WAIVER
+Clauses and rights in the Agreement may not be waived.
+13 THIRD PARTY NOTICES
+13.1 YOUTUBE NOTICE
+Where Users interact with YouTube services, Users agree to be bound by YouTube's terms of service which can be found at the following web site address: https://www.youtube.com/t/terms
+13.2 ZOOM NOTICE
+Where Users interact with Zoom services, Users agree to be bound by Zoom's terms of service which can be found at the following web site address: https://explore.zoom.us/en/terms/
+14 DEFINITIONS AND INTERPRETATION
+14.1 DEFINITIONS
+Unless the terms and conditions of the Agreement state otherwise, the following expressions used in this Agreement have the following meanings:
+AGREEMENT means these terms set out in this schedule and any document incorporated into them by reference.
+COMMENCEMENT DATE means the date the User purchases a License to SGPro.
+CONSEQUENTIAL LOSS means indirect or consequential loss not arising as a natural consequence of a breach or other event giving rise to liability of a party, any loss of profits, loss of revenue, loss of any contract value, loss of anticipated profit or damages for lost opportunity or loss of data.
+FORCE MAJEURE EVENT means an unforeseen event beyond the control of the affected party, including an act of war (whether declared or not) or terrorism, the mobilization of armed forces, civil commotion or riot, natural disaster, health epidemic or pandemic, hacking, industrial action or labor disturbance, currency restriction, embargo, action or inaction by a government, a failure of a supplier, public utility or common carrier or computer disruption due to the effects of a computer virus, trojan, malware, ransomware or other malicious code.
+INTELLECTUAL PROPERTY means all present and future rights conferred by statute, common law or equity (and all moral rights) in or in relation to business names, circuit layouts, computer software, confidential information, copyright, designs, domain names, formulas, inventions, knowhow, patents, plant varieties, recipes, trademarks, and other results of intellectual activity in the industrial, commercial, scientific, literary or artistic field, the benefit of any application to register such a right and the benefit of any renewal or extension of such a right.
+LICENSE means the rights to use SGPro and the Support Materials as expressly set out in this Agreement.
+LICENSE FEE means the fee payable to MBS for a License to use SGPro and the Support Materials.
+MINIMUM SYSTEM REQUIREMENTS means the minimum requirements for the User’s IT system required to access and use SGPro.
+NON-EXCLUDABLE CONDITION means any guarantee, condition or warranty which cannot by law be excluded.
+PAYMENT TERMS means the requirement to make payment immediately on procuring the SGPro License.
+PERSONAL INFORMATION means information or an opinion about an identifiable individual (not a company), whether or not that information or opinion is true or in a material form.
+LICENSE KEY means the security credentials required to activate SGPro.
+MBS means Manhattan Beach Studios LLC and its directors, officers, employees, agents, licensees and assignees.
+VERSION UPDATE means patches, version updates and minor software updates to SGPro, as released from time to time by MBS.
+VERSION UPGRADE means a License which upgrades one SGPro lifetime License to another.
+SGPro means the version (selected at checkout or arising from any Version Upgrade) of the live software that allows Users to create professional quality productions on their own computer.
+14.2 INTERPRETATION
+Unless it is expressly stated that a different rule of interpretation will apply:
+(a) a reference to a part, clause, annexure, exhibit, appendix or schedule is a reference to a part of, clause of, annexure, exhibit, appendix or schedule to this Agreement and a reference to this Agreement includes any annexure, exhibit, appendix and schedule;
+(b) a reference to an agreement includes any variation or replacement of the agreement;
+(c) the singular includes the plural and the opposite also applies;
+(d) headings are provided for convenience and do not affect the interpretation of the documents making up the Agreement;
+(e) unless used for the usual grammatical purpose, inverted commas around a term indicate industry jargon that will be interpreted according to how that term would be understood by an individual with expertise in the relevant industry;
+(f)  include,  includes  and  including  must be read as if followed by the words  without limitation ;
+(g) a reference to a clause refers to clauses in this Agreement and is a reference to its sub-clauses;
+(h) if a word or phrase is defined, its other grammatical forms have corresponding meanings;
+(i) agreements, representations and warranties made by two or more people will bind them jointly and severally;
+(j) a reference to any legislation includes any consolidation, amendment, re-enactment or replacement of legislation;
+(k) a person includes the person s executors, administrators and permitted novatees and assignees;
+(l) a reference to a person includes a firm, a body corporate, an unincorporated association or an authority and vice versa;
+(m) a reference to conduct includes any omission, representation, statement or undertaking, whether or not in writing;
+(n) no rule of construction will apply to a provision of a document to the disadvantage of a party merely because that party drafted the provision or would otherwise benefit from it; and 
+(o) if any part of the Agreement is invalid, unlawful or unenforceable, the invalid, unlawful or unenforceable part of the Agreement will not apply but the other parts of the Agreement will not be affected.
