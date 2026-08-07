@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control API — StreamGraphics Pro</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .wrap{max-width:900px;margin:0 auto;padding:30px 20px}
+  h1{margin:6px 0 4px;display:flex;align-items:center;gap:10px}
+  .sub{color:var(--muted);margin-bottom:20px;line-height:1.5}
+  .back{color:var(--muted);text-decoration:none;font-size:13px}.back:hover{color:var(--txt)}
+  .basebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:20px}
+  .basebar label{font-size:13px;color:var(--muted);font-weight:700}
+  .basebar input{flex:1;min-width:220px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 12px;color:var(--txt);font-size:14px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  h2{font-size:16px;margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .tag{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .cmd{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:8px}
+  .cmd .lbl{font-weight:700;font-size:13px;min-width:150px;flex:none}
+  .cmd .u{flex:1;min-width:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:#9fb2c8;overflow-x:auto;white-space:nowrap;padding:4px 0}
+  .cmd button{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;flex:none}
+  .cmd button:hover{border-color:var(--accent)}
+  .cmd button.ok{background:var(--accent);border-color:var(--accent);color:#fff}
+  .grp{font-size:13px;color:var(--muted);margin:4px 0 10px}
+  .pill{display:inline-block;font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;margin-left:6px}
+  .pill.on{background:rgba(18,184,134,.16);color:#12b886}.pill.off{background:var(--panel2);color:var(--muted)}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px}
+  .note{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;color:var(--muted);font-size:13px;line-height:1.55;margin:6px 0 22px}
+  code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .refresh{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer}
+</style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%236d5cf6'/%3E%3Ctext x='32' y='45' font-family='Arial' font-size='30' font-weight='bold' fill='%23fff' text-anchor='middle'%3EAPI%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">☰ All graphics</a>
+    <h1><span class="dot"></span> Control API</h1>
+    <div class="sub">One URL = one button. Drive StreamGraphics from <b>Bitfocus Companion</b>, a Stream Deck, or any automation — everything is addressed by the <b>name</b> you gave it in the app. In Companion, use a <b>Generic HTTP Request</b> action (method GET) and paste one of these URLs.</div>
+
+    <div class="basebar">
+      <label for="base">This computer's address</label>
+      <input id="base" spellcheck="false">
+      <button class="refresh" id="refresh">↻ Refresh names</button>
+    </div>
+    <div class="note">Opening this page from another computer? Use the show computer's network address above (e.g. <code>http://192.168.1.50:4000</code>) — that's what your Stream Deck / Companion machine must reach. Change it here and every URL below updates. Windows may prompt to allow network access the first time.</div>
+
+    <h2>Presenter Timer <span class="tag">fixed commands</span></h2>
+    <div id="timer"></div>
+
+    <h2>Library Presets <span class="tag">by name</span></h2>
+    <div class="grp">Every saved preset gets on / off / toggle. Presets with a spreadsheet also get next / previous row.</div>
+    <div id="presets"><div class="empty">Loading…</div></div>
+
+    <h2>Scoreboards <span class="tag">by name</span></h2>
+    <div class="grp">Points go to the currently active game. Team 1 is the top row, Team 2 the bottom.</div>
+    <div id="scoreboards"><div class="empty">Loading…</div></div>
+
+    <h2>Baseball / Softball <span class="tag">fixed commands</span></h2>
+    <div id="baseball"></div>
+  </div>
+  <script src="/control-api.js"></script>
+</body>
+</html>

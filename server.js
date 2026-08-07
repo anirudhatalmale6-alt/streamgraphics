@@ -887,6 +887,89 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // --- Control API: simple, NAME-addressable commands for Bitfocus Companion / Stream Deck / any automation.
+  //     One URL = one button. GET or POST. Everything is addressed by the name you gave it in the app. ---
+  if (pathname.startsWith('/api/')) {
+    const q = url.searchParams;
+    const seg = pathname.split('/').filter(Boolean); // ['api', group, cmd]
+    const group = (seg[1] || '').toLowerCase();
+    const cmd = (seg[2] || '').toLowerCase();
+    const okJson = (obj, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(obj)); };
+    const fail = (msg, code = 400) => okJson({ ok: false, error: msg }, code);
+    const did = (extra) => { broadcast(); okJson(Object.assign({ ok: true }, extra || {})); };
+    const findShow = (nm) => { nm = String(nm || '').trim().toLowerCase(); return state.shows.find(s => String(s.name).trim().toLowerCase() === nm); };
+    const findBoard = (nm) => { if (!nm) return (state.scoreboards || [])[0]; const k = String(nm).trim().toLowerCase(); return (state.scoreboards || []).find(b => String(b.name).trim().toLowerCase() === k); };
+    const teamIdx = () => (String(q.get('team') || '1').trim() === '2') ? 1 : 0;
+
+    // Discovery — lists the names you can drive (powers the Control API help page + lets Companion see names)
+    if (group === 'list') {
+      return okJson({ ok: true,
+        presets: state.shows.map(s => ({ name: s.name, on: !!s.on, csv: !!(s.rows && s.rows.length), rows: (s.rows || []).length, row: (s.rows && s.rows.length) ? (s.rowIndex || 0) + 1 : 0 })),
+        scoreboards: (state.scoreboards || []).map(b => ({ name: b.name, visible: !!b.visible })),
+        timer: { visible: !!state.timer.visible, mode: state.timer.mode },
+        baseball: { visible: !!state.baseball.visible } });
+    }
+
+    // Library presets — on / off / toggle, plus CSV row stepping
+    if (group === 'preset') {
+      if (cmd === 'alloff') { applyAction({ type: 'show_alloff' }); return did(); }
+      const it = findShow(q.get('name'));
+      if (!it) return fail('preset not found: "' + (q.get('name') || '') + '"', 404);
+      if (cmd === 'on')     { applyAction({ type: 'show_toggle', id: it.id, on: true });  return did({ name: it.name, on: true }); }
+      if (cmd === 'off')    { applyAction({ type: 'show_toggle', id: it.id, on: false }); return did({ name: it.name, on: false }); }
+      if (cmd === 'toggle') { applyAction({ type: 'show_toggle', id: it.id });            return did({ name: it.name, on: !!it.on }); }
+      if (cmd === 'next')   { applyAction({ type: 'show_rowselect', id: it.id, cmd: 'next' }); return did({ name: it.name, row: (it.rowIndex || 0) + 1 }); }
+      if (cmd === 'prev')   { applyAction({ type: 'show_rowselect', id: it.id, cmd: 'prev' }); return did({ name: it.name, row: (it.rowIndex || 0) + 1 }); }
+      if (cmd === 'row')    { applyAction({ type: 'show_rowselect', id: it.id, cmd: 'goto', n: (parseInt(q.get('n'), 10) || 1) - 1 }); return did({ name: it.name, row: (it.rowIndex || 0) + 1 }); }
+      return fail('unknown preset command: "' + cmd + '" (use on/off/toggle/next/prev/row)');
+    }
+
+    // Presenter timer
+    if (group === 'timer') {
+      if (cmd === 'start') { applyAction({ type: 'start' }); return did(); }
+      if (cmd === 'pause' || cmd === 'stop') { applyAction({ type: 'pause' }); return did(); }
+      if (cmd === 'reset') { applyAction({ type: 'reset' }); return did(); }
+      if (cmd === 'air' || cmd === 'show') { applyAction({ type: 'show' }); return did(); }
+      if (cmd === 'off' || cmd === 'hide') { applyAction({ type: 'hide' }); return did(); }
+      if (cmd === 'set') {
+        let ms = null;
+        if (q.get('seconds') != null) ms = Math.round(parseFloat(q.get('seconds')) * 1000);
+        else if (q.get('mmss')) { const p = String(q.get('mmss')).split(':').map(n => parseInt(n, 10) || 0); ms = p.length === 3 ? (p[0] * 3600 + p[1] * 60 + p[2]) * 1000 : (p.length === 2 ? (p[0] * 60 + p[1]) * 1000 : 0); }
+        if (ms == null || isNaN(ms)) return fail('provide ?seconds=N or ?mmss=MM:SS');
+        applyAction({ type: 'setMode', mode: 'down' }); applyAction({ type: 'setDuration', ms }); return did({ ms });
+      }
+      if (cmd === 'adjust') { const s = parseFloat(q.get('seconds')); if (isNaN(s)) return fail('provide ?seconds=±N'); applyAction({ type: 'adjust', ms: Math.round(s * 1000) }); return did(); }
+      return fail('unknown timer command: "' + cmd + '" (use start/pause/reset/air/off/set/adjust)');
+    }
+
+    // Scoreboard (beach volleyball), addressed by the board name — points go to the active game
+    if (group === 'scoreboard') {
+      const b = findBoard(q.get('name'));
+      if (!b) return fail('scoreboard not found: "' + (q.get('name') || '') + '"', 404);
+      if (cmd === 'point')    { const d = parseInt(q.get('delta'), 10); applyAction({ type: 'sb_score', board: b.id, team: teamIdx(), game: b.activeGame, delta: isNaN(d) ? 1 : d }); return did({ scoreboard: b.name }); }
+      if (cmd === 'show')     { applyAction({ type: 'sb_show', board: b.id }); return did({ scoreboard: b.name }); }
+      if (cmd === 'hide')     { applyAction({ type: 'sb_hide', board: b.id }); return did({ scoreboard: b.name }); }
+      if (cmd === 'nextgame') { applyAction({ type: 'sb_startGame', board: b.id, game: (b.activeGame | 0) + 1 }); return did({ scoreboard: b.name }); }
+      if (cmd === 'restart')  { applyAction({ type: 'sb_restart', board: b.id }); return did({ scoreboard: b.name }); }
+      return fail('unknown scoreboard command: "' + cmd + '" (use point/show/hide/nextgame/restart)');
+    }
+
+    // Baseball / softball
+    if (group === 'baseball') {
+      if (cmd === 'run')        { applyAction({ type: 'bl_run', team: teamIdx(), delta: (parseInt(q.get('delta'), 10) || 1) }); return did(); }
+      if (cmd === 'ball')       { applyAction({ type: 'bl_count', ball: 1 }); return did(); }
+      if (cmd === 'strike')     { applyAction({ type: 'bl_count', strike: 1 }); return did(); }
+      if (cmd === 'out')        { applyAction({ type: 'bl_count', out: 1 }); return did(); }
+      if (cmd === 'clearcount') { applyAction({ type: 'bl_clearCount' }); return did(); }
+      if (cmd === 'advance')    { applyAction({ type: 'bl_advance' }); return did(); }
+      if (cmd === 'show')       { applyAction({ type: 'bl_show' }); return did(); }
+      if (cmd === 'hide')       { applyAction({ type: 'bl_hide' }); return did(); }
+      return fail('unknown baseball command: "' + cmd + '" (use run/ball/strike/out/clearcount/advance/show/hide)');
+    }
+
+    return fail('unknown api group: "' + group + '" (use preset/timer/scoreboard/baseball/list)', 404);
+  }
+
   // --- upload a local image, get back a short URL to use as a logo/backdrop ---
   //     (so the operator can "Browse" for a file instead of typing a URL)
   if (pathname === '/upload' && req.method === 'POST') {
@@ -1052,6 +1135,7 @@ const server = http.createServer((req, res) => {
           : pathname === '/lowerthird-output' ? '/lowerthird-output.html'
           : pathname === '/shows' ? '/shows.html'
           : pathname === '/program-output' ? '/program-output.html'
+          : pathname === '/control-api' ? '/control-api.html'
           : pathname;
   // decode %20 etc. so files/folders with spaces (e.g. /media/Grad 2026/jane.jpg) resolve
   try { rel = decodeURIComponent(rel); } catch (e) {}
