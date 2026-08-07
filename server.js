@@ -932,6 +932,7 @@ const server = http.createServer((req, res) => {
   let rel = pathname === '/' ? '/home.html'
           : pathname === '/output' ? '/output.html'
           : pathname === '/control' ? '/control.html'
+          : pathname === '/scoreboards' ? '/scoreboards.html'
           : pathname === '/scoreboard' ? '/scoreboard.html'
           : pathname === '/scoreboard-output' ? '/scoreboard-output.html'
           : pathname === '/scorer' ? '/scorer.html'

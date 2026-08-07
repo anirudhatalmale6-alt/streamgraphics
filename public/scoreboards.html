@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics Pro — Scoreboards</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .wrap{max-width:900px;margin:0 auto;padding:34px 20px}
+  h1{margin:6px 0 4px;display:flex;align-items:center;gap:10px}
+  .sub{color:var(--muted);margin-bottom:26px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.grid{grid-template-columns:1fr}}
+  .sport{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .sport.soon{opacity:.92}
+  .sport .top{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .ic{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:none;color:#fff}
+  .sport h3{font-size:18px;margin:0}
+  .tag{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-left:auto}
+  .tag.live{background:rgba(18,184,134,.16);color:#12b886}
+  .tag.build{background:rgba(244,166,60,.16);color:#f4a63c}
+  .sport p{color:var(--muted);font-size:14px;margin:2px 0 14px;flex:1}
+  .links{display:flex;gap:10px;flex-wrap:wrap}
+  .links a{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);text-decoration:none;font-size:13px;font-weight:700}
+  .links a:hover{border-color:var(--accent)}
+  .links a.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .links .muted{color:var(--muted);border-style:dashed;cursor:default}
+  .back{color:var(--muted);text-decoration:none;font-size:13px}
+  .back:hover{color:var(--txt)}
+</style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e11d48'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='30' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3ESB%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">☰ All graphics</a>
+    <h1><span class="dot"></span> Scoreboards</h1>
+    <div class="sub">Pick a sport. Each scoreboard has a CONTROL panel, a big-button SCORER for volunteers, and an OUTPUT page you drop into OBS, vMix or an ATEM as a browser source.</div>
+
+    <div class="grid">
+
+      <!-- BEACH VOLLEYBALL (live) -->
+      <div class="sport">
+        <div class="top">
+          <span class="ic" style="background:linear-gradient(135deg,#f5c518,#f4a63c)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3.5 9h17M4 15h16M8 3.5C6 7 6 17 8 20.5M16 3.5C18 7 18 17 16 20.5"/></svg>
+          </span>
+          <h3>Beach Volleyball</h3>
+          <span class="tag live">Live</span>
+        </div>
+        <p>Two-team match board — pairs, seeds, per-game scoring with the active game highlighted, score-change flash, team library, and multiple courts at once.</p>
+        <div class="links">
+          <a class="primary" href="/scoreboard">Open control ▸</a>
+          <a href="/scorer" target="_blank">Scorer</a>
+          <a href="/scoreboard-output" target="_blank">Output ↗</a>
+        </div>
+      </div>
+
+      <!-- BASKETBALL -->
+      <div class="sport soon">
+        <div class="top">
+          <span class="ic" style="background:linear-gradient(135deg,#ef6a4c,#e0561d)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.5 5.5c4 3 5 10 3.5 13M18.5 5.5c-4 3-5 10-3.5 13"/></svg>
+          </span>
+          <h3>Basketball</h3>
+          <span class="tag build">In build</span>
+        </div>
+        <p>Running score with +1 / +2 / +3, quarters &amp; a live game clock, team fouls, timeouts, bonus and possession — the classic bottom score bug.</p>
+        <div class="links"><a class="muted">Control (coming)</a><a class="muted">Output (coming)</a></div>
+      </div>
+
+      <!-- FOOTBALL -->
+      <div class="sport soon">
+        <div class="top">
+          <span class="ic" style="background:linear-gradient(135deg,#6d8b3c,#4a6323)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 12c0-4 4-8 8-8s8 4 8 8-4 8-8 8-8-4-8-8Z"/><path d="M9 9l6 6M15 9l-6 6M12 8v8"/></svg>
+          </span>
+          <h3>Football</h3>
+          <span class="tag build">In build</span>
+        </div>
+        <p>Score, quarter and game clock, down &amp; distance, possession, timeouts and a play clock — everything a gridiron broadcast needs.</p>
+        <div class="links"><a class="muted">Control (coming)</a><a class="muted">Output (coming)</a></div>
+      </div>
+
+      <!-- BASEBALL -->
+      <div class="sport soon">
+        <div class="top">
+          <span class="ic" style="background:linear-gradient(135deg,#2b6cb0,#1d4e86)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 4.5c2.5 2 3 13 1.5 15M16 4.5c-2.5 2-3 13-1.5 15"/></svg>
+          </span>
+          <h3>Baseball</h3>
+          <span class="tag build">In build</span>
+        </div>
+        <p>Runs by inning with top/bottom, balls · strikes · outs, the bases diamond, and R / H / E — the full ballgame line.</p>
+        <div class="links"><a class="muted">Control (coming)</a><a class="muted">Output (coming)</a></div>
+      </div>
+
+    </div>
+  </div>
+  <script src="/ver.js"></script>
+  <script src="/update.js"></script>
+</body>
+</html>
