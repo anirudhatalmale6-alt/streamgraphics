@@ -4,7 +4,24 @@ A realtime livestream graphics engine. Open the URLs below and you'll see a home
 page listing each graphic. Each has a CONTROL panel (drive it from any browser on
 your network) and an OUTPUT page (add to OBS/vMix as a Browser Source, 1920×1080).
 
-Run it with `node server.js` (Node 16+, no install step), then open:
+## Installing & launching
+
+**Easiest (Windows):** double-click **`Start StreamGraphics.bat`**. It checks that
+Node.js is installed (and tells you where to get it if not), starts the app, and your
+browser opens to the home screen automatically. Keep that window open while you work;
+close it to stop the app.
+
+**Make it feel like an app (Windows):** double-click **`Create Desktop Shortcut.bat`**
+once. It puts a **StreamGraphics Pro** icon on your Desktop that launches the app with
+no console window (via `Start StreamGraphics (no window).vbs`). From then on, just
+double-click the desktop icon.
+
+**macOS:** double-click **`Start StreamGraphics.command`**.
+**Linux:** run **`./start.sh`**.
+
+All launchers just wrap one command — `node server.js` (Node 16+, no install step) —
+so you can always run that directly instead. The app opens your browser to the home
+screen on launch; set `SG_NO_OPEN=1` to skip that. URLs:
 - Home:               http://localhost:4000/
 - Timer control:      http://localhost:4000/control        · output: /output
 - Scoreboard control: http://localhost:4000/scoreboard     · output: /scoreboard-output

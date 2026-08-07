@@ -983,4 +983,18 @@ server.listen(PORT, () => {
   console.log(`  ---------------------------------------------------------------`);
   console.log(`  From ANOTHER computer, swap "localhost" for  ${lan}`);
   console.log(`  e.g. OBS/vMix Browser Source:  http://${lan}:${PORT}/lowerthird-output\n`);
+  openBrowser('http://localhost:' + PORT + '/');
 });
+
+// Pop the control panel open in the default browser on launch, so double-clicking a
+// launcher feels like opening an app. Set SG_NO_OPEN=1 to skip (e.g. on a headless box).
+function openBrowser(url) {
+  if (process.env.SG_NO_OPEN) return;
+  try {
+    const cp = require('child_process');
+    const plat = process.platform;
+    if (plat === 'win32') cp.spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
+    else if (plat === 'darwin') cp.spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
+    else cp.spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+  } catch (e) { /* no browser (headless) — the URLs above still work */ }
+}
