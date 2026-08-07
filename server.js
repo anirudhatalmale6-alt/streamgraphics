@@ -189,10 +189,51 @@ function defaultState() {
     shows: [],
     // User-made / imported Templates (built-ins are added on top in wireState/allTemplates).
     userTemplates: [],
+    // Baseball / softball scoreboard — a clock-free sport, so it's the first of the
+    // new sports. Innings are adjustable (softball/youth vary by age & level).
+    baseball: defaultBaseball(),
     // License (free by default → watermark on, add-ons off).
     license: { active: false, key: '', name: '', tier: 'free', features: [] }
   };
 }
+
+// Baseball/softball board. Away bats the TOP of an inning, Home the BOTTOM.
+// Each team's line[] holds runs per inning (null = not batted yet); total R = sum.
+function defaultBaseball() {
+  return {
+    visible: false,
+    innings: 7,                 // adjustable 1..12 (softball 7, baseball 9, youth 6…)
+    inning: 1, half: 'top',     // current at-bat
+    balls: 0, strikes: 0, outs: 0,
+    bases: { first: false, second: false, third: false },
+    teams: [
+      { name: 'Away', abbr: 'AWY', color: '#1d4e86', logoUrl: '', line: [0, null, null, null, null, null, null], hits: 0, errors: 0 },
+      { name: 'Home', abbr: 'HOM', color: '#8a1c1c', logoUrl: '', line: [null, null, null, null, null, null, null], hits: 0, errors: 0 }
+    ],
+    style: {
+      position: 'bottom-left',
+      accent: '#f4a63c',
+      chroma: '',
+      animation: 'slide-up',
+      showLine: true,           // show the per-inning line score strip
+      showClock: false,         // clock slot (off for baseball; here so clock sports reuse the layout)
+      clockText: ''
+    }
+  };
+}
+// Keep every team's line[] exactly `innings` long (pad with null, trim extras).
+function ensureBaseballShape(bb) {
+  var n = Math.max(1, Math.min(12, parseInt(bb.innings, 10) || 7));
+  bb.innings = n;
+  (bb.teams || []).forEach(function (t) {
+    if (!Array.isArray(t.line)) t.line = [];
+    while (t.line.length < n) t.line.push(null);
+    if (t.line.length > n) t.line.length = n;
+  });
+  if (bb.inning > n) bb.inning = n;
+  if (bb.inning < 1) bb.inning = 1;
+}
+function baseballRuns(t) { return (t.line || []).reduce(function (s, v) { return s + (v == null ? 0 : (parseInt(v, 10) || 0)); }, 0); }
 
 function defaultLowerThirdLayers() {
   // Each layer has an independent ANIMATE-ON (in) and ANIMATE-OFF (out), and each
@@ -551,6 +592,75 @@ function applyAction(action) {
     case 'sb_board_add': { if ((state.scoreboards || []).length < 24) state.scoreboards.push(defaultScoreboard(String(action.name || ('Court ' + (state.scoreboards.length + 1))).slice(0, 60))); break; }
     case 'sb_board_rename': { const sb = boardOf(action.board); if (sb && action.name != null) sb.name = String(action.name).slice(0, 60); break; }
     case 'sb_board_delete': { if ((state.scoreboards || []).length > 1) state.scoreboards = state.scoreboards.filter(b => b.id !== action.board); break; }
+
+    /* -------- baseball / softball scoreboard -------- */
+    case 'bl_show': state.baseball.visible = true;  break;
+    case 'bl_hide': state.baseball.visible = false; break;
+    case 'bl_team': { // edit a team's name / abbr / colour / logo (team 0 = away, 1 = home)
+      const t = state.baseball.teams[action.team]; if (!t) break;
+      if (action.name != null)   t.name    = String(action.name).slice(0, 40);
+      if (action.abbr != null)   t.abbr    = String(action.abbr).slice(0, 5).toUpperCase();
+      if (action.color != null)  t.color   = String(action.color).slice(0, 30);
+      if (action.logoUrl != null) t.logoUrl = String(action.logoUrl).slice(0, 400);
+      break;
+    }
+    case 'bl_innings': { state.baseball.innings = Math.max(1, Math.min(12, parseInt(action.n, 10) || 7)); ensureBaseballShape(state.baseball); break; }
+    case 'bl_run': { // add/remove a run for a team in the CURRENT inning cell
+      const bb = state.baseball; ensureBaseballShape(bb);
+      const t = bb.teams[action.team]; if (!t) break;
+      const i = bb.inning - 1;
+      const cur = (t.line[i] == null) ? 0 : t.line[i];
+      t.line[i] = Math.max(0, cur + (parseInt(action.delta, 10) || 0));
+      break;
+    }
+    case 'bl_setRun': { // direct-edit one inning cell ('' clears to null)
+      const bb = state.baseball; ensureBaseballShape(bb);
+      const t = bb.teams[action.team]; if (!t) break;
+      const i = Math.max(0, Math.min(bb.innings - 1, parseInt(action.inning, 10)));
+      const v = String(action.value == null ? '' : action.value).trim();
+      t.line[i] = (v === '' || v === '--') ? null : Math.max(0, parseInt(v, 10) || 0);
+      break;
+    }
+    case 'bl_stat': { // hits / errors +/-
+      const t = state.baseball.teams[action.team]; if (!t) break;
+      const f = (action.stat === 'errors') ? 'errors' : 'hits';
+      t[f] = Math.max(0, (parseInt(t[f], 10) || 0) + (parseInt(action.delta, 10) || 0));
+      break;
+    }
+    case 'bl_count': { // balls / strikes / outs +/- with sensible caps
+      const bb = state.baseball;
+      if (action.ball != null)   bb.balls   = Math.max(0, Math.min(3, bb.balls   + (parseInt(action.ball, 10)   || 0)));
+      if (action.strike != null) bb.strikes = Math.max(0, Math.min(2, bb.strikes + (parseInt(action.strike, 10) || 0)));
+      if (action.out != null)    bb.outs    = Math.max(0, Math.min(3, bb.outs    + (parseInt(action.out, 10)    || 0)));
+      break;
+    }
+    case 'bl_clearCount': { state.baseball.balls = 0; state.baseball.strikes = 0; break; }
+    case 'bl_base': { const b = state.baseball.bases; const k = action.base; if (k === 'first' || k === 'second' || k === 'third') b[k] = !b[k]; break; }
+    case 'bl_setHalf': { state.baseball.half = (action.half === 'bottom') ? 'bottom' : 'top'; break; }
+    case 'bl_advance': { // next half-inning: reset count/outs/bases; open the new batting team's inning cell
+      const bb = state.baseball; ensureBaseballShape(bb);
+      if (bb.half === 'top') bb.half = 'bottom';
+      else { bb.half = 'top'; bb.inning = Math.min(12, bb.inning + 1); ensureBaseballShape(bb); }
+      bb.balls = 0; bb.strikes = 0; bb.outs = 0; bb.bases = { first: false, second: false, third: false };
+      const t = bb.teams[bb.half === 'top' ? 0 : 1];
+      if (t.line[bb.inning - 1] == null) t.line[bb.inning - 1] = 0;   // show 0, not blank, once the half starts
+      break;
+    }
+    case 'bl_back': { // step the half-inning back (undo an accidental advance)
+      const bb = state.baseball;
+      if (bb.half === 'bottom') bb.half = 'top';
+      else if (bb.inning > 1) { bb.inning -= 1; bb.half = 'bottom'; }
+      bb.balls = 0; bb.strikes = 0; bb.outs = 0;
+      break;
+    }
+    case 'bl_restart': { // fresh game, keep team names/looks + innings count
+      const bb = state.baseball; const n = bb.innings;
+      bb.inning = 1; bb.half = 'top'; bb.balls = 0; bb.strikes = 0; bb.outs = 0;
+      bb.bases = { first: false, second: false, third: false };
+      bb.teams.forEach(function (t, idx) { t.line = new Array(n).fill(null); t.hits = 0; t.errors = 0; if (idx === 0) t.line[0] = 0; });
+      break;
+    }
+    case 'bl_style': { Object.assign(state.baseball.style, action.style || {}); break; }
 
     /* -------- team library (mail-merge) -------- */
     case 'lib_import': { // replace the library with an imported list of teams
@@ -933,6 +1043,8 @@ const server = http.createServer((req, res) => {
           : pathname === '/output' ? '/output.html'
           : pathname === '/control' ? '/control.html'
           : pathname === '/scoreboards' ? '/scoreboards.html'
+          : pathname === '/baseball' ? '/baseball.html'
+          : pathname === '/baseball-output' ? '/baseball-output.html'
           : pathname === '/scoreboard' ? '/scoreboard.html'
           : pathname === '/scoreboard-output' ? '/scoreboard-output.html'
           : pathname === '/scorer' ? '/scorer.html'

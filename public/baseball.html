@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics Pro — Baseball / Softball Control</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .previewwrap{background:repeating-conic-gradient(#0e131b 0% 25%,#10151f 0% 50%) 50%/26px 26px;border:1px solid var(--line);border-radius:12px;overflow:hidden;height:300px;position:relative}
+  .previewwrap iframe{position:absolute;top:0;left:0;width:1280px;height:720px;border:0;transform:scale(.5);transform-origin:top left}
+  @media(max-width:900px){.previewwrap iframe{transform:scale(.36)}.previewwrap{height:260px}}
+  .cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.cols2{grid-template-columns:1fr}}
+  .teamcard{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel2);min-width:0}
+  .teamcard h4{font-size:13px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .teamcard .swatch{width:16px;height:16px;border-radius:4px;border:1px solid #0006}
+  .frow{display:flex;gap:8px;align-items:center;margin-bottom:9px;flex-wrap:wrap}
+  .frow label{width:54px;font-size:12px;color:var(--muted)}
+  .frow .inp{min-width:0}
+  .runbtns{display:flex;gap:8px;align-items:center;margin-top:6px}
+  .runbtns .big{font-size:20px;font-weight:900;padding:12px 0;flex:1;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer}
+  .runbtns .big:hover{border-color:var(--accent)}
+  .rlab{font-size:12px;color:var(--muted2)}
+  .browsebtn{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+  .browsebtn:hover{border-color:var(--accent)}
+  .browsebtn input[type=file]{display:none}
+  .sit{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:760px){.sit{grid-template-columns:1fr 1fr}}
+  .sitbox{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center;background:var(--panel2)}
+  .sitbox .t{font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+  .sitbox .v{font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;margin-bottom:6px}
+  .pm{display:flex;gap:6px;justify-content:center}
+  .pm button{width:38px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-weight:800;cursor:pointer}
+  .pm button:hover{border-color:var(--accent)}
+  .bases{display:flex;gap:6px;justify-content:center}
+  .bases button{padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-weight:800;cursor:pointer;font-size:12px}
+  .bases button.on{background:#f4d03f;border-color:#f4d03f;color:#1a1206}
+  .lstable{width:100%;border-collapse:collapse;margin-top:6px}
+  .lstable th,.lstable td{padding:3px 4px;text-align:center;font-size:12px}
+  .lstable th{color:var(--muted);font-weight:700}
+  .lstable td.tm{text-align:left;font-weight:800}
+  .lstable input{width:34px;text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--txt);padding:4px 2px;font-weight:800}
+  .matchbtns{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 4px}
+  @media(max-width:700px){main{padding:12px}.hero{flex-direction:column;gap:14px}.hero .preview{width:100%}}
+</style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232b6cb0'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='30' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3E%E2%9A%BE%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="top">
+    <div style="display:flex;align-items:center">
+      <div class="brand"><span class="dot"></span> StreamGraphics Pro <small>Baseball / Softball</small></div>
+      <nav class="topnav"><a href="/scoreboards">☰ Scoreboards</a><a href="/baseball-output" target="_blank">Open output ↗</a><a href="/">All graphics</a></nav>
+    </div>
+    <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
+  </header>
+
+  <main>
+    <div class="outbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:14px">
+      <button class="btn big show" id="btnShow">Take to air ▸</button>
+      <button class="btn big hide" id="btnHide">◂ Off air</button>
+      <div class="airstate" id="airState" style="min-width:90px">OFF AIR</div>
+      <span style="flex:1"></span>
+      <span class="mini" style="color:var(--muted)">Output:</span>
+      <code id="outUrl" style="background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:12px">…/baseball-output</code>
+      <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button>
+    </div>
+
+    <section class="panel" style="margin-bottom:14px">
+      <div class="previewwrap"><iframe id="pv" src="/baseball-output?preview=1" title="preview"></iframe></div>
+    </section>
+
+    <!-- game setup: innings + look -->
+    <section class="panel" style="margin-bottom:14px">
+      <div class="frow">
+        <label style="width:auto">Innings</label>
+        <select class="inp" id="innings" style="width:auto"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option></select>
+        <span class="mini" style="color:var(--muted)">softball 7 · baseball 9 · youth 6 — set to match your league</span>
+      </div>
+      <div class="frow">
+        <label style="width:auto">Position</label>
+        <select class="inp" id="stPos" style="width:auto">
+          <option value="top-left">Top left</option><option value="top-center">Top center</option><option value="top-right">Top right</option>
+          <option value="mid-left">Mid left</option><option value="mid-center">Mid center</option><option value="mid-right">Mid right</option>
+          <option value="bottom-left">Bottom left</option><option value="bottom-center">Bottom center</option><option value="bottom-right">Bottom right</option>
+        </select>
+        <label style="width:auto">Accent</label><input type="color" id="stAccent" value="#f4a63c">
+        <label style="width:auto">Animation</label>
+        <select class="inp" id="stAnim" style="width:auto"><option value="slide-up">Slide up</option><option value="fade">Fade</option><option value="scale">Scale</option></select>
+      </div>
+      <div class="frow">
+        <label class="mini" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stLine" checked> Show line score (runs by inning + R/H/E)</label>
+        <label class="mini" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stClock"> Show clock slot</label>
+        <input class="inp" id="stClockText" placeholder="clock text e.g. 0:00" style="width:120px;display:none">
+        <span style="flex:1"></span>
+        <span class="mini" style="color:var(--muted)">Chroma</span>
+        <select class="inp" id="chromaSel" style="width:auto">
+          <option value="">Off (transparent)</option><option value="#00b140">Green</option><option value="#0047ff">Blue</option><option value="#ff00ff">Magenta</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- teams -->
+    <div class="cols2" style="margin-bottom:14px">
+      <section class="teamcard" data-team="0">
+        <h4><span class="swatch" id="sw0"></span> Away team (bats first / top)</h4>
+        <div class="frow"><label>Name</label><input class="inp" data-f="name" placeholder="Away" style="flex:1"></div>
+        <div class="frow"><label>Abbr</label><input class="inp" data-f="abbr" placeholder="AWY" maxlength="5" style="width:90px;text-transform:uppercase">
+          <label>Colour</label><input type="color" data-f="color" value="#1d4e86"></div>
+        <div class="frow"><label>Logo</label><input class="inp" data-f="logoUrl" placeholder="paste a URL, or Browse ▸" style="flex:1"><label class="browsebtn">Browse<input type="file" accept="image/*" data-browse-team="0"></label></div>
+        <div class="runbtns"><span class="rlab">Runs (this inning)</span><button class="big" data-run="-1">− Run</button><button class="big" data-run="1">+ Run</button></div>
+        <div class="frow" style="margin-top:10px"><span class="rlab" style="width:54px">Hits</span><div class="pm"><button data-stat="hits" data-d="-1">−</button><span class="v" id="h0" style="width:34px;text-align:center;font-weight:900">0</span><button data-stat="hits" data-d="1">+</button></div>
+          <span class="rlab" style="width:54px;margin-left:10px">Errors</span><div class="pm"><button data-stat="errors" data-d="-1">−</button><span class="v" id="e0" style="width:34px;text-align:center;font-weight:900">0</span><button data-stat="errors" data-d="1">+</button></div></div>
+      </section>
+      <section class="teamcard" data-team="1">
+        <h4><span class="swatch" id="sw1"></span> Home team (bats second / bottom)</h4>
+        <div class="frow"><label>Name</label><input class="inp" data-f="name" placeholder="Home" style="flex:1"></div>
+        <div class="frow"><label>Abbr</label><input class="inp" data-f="abbr" placeholder="HOM" maxlength="5" style="width:90px;text-transform:uppercase">
+          <label>Colour</label><input type="color" data-f="color" value="#8a1c1c"></div>
+        <div class="frow"><label>Logo</label><input class="inp" data-f="logoUrl" placeholder="paste a URL, or Browse ▸" style="flex:1"><label class="browsebtn">Browse<input type="file" accept="image/*" data-browse-team="1"></label></div>
+        <div class="runbtns"><span class="rlab">Runs (this inning)</span><button class="big" data-run="-1">− Run</button><button class="big" data-run="1">+ Run</button></div>
+        <div class="frow" style="margin-top:10px"><span class="rlab" style="width:54px">Hits</span><div class="pm"><button data-stat="hits" data-d="-1">−</button><span class="v" id="h1" style="width:34px;text-align:center;font-weight:900">0</span><button data-stat="hits" data-d="1">+</button></div>
+          <span class="rlab" style="width:54px;margin-left:10px">Errors</span><div class="pm"><button data-stat="errors" data-d="-1">−</button><span class="v" id="e1" style="width:34px;text-align:center;font-weight:900">0</span><button data-stat="errors" data-d="1">+</button></div></div>
+      </section>
+    </div>
+
+    <!-- situation -->
+    <section class="panel" style="margin-bottom:14px">
+      <div class="matchbtns">
+        <button class="btn go" id="btnAdvance">Next half-inning ▸</button>
+        <button class="btn" id="btnBack">◂ Back</button>
+        <button class="btn" id="btnClear">Clear count</button>
+        <button class="btn ghost" id="btnRestart" style="color:#e06">⟲ Restart game</button>
+        <span class="mini" style="align-self:center;color:var(--muted)">Currently: <b id="halfLabel">Top 1</b></span>
+      </div>
+      <div class="sit">
+        <div class="sitbox"><div class="t">Balls</div><div class="v" id="vBalls">0</div><div class="pm"><button data-count="ball" data-d="-1">−</button><button data-count="ball" data-d="1">+</button></div></div>
+        <div class="sitbox"><div class="t">Strikes</div><div class="v" id="vStrikes">0</div><div class="pm"><button data-count="strike" data-d="-1">−</button><button data-count="strike" data-d="1">+</button></div></div>
+        <div class="sitbox"><div class="t">Outs</div><div class="v" id="vOuts">0</div><div class="pm"><button data-count="out" data-d="-1">−</button><button data-count="out" data-d="1">+</button></div></div>
+        <div class="sitbox"><div class="t">Bases</div><div class="bases" style="margin-top:4px"><button data-base="first">1B</button><button data-base="second">2B</button><button data-base="third">3B</button></div></div>
+      </div>
+    </section>
+
+    <!-- editable line score -->
+    <section class="panel">
+      <h3 style="margin-bottom:6px">Line score</h3>
+      <p class="mini" style="color:var(--muted);margin-bottom:6px">Runs go into the current inning with the + Run buttons above. You can also type directly into any cell to fix a mistake. Blank = not batted yet.</p>
+      <div style="overflow-x:auto"><table class="lstable" id="lstable"></table></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Output for OBS / vMix / ATEM: <code id="outUrl2">http://THIS-PC-IP:PORT/baseball-output</code>
+    <span class="hint">— transparent; add as a Browser Source at 1920×1080.</span>
+  </footer>
+
+  <script src="/baseball.js"></script>
+  <script src="/ver.js"></script>
+  <script src="/update.js"></script>
+</body>
+</html>
