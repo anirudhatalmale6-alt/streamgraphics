@@ -25,7 +25,8 @@
   .layerlist{border:1px solid var(--line);border-radius:10px;max-height:150px;overflow:auto}
   .llrow{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
   .llrow:hover{background:var(--panel2)}
-  .llrow.sel{background:var(--panel2);color:#fff}
+  .llrow.sel{background:rgba(124,92,255,.24);color:#fff;box-shadow:inset 4px 0 0 var(--accent)}
+  .llrow.sel .t{font-weight:700}
   .llrow .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .llrow .mini2{color:var(--muted);font-size:11px}
   .llrow button{background:transparent;border:1px solid var(--line);border-radius:5px;color:var(--muted);cursor:pointer;font-size:11px;width:22px;height:20px}
@@ -350,6 +351,7 @@
     </div>
   </div>
 
+  <script src="/sg-live.js"></script>
   <script src="/lowerthird.js"></script>
   <script src="/ver.js"></script>
   <script src="/update.js"></script>

@@ -102,7 +102,7 @@
 
   /* ---- SSE connection with auto-reconnect ---- */
   function connect() {
-    var es = new EventSource('/events');
+    var es = SGLive('/events');
     es.onmessage = function (e) {
       try { onState(JSON.parse(e.data)); } catch (err) {}
     };

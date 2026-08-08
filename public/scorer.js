@@ -45,7 +45,7 @@
   $('restart').onclick = function () { if (confirm('Restart the whole match? All scores reset.')) post({ type: 'sb_restart' }); };
 
   function connect() {
-    var es = new EventSource('/events');
+    var es = SGLive('/events');
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
     es.onmessage = function (e) { try { var m = JSON.parse(e.data); var bd = m.state && pickBoard(m.state); if (bd) { sb = bd; render(); } } catch (x) {} };
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };

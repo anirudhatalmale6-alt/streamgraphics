@@ -320,7 +320,7 @@
   }
 
   function connect() {
-    var es = new EventSource('/events');
+    var es = SGLive('/events');
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
     es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state) { var bd = pickBoard(m.state); if (bd) reflect(bd); reflectBoards(m.state.scoreboards || []); } if (m.state && m.state.library) reflectLibrary(m.state.library); } catch (x) {} };
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };

@@ -200,7 +200,7 @@
   };
 
   function connect() {
-    var es = new EventSource('/events');
+    var es = SGLive('/events');
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
     es.onmessage = function (e) {
       try {

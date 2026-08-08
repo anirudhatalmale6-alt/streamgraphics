@@ -185,7 +185,7 @@
   function connect() {
     var BOARD = new URLSearchParams(location.search).get('board') || '';
     function pickBoard(st) { var list = (st && st.scoreboards) || []; return (BOARD && list.filter(function (b) { return b.id === BOARD; })[0]) || list[0] || null; }
-    var es = new EventSource('/events');
+    var es = SGLive('/events');
     es.onmessage = function (e) {
       try { var msg = JSON.parse(e.data); var bd = msg.state && pickBoard(msg.state); if (bd) render(bd); }
       catch (err) {}

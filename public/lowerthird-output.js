@@ -287,7 +287,7 @@
     applyVcmd(lt.vcmd);
   }
 
-  var es = new EventSource('/events');
+  var es = SGLive('/events');
   es.onmessage = function (e) {
     try {
       var m = JSON.parse(e.data);

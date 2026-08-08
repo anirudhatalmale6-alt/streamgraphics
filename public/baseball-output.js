@@ -108,7 +108,7 @@
     }
   }
 
-  var es = new EventSource('/events');
+  var es = SGLive('/events');
   es.onmessage = function (e) {
     try { var msg = JSON.parse(e.data); if (msg.state && msg.state.baseball) render(msg.state.baseball); } catch (err) {}
   };

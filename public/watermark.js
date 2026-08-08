@@ -10,6 +10,6 @@
     return el;
   }
   function apply(licensed) { if (licensed) { if (el) el.style.display = 'none'; } else { ensure().style.display = 'block'; } }
-  var es = new EventSource('/events');
+  var es = SGLive('/events');
   es.onmessage = function (e) { try { var m = JSON.parse(e.data); if (m.state && typeof m.state.licensed !== 'undefined') apply(!!m.state.licensed); } catch (x) {} };
 })();
