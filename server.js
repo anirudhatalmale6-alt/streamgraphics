@@ -1194,6 +1194,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // --- this machine's LAN address(es), so other devices on the network can connect ---
+  if (pathname === '/netinfo') {
+    const nets = require('os').networkInterfaces();
+    const ips = [];
+    for (const name of Object.keys(nets)) {
+      for (const ni of nets[name] || []) {
+        if (ni.family === 'IPv4' && !ni.internal) ips.push(ni.address);
+      }
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ port: PORT, ips: ips }));
+    return;
+  }
+
   // --- one template's full layers on demand (for loading / exporting) ---
   if (pathname === '/template-payload') {
     const id = url.searchParams.get('id');
