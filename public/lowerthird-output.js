@@ -121,9 +121,9 @@
       else if (l.type === 'text') {
         var st = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 24) + 'px;color:' + esc(l.color || '#fff')
           + ';font-weight:' + (l.bold ? '800' : '400') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'left')
-          + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start')) + ';text-shadow:0 2px 8px rgba(0,0,0,.35)';
+          + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start')) + (l.shadow === false ? '' : ';text-shadow:0 2px 8px rgba(0,0,0,.55)');
         inner = '<div class="li ly-text" style="' + st + '">' + esc(l.text || '') + '</div>';
-      } else if (l.type === 'image') inner = '<img class="li ly-img ' + (l.fit === 'cover' ? 'cover ' : '') + (l.shape || 'none') + '" src="' + esc(l.src || '') + '" style="width:100%;height:100%">';
+      } else if (l.type === 'image') inner = '<img class="li ly-img ' + (l.fit === 'cover' ? 'cover ' : '') + (l.shape || 'none') + '" src="' + esc(l.src || '') + '" style="width:100%;height:100%' + (l.shadow ? ';filter:drop-shadow(0 3px 10px rgba(0,0,0,.55))' : '') + '">';
       else if (l.type === 'video') {
         var vrad = l.shape === 'circle' ? '50%' : (l.shape === 'rounded' ? '16px' : '0');
         inner = '<video class="li ly-vid" data-vid="' + l.id + '" src="' + esc(l.src || '') + '"' + (l.loop ? ' loop' : '') + (l.muted === false ? '' : ' muted') + ' playsinline preload="auto" style="width:100%;height:100%;object-fit:' + (l.fit === 'cover' ? 'cover' : 'contain') + ';border-radius:' + vrad + '"></video>';

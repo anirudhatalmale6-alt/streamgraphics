@@ -7,7 +7,7 @@ Unicode true
 
 !define APPNAME     "StreamGraphics Pro"
 !define COMPANY     "Manhattan Beach Studios LLC"
-!define VERSION     "0.42.0"
+!define VERSION     "0.42.1"
 !define APPDIRNAME  "StreamGraphics Pro"
 !define STAGE       "build\app"          ; staging dir created by build.sh (relative to this script)
 
@@ -19,7 +19,7 @@ RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "${APPNAME} ${VERSION} - ${COMPANY}"
 
-VIProductVersion "0.42.0.0"
+VIProductVersion "0.42.1.0"
 VIAddVersionKey "ProductName" "${APPNAME}"
 VIAddVersionKey "CompanyName" "${COMPANY}"
 VIAddVersionKey "FileDescription" "${APPNAME} Setup"
