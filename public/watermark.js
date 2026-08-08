@@ -5,7 +5,7 @@
     if (el) return el;
     el = document.createElement('div');
     el.textContent = 'StreamGraphics Pro';
-    el.style.cssText = 'position:fixed;right:16px;bottom:12px;font:600 15px system-ui,Arial,sans-serif;color:rgba(255,255,255,.72);text-shadow:0 1px 4px rgba(0,0,0,.65);letter-spacing:.02em;z-index:2147483647;pointer-events:none';
+    el.style.cssText = 'position:fixed;right:22px;bottom:18px;font:700 30px system-ui,Arial,sans-serif;color:rgba(255,255,255,.94);background:rgba(0,0,0,.30);padding:7px 16px;border-radius:10px;text-shadow:0 1px 6px rgba(0,0,0,.6);letter-spacing:.02em;z-index:2147483647;pointer-events:none';
     document.body.appendChild(el);
     return el;
   }
