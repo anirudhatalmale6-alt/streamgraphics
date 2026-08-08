@@ -22,6 +22,7 @@
   };
   $('licClear').onclick = function () {
     if (!confirm('Remove the license and go back to the free version?')) return;
+    $('licKey').value = '';   // also clear the input box, not just the active license
     fetch('/license', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clear: true }) }).then(function (r) { return r.json(); }).then(paint);
   };
   refresh();
