@@ -1232,14 +1232,14 @@ const server = http.createServer((req, res) => {
 // (usually another copy of StreamGraphics is still running in another window).
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error('\n  ⚠  Port ' + PORT + ' is already in use.');
-    console.error('     StreamGraphics is probably already running in another window.');
-    console.error('     • Just use that one (open http://localhost:' + PORT + '/ ), OR');
-    console.error('     • close the other window (click it, press Ctrl+C), then run this again, OR');
-    console.error('     • start this copy on a different port:');
-    console.error('         PowerShell:   $env:PORT=4001; node server.js');
-    console.error('         Mac/Linux:    PORT=4001 node server.js\n');
-    process.exit(1);
+    // StreamGraphics is already running (another window / a previous launch). Instead of
+    // failing silently, just open the running app in the browser — so clicking the shortcut
+    // again brings it up instead of "doing nothing".
+    console.error('\n  ⚠  Port ' + PORT + ' is already in use — StreamGraphics is already running.');
+    console.error('     Opening it in your browser:  http://localhost:' + PORT + '/\n');
+    openBrowser('http://localhost:' + PORT + '/');
+    setTimeout(function () { process.exit(0); }, 2000);  // give the browser a moment to launch, then exit cleanly
+    return;
   }
   throw err;
 });
@@ -1273,7 +1273,15 @@ function openBrowser(url) {
   try {
     const cp = require('child_process');
     const plat = process.platform;
-    if (plat === 'win32') cp.spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
+    if (plat === 'win32') {
+      // Primary: the shell 'start' command. If that fails to spawn (some locked-down
+      // setups block it), fall back to explorer.exe, which reliably opens the default browser.
+      const c = cp.spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' });
+      c.on('error', function () {
+        try { cp.spawn('explorer.exe', [url], { detached: true, stdio: 'ignore' }).unref(); } catch (e) {}
+      });
+      c.unref();
+    }
     else if (plat === 'darwin') cp.spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
     else cp.spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
   } catch (e) { /* no browser (headless) — the URLs above still work */ }

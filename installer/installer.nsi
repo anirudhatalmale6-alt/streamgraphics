@@ -7,7 +7,7 @@ Unicode true
 
 !define APPNAME     "StreamGraphics Pro"
 !define COMPANY     "Manhattan Beach Studios LLC"
-!define VERSION     "0.40.0"
+!define VERSION     "0.40.1"
 !define APPDIRNAME  "StreamGraphics Pro"
 !define STAGE       "build\app"          ; staging dir created by build.sh (relative to this script)
 
@@ -19,7 +19,7 @@ RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "${APPNAME} ${VERSION} - ${COMPANY}"
 
-VIProductVersion "0.40.0.0"
+VIProductVersion "0.40.1.0"
 VIAddVersionKey "ProductName" "${APPNAME}"
 VIAddVersionKey "CompanyName" "${COMPANY}"
 VIAddVersionKey "FileDescription" "${APPNAME} Setup"
@@ -53,6 +53,9 @@ Function LaunchApp
 FunctionEnd
 
 Section "Install"
+  ; Stop any copy that's already running so we can overwrite the engine cleanly
+  ; (installing an update on top of a running app). Silent — no console flash.
+  nsExec::Exec 'taskkill /F /IM sgpro-engine.exe /T'
   SetOutPath "$INSTDIR"
   File /r "${STAGE}\*.*"
 
