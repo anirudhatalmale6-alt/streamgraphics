@@ -669,7 +669,7 @@
     var Cx = l.x + l.w / 2, Cy = l.y + l.h / 2;
     var aLocal = { x: -dir[0]*l.w/2, y: -dir[1]*l.h/2 };            // opposite handle (stays fixed)
     var aWorld = rot2(aLocal.x, aLocal.y, rad); aWorld = { x: Cx + aWorld.x, y: Cy + aWorld.y };
-    hop = { kind: 'resize', id: id, dir: dir, rad: rad, aWorld: aWorld, startW: l.w, startH: l.h, start: canvasPoint(e) };
+    hop = { kind: 'resize', id: id, dir: dir, rad: rad, aWorld: aWorld, startW: l.w, startH: l.h, startSize: l.size, start: canvasPoint(e) };
   }
   function startRotate(id, e) {
     var l = byId(id); var Cx = (l.x + l.w / 2) * SCALE, Cy = (l.y + l.h / 2) * SCALE; var p = canvasPoint(e);
@@ -688,15 +688,18 @@
       var naW = rot2(naLocal.x, naLocal.y, hop.rad);
       var nc = { x: hop.aWorld.x - naW.x, y: hop.aWorld.y - naW.y };
       l.w = nw; l.h = nh; l.x = Math.round(nc.x - nw/2); l.y = Math.round(nc.y - nh/2);
+      // text auto-fits the box: scale the font size with the box height as you resize
+      if (hop.startSize != null && hop.startH > 0) l.size = Math.max(6, Math.round(hop.startSize * nh / hop.startH));
     } else {
       var ang = Math.atan2(p.y - hop.cy, p.x - hop.cx);
       l.rot = Math.round((hop.startRot + (ang - hop.a0) * 180 / Math.PI) % 360);
     }
     var el = cstage.querySelector('.ly[data-id="' + l.id + '"]');
     if (el) { el.style.left = l.x + 'px'; el.style.top = l.y + 'px'; el.style.width = l.w + 'px'; el.style.height = l.h + 'px'; el.style.transform = l.rot ? 'rotate(' + l.rot + 'deg)' : ''; }
+    if (el && hop.kind === 'resize' && hop.startSize != null) { var _inr = el.querySelector('.li'); if (_inr) _inr.style.fontSize = l.size + 'px'; }
     syncNum(l); renderHandles();
   });
-  document.addEventListener('mouseup', function () { if (hop) { hop = null; push(); } });
+  document.addEventListener('mouseup', function () { if (hop) { var wasResize = hop.kind === 'resize'; hop = null; push(); if (wasResize) syncProps(); } });
   function syncNum(l) { if (selId === l.id) { $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h; } }
 
   // Delete removes the selected layer; arrow keys nudge it (Shift = 10px). Not while typing.
@@ -737,8 +740,8 @@
   });
 
   /* ---- air / chroma / copy ---- */
-  $('btnShow').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_show' }) }); };
-  $('btnHide').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_hide' }) }); };
+  $('btnOnAir').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_show' }) }); };
+  $('btnOffAir').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_hide' }) }); };
   $('saveToLib').onclick = saveToLibrary;
   $('newDesign').onclick = function () { if (confirm('Start a new blank design? (Save to Library first if you want to keep the current one.)')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '' }) }); };
   function sendChroma() {
@@ -764,7 +767,7 @@
         if (m.serverTime) { var meas = m.serverTime - Date.now(); clockOffset = clockOffset === 0 ? meas : Math.round(clockOffset * 0.7 + meas * 0.3); }
         if (m.state) { showsMeta = m.state.shows || []; templates = m.state.templates || []; if (m.state.lowerthird) editingShowId = m.state.lowerthird.editingShowId || ''; if ($('tplModal').style.display === 'flex') renderTemplates(); }
         if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
-        $('airState').textContent = lt.visible ? 'ON AIR' : 'OFF AIR'; $('airState').classList.toggle('live', !!lt.visible);
+        var _live = !!lt.visible; $('btnOnAir').classList.toggle('live', _live); $('btnOffAir').classList.toggle('standby', !_live);
         if (document.activeElement !== $('chromaSel') && document.activeElement !== $('chromaColor')) {
           var cv = lt.chroma || '', preset = ['', '#00b140', '#0047ff', '#ff00ff', '#ffffff', '#000000', '#ff0000'];
           if (preset.indexOf(cv) >= 0) { $('chromaSel').value = cv; $('chromaColor').style.display = 'none'; }

@@ -1,4 +1,4 @@
-/* StreamGraphics Pro — SGLive('/events'): a drop-in replacement for  SGLive('/events')
+/* StreamGraphics Pro — SGLive('/events'): a drop-in replacement for  new EventSource('/events')
  * that shares ONE connection across every tab (via sg-sse-worker.js), so opening lots of pages
  * never trips the browser's per-site connection limit. Returns an object with the same
  * .onopen / .onmessage / .onerror / .close surface as EventSource. Falls back to a real

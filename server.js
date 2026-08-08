@@ -762,6 +762,14 @@ function applyAction(action) {
     case 'show_rename': { const it = state.shows.find(x => x.id === action.id); if (it) { it.name = String(action.name || it.name).slice(0, 120); saveShows(); } break; }
     case 'show_toggle': { const it = state.shows.find(x => x.id === action.id); if (it) { it.on = (action.on == null ? !it.on : !!action.on); saveShows(); } break; }
     case 'show_alloff': state.shows.forEach(x => { x.on = false; }); saveShows(); break;
+    case 'show_reorder': {   // move a preset up (dir -1) or down (dir +1) in the Library list
+      const i = state.shows.findIndex(x => x.id === action.id);
+      const j = i + (action.dir < 0 ? -1 : 1);
+      if (i >= 0 && j >= 0 && j < state.shows.length) {
+        const t = state.shows[i]; state.shows[i] = state.shows[j]; state.shows[j] = t; saveShows();
+      }
+      break;
+    }
 
     case 'show_import': { // add presets from an exported .sglib / .sgpreset file (merge — never overwrites)
       const list = Array.isArray(action.shows) ? action.shows : (action.show ? [action.show] : []);

@@ -38,7 +38,7 @@ main{max-width:1000px;margin:0 auto;padding:20px}
 .row>label{width:96px;color:var(--muted);font-size:13px;flex:none}
 .inp{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 11px;font-size:15px;outline:none}
 .inp:focus{border-color:var(--accent)}
-.inp.t{width:64px;text-align:center;font-variant-numeric:tabular-nums}
+.inp.t{width:84px;text-align:center;font-variant-numeric:tabular-nums}
 .inp.s{width:60px;text-align:center}
 select.inp{min-width:180px}
 .range{flex:1;accent-color:var(--accent)}

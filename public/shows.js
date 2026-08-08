@@ -64,6 +64,8 @@
       var main = '<div class="libmain" style="display:flex;align-items:center;gap:10px">'
         + '<div class="sw' + (it.on ? ' on' : '') + '" data-act="toggle" title="on / off air"></div>'
         + '<div class="nm">' + esc(it.name) + (rowCount ? ' <span class="kind" style="color:#7c9cff">' + rowCount + ' rows</span>' : '') + '</div>'
+        + '<button class="minibtn" data-act="up" title="move up in the list" style="width:26px">▲</button>'
+        + '<button class="minibtn" data-act="down" title="move down in the list" style="width:26px">▼</button>'
         + '<label class="minibtn" title="attach a CSV to mail-merge into this graphic">Import CSV<input type="file" accept=".csv,text/csv" data-act="csvfile" style="display:none"></label>'
         + '<button class="minibtn" data-act="manual" title="add one entry by hand (fill the fields)">Manual Add</button>'
         + '<button class="minibtn" data-act="load" title="open this preset in the Graphics Builder to edit its design">Edit Preset</button>'
@@ -90,6 +92,8 @@
     box.querySelectorAll('.libitem').forEach(function (row) {
       var id = row.dataset.id, it = shows.filter(function (x) { return x.id === id; })[0];
       row.querySelector('[data-act="toggle"]').onclick = function () { post({ type: 'show_toggle', id: id, on: !it.on }); };
+      var upB = row.querySelector('[data-act="up"]'); if (upB) upB.onclick = function () { post({ type: 'show_reorder', id: id, dir: -1 }); };
+      var dnB = row.querySelector('[data-act="down"]'); if (dnB) dnB.onclick = function () { post({ type: 'show_reorder', id: id, dir: 1 }); };
       row.querySelector('[data-act="csvfile"]').onchange = function (e) { importCsv(id, e.target.files[0]); };
       var keySel = row.querySelector('[data-act="key"]'); if (keySel) keySel.onchange = function () { post({ type: 'show_setkey', id: id, key: keySel.value }); };
       var pv = row.querySelector('[data-act="prev"]'); if (pv) pv.onclick = function () { post({ type: 'show_rowselect', id: id, cmd: 'prev' }); };
