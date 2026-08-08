@@ -269,7 +269,7 @@
       text.style.transition = 'transform .2s ease, opacity .2s ease';
       text.style.opacity = '0'; text.style.transform = transOut(tr);
       setTimeout(function () {
-        text.innerHTML = html; text.style.display = html ? '' : 'none';
+        text.innerHTML = html; text.style.display = html ? 'flex' : 'none';   // keep the flex layout so text stays centered (was '' which reverted to block = jumped to top)
         text.style.transition = 'none'; text.style.opacity = '0'; text.style.transform = transIn(tr); void text.offsetWidth;
         text.style.transition = 'transform .24s ease, opacity .24s ease';
         text.style.opacity = '1'; text.style.transform = 'none';
