@@ -79,8 +79,8 @@
   $('overtime').onchange = function () { send({ type: 'setOvertime', value: $('overtime').checked }); };
   $('flash').onchange = function () { send({ type: 'setFlash', value: $('flash').checked }); };
 
-  $('btnShow').onclick = function () { send({ type: 'show' }); };
-  $('btnHide').onclick = function () { send({ type: 'hide' }); };
+  $('btnOnAir').onclick = function () { send({ type: 'show' }); };
+  $('btnOffAir').onclick = function () { send({ type: 'hide' }); };
 
   /* ---- wire look controls ---- */
   ['stColor','stAccent','stBg','stBgA','stFont','stAnim'].forEach(function (id) {
@@ -111,8 +111,7 @@
     });
     // on-air state
     var live = !!t.visible;
-    $('airState').textContent = live ? 'ON AIR' : 'OFF AIR';
-    $('airState').classList.toggle('live', live);
+    $('btnOnAir').classList.toggle('live', live); $('btnOffAir').classList.toggle('standby', !live);
     // speaker timer reflect
     if (document.activeElement !== $('overtime')) $('overtime').checked = !!t.overtime;
     if (document.activeElement !== $('flash')) $('flash').checked = !!t.flash;

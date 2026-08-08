@@ -5,7 +5,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var SCALE = 0.375;                 // canvas is 1920x1080 shown at 720x405
-  var layers = [], selId = null, selIds = [], loaded = false, seq = 0;
+  var layers = [], selId = null, selIds = [], loaded = false, seq = 0, editing = false;
   var showsMeta = [], editingShowId = '', templates = [];   // Show-Library metadata, editing link, Templates list
   var cstage = $('cstage');
 
@@ -190,7 +190,7 @@
       var clickthru = (l.hidden || l.locked) ? ';pointer-events:none' : '';
       return '<div class="ly' + (selIds.indexOf(l.id) >= 0 ? ' sel' : '') + (l.locked ? ' locked' : '') + '" data-id="' + l.id + '" style="left:' + l.x + 'px;top:' + l.y + 'px;width:' + l.w + 'px;height:' + l.h + 'px;z-index:' + (l.z || 0) + t + hid + clickthru + '">' + innerHtml(l) + '</div>';
     }).join('');
-    cstage.querySelectorAll('.ly').forEach(function (el) { el.addEventListener('mousedown', startDrag); });
+    cstage.querySelectorAll('.ly').forEach(function (el) { el.addEventListener('mousedown', startDrag); el.addEventListener('dblclick', onDblClick); });
     // Paint the first frame of each builder-preview video, then keep it paused (no continuous decode).
     cstage.querySelectorAll('video.libvid').forEach(function (v) {
       var f = function () { try { v.pause(); if (v.currentTime < 0.05) v.currentTime = 0.05; } catch (e) {} };
@@ -567,6 +567,7 @@
   /* ---- drag on canvas ---- */
   var drag = null;
   function startDrag(e) {
+    if (editing) return;                                                 // don't drag while inline-editing text
     var id = e.currentTarget.dataset.id;
     if (e.altKey) { cycleUnder(e); e.preventDefault(); return; }         // alt-click digs to the layer beneath
     if (e.shiftKey) { select(id, true); e.preventDefault(); return; }   // shift-click toggles selection, no drag
@@ -586,6 +587,41 @@
     var cur = selId || (selIds.length ? selIds[selIds.length - 1] : null);
     var i = -1; for (var k = 0; k < hits.length; k++) if (hits[k].id === cur) i = k;
     select(hits[(i + 1) % hits.length].id, false);
+  }
+  // Double-click a layer to select JUST that one (even inside a group, so you can edit a single
+  // grouped layer without ungrouping); if it's text, jump straight into inline editing.
+  function onDblClick(e) {
+    e.preventDefault(); e.stopPropagation();
+    var id = e.currentTarget.dataset.id, l = byId(id); if (!l) return;
+    selIds = [id]; selId = id;
+    cstage.querySelectorAll('.ly').forEach(function (el) { el.classList.toggle('sel', el.dataset.id === id); });
+    document.querySelectorAll('#layerList .llrow[data-id]').forEach(function (r) { r.classList.toggle('sel', r.dataset.id === id); });
+    syncProps(); renderHandles();
+    if (l.type === 'text') startInlineEdit(id, e.currentTarget);
+  }
+  function startInlineEdit(id, lyEl) {
+    var l = byId(id); if (!l) return;
+    var txtEl = lyEl.querySelector('.ly-text'); if (!txtEl) return;
+    editing = true; drag = null; hop = null;
+    txtEl.setAttribute('contenteditable', 'true');
+    txtEl.style.pointerEvents = 'auto'; txtEl.style.cursor = 'text'; txtEl.style.outline = '2px solid #7c5cff';
+    txtEl.focus();
+    var range = document.createRange(); range.selectNodeContents(txtEl);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    function finish() {
+      txtEl.removeEventListener('keydown', onKey);
+      txtEl.removeAttribute('contenteditable'); txtEl.style.outline = ''; txtEl.style.pointerEvents = ''; txtEl.style.cursor = '';
+      editing = false;
+      var newText = txtEl.innerText.replace(/\n$/, '');
+      if (newText !== (l.text || '')) mutate(function (m) { m.text = newText; });   // save + push + re-render
+    }
+    function onKey(ev) {
+      ev.stopPropagation();   // keep Delete/arrows from hitting the canvas shortcuts
+      if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); txtEl.blur(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); txtEl.textContent = l.text || ''; txtEl.blur(); }
+    }
+    txtEl.addEventListener('keydown', onKey);
+    txtEl.addEventListener('blur', finish, { once: true });
   }
   document.addEventListener('mousemove', function (e) {
     if (!drag) return;
@@ -691,8 +727,10 @@
       var naW = rot2(naLocal.x, naLocal.y, hop.rad);
       var nc = { x: hop.aWorld.x - naW.x, y: hop.aWorld.y - naW.y };
       l.w = nw; l.h = nh; l.x = Math.round(nc.x - nw/2); l.y = Math.round(nc.y - nh/2);
-      // text auto-fits the box: scale the font size with the box height as you resize
-      if (hop.startSize != null && hop.startH > 0) l.size = Math.max(6, Math.round(hop.startSize * nh / hop.startH));
+      // text auto-fits the box: scale the font with the box on a CORNER drag (both dims change),
+      // so it stays proportional. A pure vertical/horizontal edge drag just resizes the box
+      // (no font change) — otherwise the font grew while the width stayed fixed and text overflowed.
+      if (hop.startSize != null && hop.startH > 0 && hop.dir[0] !== 0 && hop.dir[1] !== 0) l.size = Math.max(6, Math.round(hop.startSize * nh / hop.startH));
     } else {
       var ang = Math.atan2(p.y - hop.cy, p.x - hop.cx);
       l.rot = Math.round((hop.startRot + (ang - hop.a0) * 180 / Math.PI) % 360);
@@ -707,6 +745,7 @@
 
   // Delete removes the selected layer; arrow keys nudge it (Shift = 10px). Not while typing.
   document.addEventListener('keydown', function (e) {
+    if (editing) return;                                                 // typing into an inline-edited text layer
     var t = document.activeElement && document.activeElement.tagName;
     if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
     if ((e.key === 'Delete' || e.key === 'Backspace') && (selIds.length || selId)) { e.preventDefault(); deleteSelected(); return; }

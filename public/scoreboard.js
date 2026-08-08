@@ -85,8 +85,8 @@
   $('mLogoSize').addEventListener('focus', function () { editing = 'mLogoSize'; });
   $('mLogoSize').addEventListener('blur', function () { editing = null; });
   $('mLogoSize').oninput = function () { $('mLogoSizeV').textContent = $('mLogoSize').value; send({ type: 'sb_meta', eventLogoSize: +$('mLogoSize').value }); };
-  $('btnShow').onclick = function () { send({ type: 'sb_show' }); };
-  $('btnHide').onclick = function () { send({ type: 'sb_hide' }); };
+  $('btnOnAir').onclick = function () { send({ type: 'sb_show' }); };
+  $('btnOffAir').onclick = function () { send({ type: 'sb_hide' }); };
 
   /* ---- look ---- */
   function pushStyle() {
@@ -260,8 +260,7 @@
   function reflect(s) {
     sb = s;
     var live = !!s.visible;
-    $('airState').textContent = live ? 'ON AIR' : 'OFF AIR';
-    $('airState').classList.toggle('live', live);
+    $('btnOnAir').classList.toggle('live', live); $('btnOffAir').classList.toggle('standby', !live);
 
     s.teams.forEach(function (tm, ti) {
       var card = document.querySelector('.teamcard[data-team="' + ti + '"]');

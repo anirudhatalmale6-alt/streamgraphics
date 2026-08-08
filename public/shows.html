@@ -8,11 +8,11 @@
 <style>
   .lib{display:flex;flex-direction:column;gap:8px;margin-top:6px}
   .libitem{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-  .libitem.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .libitem.on{border-color:#e11d1d;box-shadow:0 0 0 1px #e11d1d inset}
   .libitem .nm{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .libitem .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
   .sw{position:relative;width:52px;height:28px;border-radius:16px;background:#39424f;cursor:pointer;flex:none;transition:background .15s}
-  .sw.on{background:var(--accent)}
+  .sw.on{background:#e11d1d}
   .sw::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s}
   .sw.on::after{left:27px}
   .minibtn{font-size:12px;line-height:1;padding:6px 10px;min-height:30px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;vertical-align:middle}
