@@ -27,20 +27,41 @@ const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 let VERSION = '?'; try { VERSION = require('./package.json').version; } catch (e) {}
 
-// Update check: the app fetches a small JSON manifest you host (e.g. streamgraphicspro.com/latest.json
-// → {"version":"0.40.0","url":"https://...","notes":"..."}) and shows an in-app banner if newer.
-const UPDATE_MANIFEST = process.env.SG_UPDATE_URL || 'https://streamgraphicspro.com/latest.json';
+// Update check: the app fetches a small JSON manifest you host
+// (→ {"version":"1.0.1","url":"https://...","notes":"..."}) and shows an in-app banner if newer.
+// Several names are tried in order: some hosts (SiteGround among them) refuse to serve a file
+// literally named "latest.json", so the primary name is sgpro-version.json and the old name is
+// kept last as a fallback for anyone already hosting it that way.
+const UPDATE_MANIFESTS = process.env.SG_UPDATE_URL
+  ? [process.env.SG_UPDATE_URL]
+  : ['https://streamgraphicspro.com/sgpro-version.json', 'https://streamgraphicspro.com/latest.json'];
 let _updCache = { at: 0, data: null };
 function cmpVer(a, b) { const A = String(a).split('.').map(n => parseInt(n, 10) || 0), B = String(b).split('.').map(n => parseInt(n, 10) || 0); for (let i = 0; i < 3; i++) { if ((A[i] || 0) > (B[i] || 0)) return 1; if ((A[i] || 0) < (B[i] || 0)) return -1; } return 0; }
+// Fetch one manifest URL. Calls back with the parsed object, or null on any failure.
+function fetchManifest(url, cb) {
+  let done = false;
+  const finish = j => { if (!done) { done = true; cb(j); } };
+  try {
+    const req = https.get(url, { timeout: 4000 }, res => {
+      if (res.statusCode !== 200) { res.resume(); finish(null); return; }
+      let d = '';
+      res.on('data', c => { d += c; if (d.length > 5000) req.destroy(); });
+      res.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (e) {} finish(j && j.version ? j : null); });
+    });
+    req.on('error', () => finish(null));
+    req.on('timeout', () => { req.destroy(); finish(null); });
+  } catch (e) { finish(null); }
+}
 function checkUpdate(cb) {
   if (Date.now() - _updCache.at < 6 * 3600 * 1000) { cb(_updCache.data); return; }
-  try {
-    const req = https.get(UPDATE_MANIFEST, { timeout: 4000 }, res => {
-      let d = ''; res.on('data', c => { d += c; if (d.length > 5000) req.destroy(); }); res.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (e) {} _updCache = { at: Date.now(), data: j }; cb(j); });
+  const tryAt = i => {
+    if (i >= UPDATE_MANIFESTS.length) { _updCache = { at: Date.now(), data: null }; cb(null); return; }
+    fetchManifest(UPDATE_MANIFESTS[i], j => {
+      if (j) { _updCache = { at: Date.now(), data: j }; cb(j); return; }
+      tryAt(i + 1);
     });
-    req.on('error', () => { _updCache = { at: Date.now(), data: null }; cb(null); });
-    req.on('timeout', () => { req.destroy(); cb(null); });
-  } catch (e) { cb(null); }
+  };
+  tryAt(0);
 }
 
 /* ------------------------------------------------------------------ *
