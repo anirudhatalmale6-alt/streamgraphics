@@ -856,11 +856,71 @@ function applyAction(action) {
       if (!it.rows) it.rows = [];
       if (!it.columns || !it.columns.length) it.columns = Object.keys(row).slice(0, 60);
       const o = {}; it.columns.forEach(c => { o[c] = String(row[c] == null ? '' : row[c]).slice(0, 600); });
-      if (it.rows.length < 3000) { it.rows.push(o); it.rowIndex = it.rows.length - 1; }
+      // keepIndex: the row editor appends without yanking whatever is currently on air.
+      if (it.rows.length < 3000) { it.rows.push(o); if (!action.keepIndex) it.rowIndex = it.rows.length - 1; }
       if (!it.rowKey) it.rowKey = it.columns[0] || '';
       saveShows(); break;
     }
     case 'show_clear_csv': { const it = state.shows.find(x => x.id === action.id); if (it) { delete it.rows; delete it.columns; delete it.rowKey; it.rowIndex = 0; saveShows(); } break; }
+
+    /* ---- Live row editing. A name is too long, an entry is wrong, someone didn't show up —
+       the operator fixes it mid-event without re-exporting the spreadsheet and re-importing.
+       Edits to the row that's currently on air reach the output immediately: the Program
+       output's signature is built from the FILLED layers, so changing a cell re-renders that
+       preset in place (a straight swap, not the row-change animation). ---- */
+    case 'show_setcell': {
+      const it = state.shows.find(x => x.id === action.id); if (!it || !it.rows) break;
+      const n = parseInt(action.n, 10); if (isNaN(n) || n < 0 || n >= it.rows.length) break;
+      const col = String(action.col || ''); if (!col || (it.columns || []).indexOf(col) < 0) break;
+      it.rows[n][col] = String(action.value == null ? '' : action.value).slice(0, 600);
+      saveShows(); break;
+    }
+    case 'show_delrow': {
+      const it = state.shows.find(x => x.id === action.id); if (!it || !it.rows || !it.rows.length) break;
+      const n = parseInt(action.n, 10); if (isNaN(n) || n < 0 || n >= it.rows.length) break;
+      it.rows.splice(n, 1);
+      // Deleting a row ABOVE the one on air would otherwise slide a different person into
+      // view without anybody touching the picker. Follow the content, not the slot number.
+      let i = it.rowIndex || 0;
+      if (n < i) i--;
+      it.rowIndex = it.rows.length ? Math.max(0, Math.min(it.rows.length - 1, i)) : 0;
+      if (!it.rows.length) { delete it.rows; delete it.columns; delete it.rowKey; }  // last row gone = no spreadsheet
+      saveShows(); break;
+    }
+    case 'show_moverow': {
+      const it = state.shows.find(x => x.id === action.id); if (!it || !it.rows) break;
+      const n = parseInt(action.n, 10); const dir = (parseInt(action.dir, 10) < 0) ? -1 : 1;
+      const to = n + dir;
+      if (isNaN(n) || n < 0 || n >= it.rows.length || to < 0 || to >= it.rows.length) break;
+      const cur = it.rowIndex || 0;
+      it.rows.splice(to, 0, it.rows.splice(n, 1)[0]);
+      if (cur === n) it.rowIndex = to; else if (cur === to) it.rowIndex = n;   // selection travels with the row
+      saveShows(); break;
+    }
+    case 'show_insertrow': {   // add at a position — also how Undo puts a deleted row back where it was
+      const it = state.shows.find(x => x.id === action.id); if (!it) break;
+      const row = (action.row && typeof action.row === 'object') ? action.row : {};
+      if (!it.rows) it.rows = [];
+      if (!it.columns || !it.columns.length) it.columns = Object.keys(row).slice(0, 60);
+      if (it.rows.length >= 3000) break;
+      let n = parseInt(action.n, 10); if (isNaN(n)) n = it.rows.length;
+      n = Math.max(0, Math.min(it.rows.length, n));
+      const o = {}; it.columns.forEach(c => { o[c] = String(row[c] == null ? '' : row[c]).slice(0, 600); });
+      it.rows.splice(n, 0, o);
+      const cur = it.rowIndex || 0;
+      it.rowIndex = (n <= cur) ? Math.min(it.rows.length - 1, cur + 1) : cur;   // whatever was on air stays on air
+      if (!it.rowKey) it.rowKey = it.columns[0] || '';
+      saveShows(); break;
+    }
+    case 'show_addcol': {   // a spreadsheet arrived missing a field the design needs
+      const it = state.shows.find(x => x.id === action.id); if (!it || !it.rows) break;
+      const col = String(action.col || '').trim().slice(0, 80); if (!col) break;
+      if (!it.columns) it.columns = [];
+      if (it.columns.indexOf(col) >= 0 || it.columns.length >= 80) break;
+      it.columns.push(col);
+      it.rows.forEach(r => { if (r[col] == null) r[col] = ''; });
+      saveShows(); break;
+    }
 
     default:
       return false;
@@ -1244,6 +1304,18 @@ const server = http.createServer((req, res) => {
     const it = (state.shows || []).find(x => x.id === id);
     res.writeHead(it ? 200 : 404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify(it ? { ok: true, payload: it.payload || {} } : { ok: false }));
+    return;
+  }
+
+  // Full spreadsheet rows for the row editor. Kept off /show-payload on purpose — that one is
+  // hit every time somebody opens a preset in the builder, and a 3000-row sheet would ride along.
+  if (pathname === '/show-rows') {
+    const id = url.searchParams.get('id');
+    const it = (state.shows || []).find(x => x.id === id);
+    res.writeHead(it ? 200 : 404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify(it
+      ? { ok: true, name: it.name, columns: it.columns || [], rows: it.rows || [], rowKey: it.rowKey || '', rowIndex: it.rowIndex || 0, on: !!it.on }
+      : { ok: false }));
     return;
   }
 

@@ -174,7 +174,8 @@
           }
         ]
       },
-      "on": false
+      "on": false,
+      "rowIndex": 0
     },
     {
       "id": "Smsj9mzex2",

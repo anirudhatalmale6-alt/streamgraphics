@@ -54,6 +54,192 @@
     r.readAsText(file);
   }
 
+  /* ---------------------------------------------------------------- *
+   *  ROW EDITOR — fix the spreadsheet mid-show.
+   *  A name runs off the lower third, someone scratched, a late entry turns up: the
+   *  operator shouldn't have to go back to Excel, re-export and re-import while the
+   *  event is running. Every change is sent the moment it's made, so there is no Save
+   *  button to forget. Editing the row that's on air updates the output in place.
+   * ---------------------------------------------------------------- */
+  var rowsEdit = null;          // { id, name, columns, rows, cur } while the editor is open
+  var cellTimers = {};          // per-cell debounce so typing isn't one POST per keystroke
+  var lastDeleted = null;       // { n, row } — backs the Undo button
+  var undoTimer = null;
+  var LONG = 26;                // chars past which a cell gets an amber edge — "this may not fit"
+
+  var STRUCTURAL = { show_insertrow: 1, show_delrow: 1, show_moverow: 1, show_addcol: 1 };
+  function rowsPost(a) {
+    // Row count / order is about to change on the server; ignore incoming state for a moment
+    // so our own edit isn't mistaken for another operator's and trigger a re-fetch mid-type.
+    if (rowsEdit && STRUCTURAL[a.type]) rowsEdit.busyUntil = Date.now() + 1500;
+    return post(a);
+  }
+
+  function flushCells() {
+    Object.keys(cellTimers).forEach(function (k) { var t = cellTimers[k]; if (t) { clearTimeout(t.id); t.fire(); } });
+    cellTimers = {};
+  }
+
+  function setCell(n, col, value) {
+    if (!rowsEdit || !rowsEdit.rows[n]) return;
+    rowsEdit.rows[n][col] = value;
+    var k = n + '|' + col;
+    if (cellTimers[k]) clearTimeout(cellTimers[k].id);
+    var fire = function () { delete cellTimers[k]; rowsPost({ type: 'show_setcell', id: rowsEdit.id, n: n, col: col, value: value }); };
+    cellTimers[k] = { fire: fire, id: setTimeout(fire, 200) };
+  }
+
+  function showUndo(on) {
+    var b = $('rowsUndo'); b.style.display = on ? '' : 'none';
+    if (undoTimer) clearTimeout(undoTimer);
+    if (on) undoTimer = setTimeout(function () { lastDeleted = null; b.style.display = 'none'; }, 15000);
+  }
+
+  function paintCurrent() {
+    var wrap = $('rowsTableWrap');
+    wrap.querySelectorAll('tr[data-n]').forEach(function (tr) {
+      tr.classList.toggle('cur', +tr.dataset.n === (rowsEdit ? rowsEdit.cur : -1));
+    });
+  }
+
+  function renderRows() {
+    var d = rowsEdit, wrap = $('rowsTableWrap');
+    if (!d) return;
+    if (!d.rows.length) {
+      $('rowsCount').textContent = '';
+      wrap.innerHTML = '<div class="empty" style="border:0">Every row is gone, so the spreadsheet has been removed from this graphic. Add a row below to start a new one, or close this and import a CSV.</div>';
+      return;
+    }
+    // Filtering hides rows but never renumbers them — data-n stays the row's real position,
+    // so an edit made while filtered still lands on the right entry.
+    var q = (d.q || '').trim().toLowerCase();
+    var vis = [];
+    d.rows.forEach(function (r, n) {
+      if (!q || d.columns.some(function (c) { return String(r[c] == null ? '' : r[c]).toLowerCase().indexOf(q) >= 0; })) vis.push([r, n]);
+    });
+    $('rowsCount').textContent = (q ? vis.length + ' of ' + d.rows.length + ' rows' : d.rows.length + ' row' + (d.rows.length === 1 ? '' : 's'))
+      + ' · ' + d.columns.length + ' field' + (d.columns.length === 1 ? '' : 's');
+    if (!vis.length) { wrap.innerHTML = '<div class="empty" style="border:0">Nothing matches "' + esc(d.q) + '".</div>'; return; }
+    var head = '<thead><tr><th>#</th><th></th>' + d.columns.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '<th>Order</th><th></th></tr></thead>';
+    var body = vis.map(function (pair) {
+      var r = pair[0], n = pair[1];
+      var cells = d.columns.map(function (c) {
+        var v = r[c] == null ? '' : String(r[c]);
+        return '<td><input class="cell' + (v.length > LONG ? ' long' : '') + '" data-n="' + n + '" data-col="' + esc(c) + '" value="' + esc(v) + '"></td>';
+      }).join('');
+      return '<tr data-n="' + n + '"' + (n === d.cur ? ' class="cur"' : '') + '>'
+        + '<td class="num">' + (n + 1) + '</td>'
+        + '<td class="ops"><button class="minibtn" data-go="' + n + '" title="put this entry on air">▶</button></td>'
+        + cells
+        // Reordering is disabled while a filter is on: the row would move relative to entries
+        // you can't see, which is a good way to scramble a running order by accident.
+        + '<td class="ops"><button class="minibtn" data-mv="' + n + '" data-dir="-1" title="' + (q ? 'clear the filter to reorder' : 'move up') + '"' + (q || n === 0 ? ' disabled' : '') + '>▲</button> '
+        + '<button class="minibtn" data-mv="' + n + '" data-dir="1" title="' + (q ? 'clear the filter to reorder' : 'move down') + '"' + (q || n === d.rows.length - 1 ? ' disabled' : '') + '>▼</button></td>'
+        + '<td class="ops"><button class="minibtn danger" data-del="' + n + '" title="delete this entry">✕</button></td>'
+        + '</tr>';
+    }).join('');
+    wrap.innerHTML = '<table class="rtbl">' + head + '<tbody>' + body + '</tbody></table>';
+
+    wrap.querySelectorAll('input.cell').forEach(function (inp) {
+      var n = +inp.dataset.n, col = inp.dataset.col;
+      inp.oninput = function () { inp.classList.toggle('long', inp.value.length > LONG); setCell(n, col, inp.value); };
+      inp.onfocus = function () { $('rowsCount').textContent = col + ' · ' + inp.value.length + ' characters'; };
+      inp.onkeyup = function () { if (document.activeElement === inp) $('rowsCount').textContent = col + ' · ' + inp.value.length + ' characters'; };
+      inp.onblur = function () {
+        var k = n + '|' + col; if (cellTimers[k]) { clearTimeout(cellTimers[k].id); cellTimers[k].fire(); }
+        $('rowsCount').textContent = rowsEdit.rows.length + ' row' + (rowsEdit.rows.length === 1 ? '' : 's') + ' · ' + rowsEdit.columns.length + ' fields';
+      };
+    });
+    wrap.querySelectorAll('[data-go]').forEach(function (b) {
+      b.onclick = function () { var n = +b.dataset.go; rowsEdit.cur = n; paintCurrent(); rowsPost({ type: 'show_rowselect', id: rowsEdit.id, cmd: 'goto', n: n }); };
+    });
+    wrap.querySelectorAll('[data-mv]').forEach(function (b) {
+      b.onclick = function () {
+        flushCells();
+        var n = +b.dataset.mv, dir = +b.dataset.dir, to = n + dir;
+        if (to < 0 || to >= rowsEdit.rows.length) return;
+        rowsEdit.rows.splice(to, 0, rowsEdit.rows.splice(n, 1)[0]);
+        if (rowsEdit.cur === n) rowsEdit.cur = to; else if (rowsEdit.cur === to) rowsEdit.cur = n;
+        rowsPost({ type: 'show_moverow', id: rowsEdit.id, n: n, dir: dir });
+        renderRows();
+      };
+    });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) {
+      b.onclick = function () {
+        flushCells();
+        var n = +b.dataset.del;
+        lastDeleted = { n: n, row: JSON.parse(JSON.stringify(rowsEdit.rows[n])) };
+        rowsEdit.rows.splice(n, 1);
+        if (n < rowsEdit.cur) rowsEdit.cur--;
+        rowsEdit.cur = rowsEdit.rows.length ? Math.max(0, Math.min(rowsEdit.rows.length - 1, rowsEdit.cur)) : 0;
+        rowsPost({ type: 'show_delrow', id: rowsEdit.id, n: n });
+        showUndo(true);
+        renderRows();
+      };
+    });
+  }
+
+  function openRows(id) {
+    fetch('/show-rows?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (res) {
+      if (!res || !res.ok) { alert('Could not read this spreadsheet.'); return; }
+      var keepQ = (rowsEdit && rowsEdit.id === id) ? rowsEdit.q : '';   // a re-fetch mid-edit keeps your filter
+      rowsEdit = { id: id, name: res.name || '', columns: res.columns || [], rows: res.rows || [], cur: res.rowIndex || 0, q: keepQ };
+      $('rowsFilter').value = keepQ || '';
+      lastDeleted = null; showUndo(false);
+      $('rowsTitle').textContent = 'Edit rows — ' + rowsEdit.name;
+      renderRows();
+      $('rowsModal').style.display = 'flex';
+    }).catch(function () { alert('Could not reach the app.'); });
+  }
+
+  function closeRows() {
+    flushCells();
+    $('rowsModal').style.display = 'none';
+    rowsEdit = null; lastDeleted = null; showUndo(false);
+    lastSig = '';        // force the library list to redraw with the new row count/labels
+    render();
+  }
+
+  $('rowsFilter').oninput = function () { if (!rowsEdit) return; flushCells(); rowsEdit.q = this.value; renderRows(); };
+  $('rowsGoCur').onclick = function () {
+    if (!rowsEdit) return;
+    if (rowsEdit.q) { rowsEdit.q = ''; $('rowsFilter').value = ''; renderRows(); }   // it may be filtered out
+    var tr = $('rowsTableWrap').querySelector('tr[data-n="' + rowsEdit.cur + '"]');
+    if (tr) tr.scrollIntoView({ block: 'center' });
+  };
+  $('rowsDone').onclick = closeRows;
+  $('rowsModal').onclick = function (e) { if (e.target === $('rowsModal')) closeRows(); };
+  $('rowsAdd').onclick = function () {
+    if (!rowsEdit) return;
+    flushCells();
+    if (rowsEdit.q) { rowsEdit.q = ''; $('rowsFilter').value = ''; }   // a new empty row would be filtered straight out of view
+    var o = {}; rowsEdit.columns.forEach(function (c) { o[c] = ''; });
+    var at = rowsEdit.rows.length;
+    rowsEdit.rows.push(o);
+    rowsPost({ type: 'show_insertrow', id: rowsEdit.id, n: at, row: o });
+    renderRows();
+    var wrap = $('rowsTableWrap'); wrap.scrollTop = wrap.scrollHeight;
+    var first = wrap.querySelector('tr[data-n="' + at + '"] input.cell'); if (first) first.focus();
+  };
+  $('rowsAddCol').onclick = function () {
+    if (!rowsEdit) return;
+    var c = prompt('Field name — this must match the "CSV field" on a layer in the Graphics Builder:', '');
+    if (c == null) return; c = c.trim(); if (!c) return;
+    if (rowsEdit.columns.indexOf(c) >= 0) { alert('That field already exists.'); return; }
+    rowsEdit.columns.push(c);
+    rowsEdit.rows.forEach(function (r) { r[c] = ''; });
+    rowsPost({ type: 'show_addcol', id: rowsEdit.id, col: c });
+    renderRows();
+  };
+  $('rowsUndo').onclick = function () {
+    if (!rowsEdit || !lastDeleted) return;
+    var d = lastDeleted; lastDeleted = null; showUndo(false);
+    rowsEdit.rows.splice(d.n, 0, d.row);
+    if (d.n <= rowsEdit.cur) rowsEdit.cur = Math.min(rowsEdit.rows.length - 1, rowsEdit.cur + 1);
+    rowsPost({ type: 'show_insertrow', id: rowsEdit.id, n: d.n, row: d.row });
+    renderRows();
+  };
+
   function render() {
     var box = $('lib');
     if (!shows.length) { box.innerHTML = '<div class="empty">No saved graphics yet. Build one in the Graphics Builder, then hit "＋ Save to Library" there.</div>'; return; }
@@ -84,6 +270,7 @@
           + '<span class="mono" style="color:var(--muted)">' + (idx + 1) + ' / ' + rowCount + '</span>'
           + '<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)" title="off = cut instantly to the next entry; on = animate off, change, animate back on"><input type="checkbox" data-act="anim"' + (it.rowTransition === 'reanimate' ? ' checked' : '') + '> animate change</label>'
           + '<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)" title="pause between the old graphic leaving and the new one arriving (animated change)">delay <input class="inp t" data-act="delay" type="number" min="0" max="8000" step="100" value="' + (it.rowDelay == null ? 1000 : it.rowDelay) + '" style="width:64px"> ms</label>'
+          + '<button class="minibtn" data-act="editrows" title="fix the spreadsheet without leaving the app — shorten text, delete an entry, add one, reorder">✎ Edit rows</button>'
           + '<button class="minibtn danger" data-act="clearcsv" title="remove the CSV">Clear CSV</button>'
           + '</div>';
       }
@@ -102,6 +289,7 @@
       row.querySelector('[data-act="manual"]').onclick = function () { openManual(id, it); };
       var an = row.querySelector('[data-act="anim"]'); if (an) an.onchange = function () { post({ type: 'show_rowmode', id: id, mode: an.checked ? 'reanimate' : 'cut' }); };
       var dl = row.querySelector('[data-act="delay"]'); if (dl) dl.onchange = function () { post({ type: 'show_rowdelay', id: id, ms: +dl.value }); };
+      var er = row.querySelector('[data-act="editrows"]'); if (er) er.onclick = function () { openRows(id); };
       var cc = row.querySelector('[data-act="clearcsv"]'); if (cc) cc.onclick = function () { if (confirm('Remove the CSV from "' + it.name + '"?')) post({ type: 'show_clear_csv', id: id }); };
       row.querySelector('[data-act="load"]').onclick = function () {
         var b = row.querySelector('[data-act="load"]'); b.textContent = '…';
@@ -213,6 +401,20 @@
         ltLayers = (m.state.lowerthird && m.state.lowerthird.layers) || [];
         var n = ltLayers.length;
         $('saveHint').textContent = 'Snapshots the Graphics Builder — currently ' + n + ' layer' + (n === 1 ? '' : 's') + '.';
+        // Keep the open row editor honest: the current row can move from a Stream Deck, the
+        // Companion module or a phone, and row numbers must match the server or edits land on
+        // the wrong entry. Structural edits of our own get a grace window so our in-flight
+        // POST doesn't look like somebody else's change.
+        if (rowsEdit) {
+          var me = shows.filter(function (x) { return x.id === rowsEdit.id; })[0];
+          if (me) {
+            var ci = me.rowIndex || 0;
+            if (ci !== rowsEdit.cur) { rowsEdit.cur = ci; paintCurrent(); }
+            var cnt = me.rowCount != null ? me.rowCount : ((me.rows || []).length);
+            if (cnt !== rowsEdit.rows.length && Date.now() > (rowsEdit.busyUntil || 0)) openRows(rowsEdit.id);
+          } else { closeRows(); }   // the preset was deleted out from under us
+        }
+
         // Only rebuild the list when the library actually changed (not on every unrelated update).
         var sig = shows.map(function (x) { return x.id + '|' + x.name + '|' + (x.on ? 1 : 0) + '|' + (x.rowCount != null ? x.rowCount : (x.rows ? x.rows.length : 0)) + '|' + (x.rowIndex || 0) + '|' + (x.rowKey || '') + '|' + (x.rowTransition || 'cut'); }).join(',');
         if (sig !== lastSig) { lastSig = sig; render(); }

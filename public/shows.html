@@ -19,6 +19,18 @@
   .minibtn:hover{border-color:var(--accent)}
   .minibtn.danger:hover{border-color:#e06;color:#e06}
   .empty{color:var(--muted);padding:18px;text-align:center;border:1px dashed var(--line);border-radius:10px}
+  /* Row editor table */
+  .rtbl{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+  .rtbl th{position:sticky;top:0;background:var(--panel2);z-index:2;text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .rtbl td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .rtbl tr.cur td{background:rgba(225,29,29,.14)}
+  .rtbl tr.cur td.num{box-shadow:inset 3px 0 0 #e11d1d}
+  .rtbl td.num{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;width:1%}
+  .rtbl td.ops{white-space:nowrap;width:1%}
+  .rtbl td.ops .minibtn{padding:3px 7px;min-height:24px}
+  .rtbl input.cell{width:100%;min-width:130px;box-sizing:border-box;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--txt);padding:6px 8px;font:inherit}
+  .rtbl input.cell:focus{outline:none;border-color:var(--accent)}
+  .rtbl input.cell.long{border-color:#e0a13a}
 </style>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23eab308'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='34' font-weight='bold' fill='%23111111' text-anchor='middle'%3ELB%3C/text%3E%3C/svg%3E">
 </head>
@@ -66,6 +78,7 @@
     <section class="panel">
       <h3>Mail-merge from a spreadsheet</h3>
       <p class="mini" style="color:var(--muted)">In the Graphics Builder, name a text (or image) layer a "CSV field" — e.g. PlayerName. Then hit "Import CSV" on that graphic above; each row fills the fields and becomes a version you can step through (◀ ▶) or jump to by name. Great for rosters, speakers, graduations.</p>
+      <p class="mini" style="color:var(--muted);margin-top:8px"><b style="color:var(--txt)">Fixing the sheet mid-event:</b> hit <b>✎ Edit rows</b> on any graphic that has a spreadsheet. Shorten a name that's running off the lower third, delete someone who scratched, add a late entry, or change the running order — while the show is live. Every change saves as you make it, and if you edit the entry that's currently on air the output updates straight away. There's a filter box for finding one person among hundreds, and an Undo if you delete the wrong row.</p>
     </section>
   </main>
 
@@ -83,6 +96,26 @@
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
         <button class="minibtn" id="manCancel">Cancel</button>
         <button class="btn go" id="manSave">Add entry</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rowsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(1140px,95vw);max-height:88vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h3 id="rowsTitle" style="margin:0 0 3px;flex:1;min-width:220px">Edit rows</h3>
+        <input class="inp" id="rowsFilter" placeholder="Filter rows…" style="width:200px" title="type a name to find one entry among hundreds">
+        <button class="minibtn" id="rowsGoCur" title="scroll to the entry that's on air">On-air row</button>
+      </div>
+      <p class="mini" style="color:var(--muted);margin:0 0 12px">Edits go live as you type — there's no Save button, so nothing gets lost mid-show. The entry that's on air right now is highlighted in red; hit ▶ on any row to put that one up.</p>
+      <div id="rowsTableWrap" style="overflow:auto;flex:1;border:1px solid var(--line);border-radius:10px;min-height:80px"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
+        <button class="minibtn" id="rowsAdd" title="add an empty entry at the end">＋ Add row</button>
+        <button class="minibtn" id="rowsAddCol" title="add a field this spreadsheet is missing">＋ Add field</button>
+        <button class="minibtn" id="rowsUndo" style="display:none">↩ Undo delete</button>
+        <span class="mini" id="rowsCount" style="color:var(--muted)"></span>
+        <span style="flex:1"></span>
+        <button class="btn go" id="rowsDone">Done</button>
       </div>
     </div>
   </div>
