@@ -63,7 +63,11 @@
   function originOf(l) { return l.align === 'right' ? 'right center' : (l.align === 'center' ? 'center' : 'left center'); }
 
   function itemStyle(l, k) {
-    return 'display:' + (k.show ? 'flex' : 'none') + ';align-items:baseline'
+    // In replace mode every line lives in the SAME grid cell, so the outgoing and incoming lines
+    // overlap instead of briefly both taking up room — otherwise the list re-centres itself
+    // mid-transition and the new line visibly drops in low and then snaps up.
+    var stacked = (l.mode || 'build') === 'replace' ? 'grid-area:1/1;align-self:center;' : '';
+    return stacked + 'display:' + (k.show ? 'flex' : 'none') + ';align-items:baseline'
       + ';opacity:' + k.opacity
       + ';transform:' + (k.scale !== 1 ? 'scale(' + k.scale + ')' : 'none')
       + ';transform-origin:' + originOf(l)
@@ -71,18 +75,29 @@
       + (k.color ? ';color:' + esc(k.color) : '');
   }
 
-  function listStyle(l) {
-    var mode = l.mode || 'build';
-    var av = l.align === 'right' ? 'flex-end' : (l.align === 'center' ? 'center' : 'flex-start');
-    // replace stacks in one spot so it centres; a build anchors to whichever edge it grows away from.
-    var jc = mode === 'replace' ? 'center' : (l.grow === 'up' ? 'flex-end' : 'flex-start');
-    return 'position:absolute;inset:0;display:flex;flex-direction:column;justify-content:' + jc
-      + ';align-items:' + av + ';gap:' + num(l.gap, 14) + 'px'
-      + ';text-align:' + (l.align || 'left') + ';padding:' + num(l.pad, 24) + 'px;box-sizing:border-box;overflow:visible'
-      + ';font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + num(l.size, 44) + 'px'
+  // Typography is the same whichever way the lines are laid out.
+  function fontStyle(l) {
+    return ';font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + num(l.size, 44) + 'px'
       + ';color:' + esc(l.color || '#ffffff')
       + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';line-height:1.2'
       + ((l.bgOpacity > 0) ? '' : ';text-shadow:0 2px 8px rgba(0,0,0,.45)');
+  }
+
+  function listStyle(l) {
+    var mode = l.mode || 'build';
+    var av = l.align === 'right' ? 'flex-end' : (l.align === 'center' ? 'center' : 'flex-start');
+    var base = ';text-align:' + (l.align || 'left') + ';padding:' + num(l.pad, 24) + 'px;box-sizing:border-box;overflow:visible';
+    // replace lands every line in one spot — a single grid cell they all share, so nothing reflows.
+    if (mode === 'replace') {
+      return 'position:absolute;inset:0;display:grid;grid-template-columns:1fr;align-content:center'
+        + ';justify-items:' + (l.align === 'right' ? 'end' : (l.align === 'center' ? 'center' : 'start')) + base
+        + fontStyle(l);
+    }
+    // a build anchors to whichever edge it grows away from
+    var jc = l.grow === 'up' ? 'flex-end' : 'flex-start';
+    return 'position:absolute;inset:0;display:flex;flex-direction:column;justify-content:' + jc
+      + ';align-items:' + av + ';gap:' + num(l.gap, 14) + 'px' + base
+      + fontStyle(l);
   }
 
   function bgHtml(l) {
@@ -121,6 +136,9 @@
 
     var dur = Math.max(0, num(l.revealDur, 380));
     var tr = l.reveal || 'fade';
+    // In replace mode the two lines are on top of each other, so the old one has to fade at the
+    // same rate the new one arrives — otherwise the spot goes dark in the middle of the swap.
+    var outMs = (l.mode === 'replace') ? dur : 220;
     var lines = el.querySelectorAll('.bi');
     for (var j = 0; j < lines.length; j++) {
       (function (bi) {
@@ -144,12 +162,13 @@
           bi.style.transform = scale;
           return;
         }
-        bi.style.transition = 'opacity 220ms ease, color 220ms ease, transform 220ms ease';
+        var ms = (!k.show && wasShown) ? outMs : 220;
+        bi.style.transition = 'opacity ' + ms + 'ms ease, color 220ms ease, transform ' + ms + 'ms ease';
         bi.style.opacity = k.opacity;
         bi.style.transform = scale;
         if (!k.show && wasShown) {
           // Let it fade before it stops taking up space, or a build would jump as you step back.
-          bi._bulHide = setTimeout(function () { bi.style.display = 'none'; bi._bulHide = null; }, 240);
+          bi._bulHide = setTimeout(function () { bi.style.display = 'none'; bi._bulHide = null; }, ms + 20);
         }
       })(lines[j]);
     }
