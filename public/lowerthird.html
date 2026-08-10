@@ -48,6 +48,35 @@
   #btnOnAir.live{background:#e11d1d;border-color:#e11d1d;color:#fff;box-shadow:0 0 0 2px rgba(225,29,29,.35)}
   #btnOffAir.standby{background:#eab308;border-color:#eab308;color:#111;box-shadow:0 0 0 2px rgba(234,179,8,.35)}
   @media(min-width:881px){.stagewrap{position:sticky;top:14px;align-self:start}}
+  /* Template gallery — every card draws the design itself, using the same layer renderer the
+     builder uses, so what you see in the picker is exactly what you get on the canvas. */
+  /* grid-auto-rows:max-content — the grid is a fixed-height flex child, and with plain `auto`
+     rows the browser sized every row to ~97px while the cards' real content was 266px, clipping
+     the name and buttons off the bottom of each card. */
+  .tplgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-content:start;grid-auto-rows:max-content}
+  .tcard{position:relative;border:1px solid var(--line);border-radius:11px;background:var(--panel2);overflow:hidden;display:flex;flex-direction:column}
+  .tcard.picked{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  /* flex:none matters — as a shrinkable flex child the preview collapsed to a sliver and
+     overflow:hidden then clipped the whole design out of sight. */
+  .tprev{flex:none;position:relative;width:100%;overflow:hidden;cursor:pointer;background:
+     linear-gradient(45deg,rgba(255,255,255,.035) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.035) 75%),
+     linear-gradient(45deg,rgba(255,255,255,.035) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.035) 75%),
+     linear-gradient(160deg,#20262f,#12161c);
+     background-size:16px 16px,16px 16px,100% 100%;background-position:0 0,8px 8px,0 0}
+  .tprev .tstage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:top left;pointer-events:none}
+  .tprev .ly{position:absolute}
+  .tprev:hover::after{content:'Use this design';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+     background:rgba(0,0,0,.55);color:#fff;font-weight:700;font-size:13px;letter-spacing:.02em}
+  .tmeta{padding:9px 11px;display:flex;align-items:center;gap:7px;min-width:0}
+  .tmeta .tnm{flex:1;font-weight:700;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tbadge{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:2px 7px;white-space:nowrap}
+  .tacts{display:flex;gap:5px;padding:0 11px 10px;flex-wrap:wrap}
+  .tacts .minibtn{font-size:11px;padding:4px 8px;min-height:0;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer}
+  .tacts .minibtn:hover{border-color:var(--accent)}
+  .tacts .minibtn.danger:hover{border-color:#e06;color:#e06}
+  .tchip{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;white-space:nowrap}
+  .tchip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .tpick{position:absolute;top:7px;left:7px;z-index:5;width:19px;height:19px;cursor:pointer}
   /* Nothing on this page may push the document wider than the window. */
   /* clip, NOT hidden. overflow-x:hidden makes html/body a scroll container, which silently
      stops the sticky preview above from sticking — clip guards against sideways overflow
@@ -355,17 +384,46 @@
     </div>
   </div>
 
-  <div id="tplModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center">
-    <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:560px;width:94%;max-height:86vh;overflow:auto">
-      <h3 style="margin-bottom:4px">Templates</h3>
-      <p class="mini" style="color:var(--muted);margin-bottom:12px">Start from a design, then customise it and Save to Library. Your own can be exported/imported to share.</p>
-      <div id="tplList" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px;flex-wrap:wrap">
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn ghost" id="tplSaveCur" style="font-size:12px">＋ Save current as Template</button>
-          <label class="btn ghost" style="font-size:12px;cursor:pointer">Import template file<input type="file" id="tplImport" accept=".json,application/json" style="display:none"></label>
+  <div id="tplModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(1120px,96vw);max-height:90vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0">Templates</h3>
+        <span class="mini" style="color:var(--muted);flex:1;min-width:200px">Pick a design to start from, then customise it and save it to your Library.</span>
+        <input class="inp" id="tplSearch" placeholder="Search designs…" style="width:190px">
+      </div>
+      <div id="tplFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 10px"></div>
+      <div id="tplGrid" style="overflow:auto;flex:1;padding:2px"></div>
+      <div id="tplPackBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)">
+        <b id="tplPackTitle" style="font-size:13px"></b>
+        <span class="mini" id="tplPackMeta" style="color:var(--muted);flex:1;min-width:120px"></span>
+        <button class="btn ghost" id="tplPackRemove" style="font-size:12px;color:#e06">Uninstall this pack</button>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn ghost" id="tplSaveCur" style="font-size:12px">＋ Save current design</button>
+          <label class="btn ghost" style="font-size:12px;cursor:pointer">⤒ Install pack<input type="file" id="tplPackImport" accept=".sgpack,.json,application/json" style="display:none"></label>
+          <button class="btn ghost" id="tplMake" style="font-size:12px">✦ Make a pack…</button>
+          <label class="btn ghost" style="font-size:12px;cursor:pointer">Import single<input type="file" id="tplImport" accept=".json,application/json" style="display:none"></label>
         </div>
         <button class="btn ghost" id="tplClose" style="font-size:12px">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="packModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10001;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:460px;width:92%">
+      <h3 style="margin:0 0 4px">Make a template pack</h3>
+      <p class="mini" style="color:var(--muted);margin:0 0 14px">Bundles the designs you ticked into one file. Any images they use are embedded, so it works on someone else's computer.</p>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <label class="mini" style="color:var(--muted)">Pack name<input class="inp" id="pkName" style="width:100%" placeholder="Beach Volleyball Essentials"></label>
+        <label class="mini" style="color:var(--muted)">Author<input class="inp" id="pkAuthor" style="width:100%" placeholder="Your name or studio"></label>
+        <label class="mini" style="color:var(--muted)">Version<input class="inp" id="pkVersion" style="width:100%" value="1.0"></label>
+        <label class="mini" style="color:var(--muted)">Description<textarea class="inp" id="pkDesc" rows="3" style="width:100%;resize:vertical" placeholder="What's in it and who it's for."></textarea></label>
+      </div>
+      <p class="mini" id="pkCount" style="color:var(--muted);margin:12px 0 0"></p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn ghost" id="pkCancel" style="font-size:12px">Cancel</button>
+        <button class="btn go" id="pkSave" style="font-size:12px">Build the pack</button>
       </div>
     </div>
   </div>

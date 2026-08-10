@@ -210,6 +210,8 @@ function defaultState() {
     shows: [],
     // User-made / imported Templates (built-ins are added on top in wireState/allTemplates).
     userTemplates: [],
+    // Installed template packs (metadata only — the designs live in userTemplates, tagged by pack id).
+    packs: [],
     // Baseball / softball scoreboard — a clock-free sport, so it's the first of the
     // new sports. Innings are adjustable (softball/youth vary by age & level).
     baseball: defaultBaseball(),
@@ -412,10 +414,24 @@ function builtinTemplates() {
   ];
 }
 (function () {
-  try { if (fs.existsSync(TPL_FILE)) { const j = JSON.parse(fs.readFileSync(TPL_FILE, 'utf8')); if (j && Array.isArray(j.items)) state.userTemplates = j.items; } } catch (e) {}
+  try { if (fs.existsSync(TPL_FILE)) { const j = JSON.parse(fs.readFileSync(TPL_FILE, 'utf8')); if (j && Array.isArray(j.items)) state.userTemplates = j.items; if (j && Array.isArray(j.packs)) state.packs = j.packs; } } catch (e) {}
 })();
-function saveTemplates() { writeJson(TPL_FILE, function () { return { items: state.userTemplates }; }); }
+function saveTemplates() { writeJson(TPL_FILE, function () { return { items: state.userTemplates, packs: state.packs || [] }; }); }
 function allTemplates() { return builtinTemplates().concat(state.userTemplates || []); }
+
+/* TEMPLATE PACKS — a named, shippable bundle of templates. A pack is just a JSON file, so it
+ * can be sold, emailed or dropped in a shared folder. Installing one tags each of its templates
+ * with the pack id, which is what makes "uninstall the whole pack" possible later — without
+ * that tag you could never tell a pack's designs apart from the user's own. */
+const PACK_LIMIT = 60;
+function packMeta(p) {
+  return {
+    id: String(p.id || '').slice(0, 64), name: String(p.name || 'Untitled pack').slice(0, 120),
+    author: String(p.author || '').slice(0, 120), version: String(p.version || '1.0').slice(0, 20),
+    description: String(p.description || '').slice(0, 600),
+    installed: p.installed || new Date().toISOString()
+  };
+}
 
 // Apply a license key to state (verifying it). Returns the (public) status.
 const LIC_FILE = path.join(DATA_DIR, 'license.json');
@@ -445,7 +461,7 @@ function wireState() {
     };
   });
   // Templates travel as metadata only (name/kind/builtin); the layers are fetched on demand.
-  const templates = allTemplates().map(function (t) { return { id: t.id, name: t.name, kind: t.kind, builtin: !!t.builtin }; });
+  const templates = allTemplates().map(function (t) { return { id: t.id, name: t.name, kind: t.kind, builtin: !!t.builtin, pack: t.pack || '' }; });
   // License: expose whether we're licensed + public info (never the key itself) — drives the watermark + gating.
   const covers = licCoversVersion(state.license);
   const lic = { active: !!state.license.active, name: state.license.name || '', tier: state.license.tier || 'free', features: state.license.features || [], upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers };
@@ -822,6 +838,17 @@ function applyAction(action) {
       saveTemplates(); break;
     }
     case 'tpl_delete': state.userTemplates = (state.userTemplates || []).filter(x => x.id !== action.id); saveTemplates(); break;
+    case 'tpl_rename': {
+      const t = (state.userTemplates || []).find(x => x.id === action.id);
+      if (t) { t.name = String(action.name || t.name).slice(0, 120); saveTemplates(); }
+      break;
+    }
+    case 'pack_uninstall': {   // removes the pack AND every design that came in with it
+      const id = String(action.id || ''); if (!id) break;
+      state.userTemplates = (state.userTemplates || []).filter(x => x.pack !== id);
+      state.packs = (state.packs || []).filter(p => p.id !== id);
+      saveTemplates(); break;
+    }
     case 'tpl_load': { // load a template's design into the Graphics Builder
       const t = allTemplates().find(x => x.id === action.id);
       if (t && Array.isArray(t.layers)) { state.lowerthird.layers = JSON.parse(JSON.stringify(t.layers)); state.lowerthird.editingShowId = ''; saveLowerThird(); }
@@ -1189,6 +1216,94 @@ const server = http.createServer((req, res) => {
       if (ok) broadcast();
       res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ ok, added }));
+    });
+    return;
+  }
+
+  // --- Every template WITH its layers, plus installed packs. The SSE stream carries template
+  //     metadata only, but the picker needs real layers to draw a preview of each design. ---
+  if (pathname === '/templates') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({
+      ok: true,
+      packs: state.packs || [],
+      templates: allTemplates().map(t => ({
+        id: t.id, name: t.name, kind: t.kind, builtin: !!t.builtin,
+        pack: t.pack || '', desc: t.desc || '', layers: t.layers || []
+      }))
+    }));
+    return;
+  }
+
+  // --- Build a .sgpack from chosen templates. Goes through the server so referenced images are
+  //     embedded — a pack that points at /media paths would arrive broken on someone else's machine. ---
+  if (pathname === '/export/pack' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 5e6) req.destroy(); });
+    req.on('end', () => {
+      let out = null;
+      try {
+        const j = JSON.parse(body || '{}');
+        const ids = Array.isArray(j.ids) ? j.ids.map(String) : [];
+        const picked = allTemplates().filter(t => ids.indexOf(t.id) >= 0);
+        if (picked.length) {
+          out = {
+            type: 'streamgraphics-pack', app: 'StreamGraphics Pro', version: VERSION,
+            exported: new Date().toISOString(),
+            pack: {
+              name: String(j.name || 'Untitled pack').slice(0, 120),
+              author: String(j.author || '').slice(0, 120),
+              version: String(j.version || '1.0').slice(0, 20),
+              description: String(j.description || '').slice(0, 600)
+            },
+            templates: picked.map(t => inlineMedia({ name: t.name, kind: t.kind || 'lowerthird', desc: t.desc || '', layers: t.layers || [] }))
+          };
+        }
+      } catch (e) { out = null; }
+      res.writeHead(out ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify(out || { ok: false, error: 'nothing to export' }));
+    });
+    return;
+  }
+
+  // --- Install a .sgpack (own endpoint: embedded images make these far too big for /action) ---
+  if (pathname === '/pack-install' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 90e6) req.destroy(); });
+    req.on('end', () => {
+      let ok = false, added = 0, name = '', err = '';
+      try {
+        const j = JSON.parse(body || '{}');
+        const list = Array.isArray(j.templates) ? j.templates : [];
+        const meta = (j.pack && typeof j.pack === 'object') ? j.pack : {};
+        if (!list.length) err = 'that file has no designs in it';
+        else if ((state.packs || []).length >= PACK_LIMIT) err = 'too many packs installed';
+        else {
+          const pid = 'pk_' + Date.now().toString(36) + Math.floor(Date.now() % 997).toString(36);
+          if (!state.userTemplates) state.userTemplates = [];
+          list.forEach(function (raw, i) {
+            if (!raw || typeof raw !== 'object' || !Array.isArray(raw.layers)) return;
+            if (state.userTemplates.length >= 500) return;
+            state.userTemplates.push({
+              id: 'ut_' + Date.now().toString(36) + '_' + i,
+              name: String(raw.name || 'Untitled').slice(0, 120),
+              kind: String(raw.kind || 'lowerthird'),
+              desc: String(raw.desc || '').slice(0, 400),
+              layers: raw.layers.slice(0, 100),
+              pack: pid
+            });
+            added++;
+          });
+          if (added) {
+            name = String(meta.name || 'Untitled pack').slice(0, 120);
+            state.packs = (state.packs || []).concat([packMeta(Object.assign({}, meta, { id: pid, name }))]);
+            saveTemplates(); ok = true;
+          } else err = 'none of the designs in that file were usable';
+        }
+      } catch (e) { err = 'that file is not a valid pack'; }
+      if (ok) broadcast();
+      res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ ok, added, name, error: err }));
     });
     return;
   }
