@@ -90,7 +90,7 @@
 
   // the "hidden" state (from-state for ON, to-state for OFF) of an animation type
   var BOUNCE = 'cubic-bezier(.34,1.62,.5,1)';   // overshoot for bounce/pop
-  function hidden(type) {
+  function hidden(type, dir) {
     switch (type) {
       case 'slide-up': return { o: 0, t: 'translateY(46px)' };
       case 'slide-down': return { o: 0, t: 'translateY(-46px)' };
@@ -102,7 +102,10 @@
       case 'pop': return { o: 0, t: 'scale(.3)', ease: BOUNCE };
       case 'rotate': return { o: 0, t: 'rotate(-180deg) scale(.4)' };  // spin in
       case 'scale': return { o: 0, t: 'scale(.86)' };
-      case 'none': return { o: 1, t: 'none' };
+      // "None" means no animation — it does NOT mean "stay on screen". Coming on that's an
+      // instant appear; going off it has to be an instant disappear, or the layer never leaves
+      // air and sits over everything until you delete it.
+      case 'none': return dir === 'out' ? { o: 0, t: 'none', cut: true } : { o: 1, t: 'none' };
       default: return { o: 0, t: 'none' }; // fade
     }
   }
@@ -234,7 +237,7 @@
   }
   function animateOn() {
     eachLi(function (li, l) {
-      var e = effAnim(l, 'in'), h = hidden(e.anim);
+      var e = effAnim(l, 'in'), h = hidden(e.anim, 'in');
       li.style.transition = 'none'; setState(li, h.o, h.t); void li.offsetWidth;
       li.style.transition = 'transform ' + e.dur + 'ms ' + (h.ease || EASE) + ' ' + e.del + 'ms, opacity ' + e.dur + 'ms ease ' + e.del + 'ms';
       setState(li, 1, 'none');
@@ -242,13 +245,17 @@
   }
   function animateOff() {
     eachLi(function (li, l) {
-      var e = effAnim(l, 'out'), h = hidden(e.anim);
+      var e = effAnim(l, 'out'), h = hidden(e.anim, 'out');
+      if (h.cut) { li.style.transition = 'none'; setState(li, h.o, h.t); return; }   // "None" = cut, not a fade
       li.style.transition = 'transform ' + e.dur + 'ms ' + (h.ease || EASE) + ' ' + e.del + 'ms, opacity ' + e.dur + 'ms ease ' + e.del + 'ms';
       setState(li, h.o, h.t);
     });
   }
-  function snap(v) { // instant reflect after an edit (no animation)
-    eachLi(function (li, l) { li.style.transition = 'none'; if (v) setState(li, 1, 'none'); else { var h = hidden(effAnim(l, 'in').anim); setState(li, h.o, h.t); } });
+  // Instantly reflect an edit with no animation. Off air, the resting state is the ON animation's
+  // start pose (so the next take plays from the right place) — but asked for it as an OUT state,
+  // because off air has to be invisible whatever animation the layer was given.
+  function snap(v) {
+    eachLi(function (li, l) { li.style.transition = 'none'; if (v) setState(li, 1, 'none'); else { var h = hidden(effAnim(l, 'in').anim, 'out'); setState(li, h.o, h.t); } });
   }
 
   function applyChroma(c) {

@@ -196,7 +196,7 @@
 
   // ---- animation preview in the builder (mirrors the output's animateOn/Off) ----
   var A_BOUNCE = 'cubic-bezier(.34,1.62,.5,1)', A_EASE = 'cubic-bezier(.16,1,.3,1)';
-  function animHidden(type) {
+  function animHidden(type, dir) {
     switch (type) {
       case 'slide-up': return { o: 0, t: 'translateY(46px)' };
       case 'slide-down': return { o: 0, t: 'translateY(-46px)' };
@@ -208,7 +208,9 @@
       case 'pop': return { o: 0, t: 'scale(.3)', ease: A_BOUNCE };
       case 'rotate': return { o: 0, t: 'rotate(-180deg) scale(.4)' };
       case 'scale': return { o: 0, t: 'scale(.86)' };
-      case 'none': return { o: 1, t: 'none' };
+      // "None" is an instant appear coming on and an instant cut going off — the preview has to
+      // show that, or Animate Off = None looks like it works here and sticks on air.
+      case 'none': return dir === 'out' ? { o: 0, t: 'none', cut: true } : { o: 1, t: 'none' };
       default: return { o: 0, t: 'none' }; // fade
     }
   }
@@ -229,8 +231,8 @@
       var li = el.querySelector('.li'); if (!li) return;
       var l = byId(id); if (!l) return;
       var eIn = effAnim(l, 'in'), eOut = effAnim(l, 'out');
-      var hIn = animHidden(eIn.anim), inDur = eIn.dur, inDel = eIn.del;
-      var hOut = animHidden(eOut.anim), outDur = eOut.dur;
+      var hIn = animHidden(eIn.anim, 'in'), inDur = eIn.dur, inDel = eIn.del;
+      var hOut = animHidden(eOut.anim, 'out'), outDur = hOut.cut ? 0 : eOut.dur;
       li.style.transition = 'none'; li.style.opacity = hIn.o; li.style.transform = hIn.t; void li.offsetWidth;   // snap to IN start
       li.style.transition = 'transform ' + inDur + 'ms ' + (hIn.ease || A_EASE) + ' ' + inDel + 'ms, opacity ' + inDur + 'ms ease ' + inDel + 'ms';
       li.style.opacity = 1; li.style.transform = 'none';

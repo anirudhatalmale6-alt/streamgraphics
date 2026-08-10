@@ -97,7 +97,7 @@
 
   // ---- per-layer in/out animation (same design as the builder output) ----
   var EASE = 'cubic-bezier(.16,1,.3,1)', BOUNCE = 'cubic-bezier(.34,1.62,.5,1)';
-  function hidden(type) {
+  function hidden(type, dir) {
     switch (type) {
       case 'slide-up': return { o: 0, t: 'translateY(46px)' };
       case 'slide-down': return { o: 0, t: 'translateY(-46px)' };
@@ -109,7 +109,8 @@
       case 'pop': return { o: 0, t: 'scale(.3)', ease: BOUNCE };
       case 'rotate': return { o: 0, t: 'rotate(-180deg) scale(.4)' };
       case 'scale': return { o: 0, t: 'scale(.86)' };
-      case 'none': return { o: 1, t: 'none' };
+      // "None" means no animation, not "stay on screen" — on the way out it cuts. (See lowerthird-output.js.)
+      case 'none': return dir === 'out' ? { o: 0, t: 'none', cut: true } : { o: 1, t: 'none' };
       default: return { o: 0, t: 'none' };
     }
   }
@@ -128,11 +129,13 @@
     var maxOut = 0, map = container._lmap || {};
     container.querySelectorAll('.ly').forEach(function (ly) {
       var l = map[ly.dataset.id]; var li = ly.querySelector('.li'); if (!l || !li) return;
-      var e = effAnim(map, l, dir), h = hidden(e.anim);
+      var e = effAnim(map, l, dir), h = hidden(e.anim, dir);
       if (dir === 'in') {
         li.style.transition = 'none'; setState(li, h.o, h.t); void li.offsetWidth;
         li.style.transition = 'transform ' + e.dur + 'ms ' + (h.ease || EASE) + ' ' + e.del + 'ms, opacity ' + e.dur + 'ms ease ' + e.del + 'ms';
         setState(li, 1, 'none');
+      } else if (h.cut) {
+        li.style.transition = 'none'; setState(li, h.o, h.t);   // "None" = gone this frame, adds nothing to the wait
       } else {
         li.style.transition = 'transform ' + e.dur + 'ms ' + (h.ease || EASE) + ' ' + e.del + 'ms, opacity ' + e.dur + 'ms ease ' + e.del + 'ms';
         setState(li, h.o, h.t);
