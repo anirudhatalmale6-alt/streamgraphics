@@ -6,10 +6,14 @@
 <title>StreamGraphics Pro — Lower Third / Graphics Builder</title>
 <link rel="stylesheet" href="/control.css">
 <style>
-  .builder{display:grid;grid-template-columns:1fr 320px;gap:16px}
-  @media(max-width:900px){.builder{grid-template-columns:1fr}}
-  .stagewrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
-  .canvas{position:relative;width:720px;max-width:100%;height:405px;border-radius:8px;overflow:hidden;
+  /* minmax(0,1fr): without it the first track floors at the canvas's own width and the
+     side panel is pushed off the right edge in any window narrower than ~1120px. */
+  .builder{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+  .builder>*{min-width:0}
+  @media(max-width:880px){.builder{grid-template-columns:minmax(0,1fr)}}
+  .stagewrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+  /* Fluid 16:9 canvas — the 1920x1080 stage inside is scaled to fit by fitStage() in lowerthird.js. */
+  .canvas{position:relative;width:100%;max-width:860px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;
     background:repeating-conic-gradient(#0e131b 0% 25%,#10151f 0% 50%) 50%/28px 28px;margin:0 auto}
   .safe{position:absolute;border:1px dashed rgba(255,255,255,.18);pointer-events:none;inset:5% 5%}
   .cstage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform:scale(.375);transform-origin:top left}
@@ -43,7 +47,10 @@
   .airbtn{min-width:96px}
   #btnOnAir.live{background:#e11d1d;border-color:#e11d1d;color:#fff;box-shadow:0 0 0 2px rgba(225,29,29,.35)}
   #btnOffAir.standby{background:#eab308;border-color:#eab308;color:#111;box-shadow:0 0 0 2px rgba(234,179,8,.35)}
-  @media(min-width:901px){.stagewrap{position:sticky;top:14px;align-self:start}}
+  @media(min-width:881px){.stagewrap{position:sticky;top:14px;align-self:start}}
+  /* Nothing on this page may push the document wider than the window. */
+  html,body{overflow-x:hidden}
+  @media(min-width:1240px){main{max-width:1240px}}   /* roomier preview on a big monitor */
 </style>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f97316'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='34' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3EGX%3C/text%3E%3C/svg%3E">
 </head>
@@ -260,8 +267,12 @@
               <input class="inp t" id="pSlRadius" type="number" min="0" max="120" value="14" title="corner radius px">
             </div>
             <div class="row only-slides"><label>Between slides</label>
-              <select class="inp" id="pSlTrans" style="width:auto"><option value="fade">Fade</option><option value="slide-up">Slide up</option><option value="slide-down">Slide down</option><option value="slide-left">Slide left</option><option value="slide-right">Slide right</option></select>
-              <span class="mini2" style="color:var(--muted2);font-size:11px">background stays; only the text animates</span>
+              <select class="inp" id="pSlTrans" style="width:auto"><option value="fade">Fade</option><option value="slide-up">Slide up</option><option value="slide-down">Slide down</option><option value="slide-left">Slide left</option><option value="slide-right">Slide right</option><option value="zoom">Zoom</option><option value="none">Cut (no animation)</option></select>
+              <input class="inp t" id="pSlTransDur" type="number" min="0" max="3000" step="20" value="220" title="how long the change takes, in milliseconds"> <span class="mini2" style="color:var(--muted2);font-size:11px">ms</span>
+              <button class="btn ghost" id="pSlTransTest" style="font-size:12px" title="play the change here in the preview">▶ Test</button>
+            </div>
+            <div class="row only-slides" style="margin-top:-4px">
+              <label style="width:auto;color:var(--muted2);font-size:11px">The background panel stays put — only the text animates. Change it and the preview plays it back.</label>
             </div>
             <div class="row only-slides"><label>Font</label>
               <select class="inp" id="pSlFont" style="width:auto">

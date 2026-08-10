@@ -11,6 +11,10 @@ To start: use the Start Menu or Desktop shortcut 'StreamGraphics Pro'.
 Your browser opens automatically at http://localhost:4000 - that's your control panel.
 (If it doesn't open on its own, just type that address into any browser.)
 
+If you have questions, comments or thoughts, please email mark@streamgraphicspro.com.
+
+Also, documentation and tutorial videos are available at: www.streamgraphicspro.com.
+
 You have a few different control panels - graphics, scoreboard, speaker and library.
 Together they give you a ton of options.
 

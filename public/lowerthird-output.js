@@ -44,8 +44,9 @@
       + '<div class="slide-text" style="' + hide + slideTextStyle(l) + ';transition:transform .22s ease,opacity .22s ease">' + innerHtmlStr + '</div></div>';
   }
   // Between-slide transition offsets (text only): out-state and in-from-state.
-  function transOut(tr) { return tr === 'slide-up' ? 'translateY(-26px)' : tr === 'slide-down' ? 'translateY(26px)' : tr === 'slide-left' ? 'translateX(-44px)' : tr === 'slide-right' ? 'translateX(44px)' : 'none'; }
-  function transIn(tr) { return tr === 'slide-up' ? 'translateY(26px)' : tr === 'slide-down' ? 'translateY(-26px)' : tr === 'slide-left' ? 'translateX(44px)' : tr === 'slide-right' ? 'translateX(-44px)' : 'none'; }
+  function transOut(tr) { return tr === 'slide-up' ? 'translateY(-26px)' : tr === 'slide-down' ? 'translateY(26px)' : tr === 'slide-left' ? 'translateX(-44px)' : tr === 'slide-right' ? 'translateX(44px)' : tr === 'zoom' ? 'scale(1.12)' : 'none'; }
+  function transIn(tr) { return tr === 'slide-up' ? 'translateY(26px)' : tr === 'slide-down' ? 'translateY(-26px)' : tr === 'slide-left' ? 'translateX(44px)' : tr === 'slide-right' ? 'translateX(-44px)' : tr === 'zoom' ? 'scale(.88)' : 'none'; }
+  function transDurOf(l) { var d = (l && l.transDur != null) ? +l.transDur : 220; return (isFinite(d) && d >= 0) ? d : 220; }
 
   // ---- timer layer math (shared shape with the standalone timer + server) ----
   function liveTimerMs(t, now) {
@@ -264,17 +265,23 @@
       var idx = (l.index == null ? -1 : l.index);
       if (String(idx) === el.getAttribute('data-idx')) return;
       var txt = (idx >= 0 && l.slides && l.slides[idx] != null) ? l.slides[idx] : '';
-      var html = slideHtml(txt), tr = l.trans || 'fade';
+      var html = slideHtml(txt), tr = l.trans || 'fade', dur = transDurOf(l);
+      if (tr === 'none' || dur === 0) {   // hard cut, on purpose
+        text.innerHTML = html; text.style.display = html ? 'flex' : 'none';
+        text.style.transition = 'none'; text.style.opacity = '1'; text.style.transform = 'none';
+        el.setAttribute('data-idx', String(idx)); return;
+      }
+      var out = Math.round(dur * 0.45), inn = Math.max(dur - out, 40);
       // Animate the TEXT out (background panel stays put), swap, animate the new text in.
-      text.style.transition = 'transform .2s ease, opacity .2s ease';
+      text.style.transition = 'transform ' + out + 'ms ease, opacity ' + out + 'ms ease';
       text.style.opacity = '0'; text.style.transform = transOut(tr);
       setTimeout(function () {
         text.innerHTML = html; text.style.display = html ? 'flex' : 'none';   // keep the flex layout so text stays centered (was '' which reverted to block = jumped to top)
         text.style.transition = 'none'; text.style.opacity = '0'; text.style.transform = transIn(tr); void text.offsetWidth;
-        text.style.transition = 'transform .24s ease, opacity .24s ease';
+        text.style.transition = 'transform ' + inn + 'ms ease, opacity ' + inn + 'ms ease';
         text.style.opacity = '1'; text.style.transform = 'none';
         el.setAttribute('data-idx', String(idx));
-      }, 200);
+      }, out);
     });
   }
   function render(lt) {

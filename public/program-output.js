@@ -86,7 +86,7 @@
         var sidx = (l.index == null ? -1 : l.index);
         var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
         var bg = (l.bgOpacity > 0 && l.bg) ? '<div style="position:absolute;inset:0;background:' + rgba(l.bg, l.bgOpacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>' : '';
-        inner = '<div class="li" style="position:relative;overflow:visible;width:100%;height:100%">' + bg + '<div class="ly-slide-text" style="' + (stxt ? '' : 'display:none;') + slideTextStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
+        inner = '<div class="li ly-slide" data-idx="' + sidx + '" style="position:relative;overflow:visible;width:100%;height:100%">' + bg + '<div class="ly-slide-text" style="' + (stxt ? '' : 'display:none;') + slideTextStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
       }
       html += '<div class="ly" data-id="' + l.id + '" style="' + box + '">' + inner + '</div>';
     });
@@ -200,6 +200,41 @@
     });
   }
 
+  // ---- between-slide transitions (same three offsets as the builder and lowerthird output) ----
+  function transOut(tr) { return tr === 'slide-up' ? 'translateY(-26px)' : tr === 'slide-down' ? 'translateY(26px)' : tr === 'slide-left' ? 'translateX(-44px)' : tr === 'slide-right' ? 'translateX(44px)' : tr === 'zoom' ? 'scale(1.12)' : 'none'; }
+  function transIn(tr) { return tr === 'slide-up' ? 'translateY(26px)' : tr === 'slide-down' ? 'translateY(-26px)' : tr === 'slide-left' ? 'translateX(44px)' : tr === 'slide-right' ? 'translateX(-44px)' : tr === 'zoom' ? 'scale(.88)' : 'none'; }
+  function transDurOf(l) { var d = (l && l.transDur != null) ? +l.transDur : 220; return (isFinite(d) && d >= 0) ? d : 220; }
+
+  // Advancing a slide only changes its index — animate the text in place so the panel
+  // behind it stays put and any tickers in the same preset keep scrolling.
+  function refreshSlides(container, layers) {
+    if (!container) return;
+    (layers || []).forEach(function (l) {
+      if (l.type !== 'slides') return;
+      var el = container.querySelector('.ly[data-id="' + l.id + '"] .ly-slide'); if (!el) return;
+      var text = el.querySelector('.ly-slide-text'); if (!text) return;
+      var idx = (l.index == null ? -1 : l.index);
+      if (String(idx) === el.getAttribute('data-idx')) return;
+      var txt = (idx >= 0 && l.slides && l.slides[idx] != null) ? l.slides[idx] : '';
+      var html = slideHtml(txt), tr = l.trans || 'fade', dur = transDurOf(l);
+      if (tr === 'none' || dur === 0) {
+        text.innerHTML = html; text.style.display = html ? 'flex' : 'none';
+        text.style.transition = 'none'; text.style.opacity = '1'; text.style.transform = 'none';
+        el.setAttribute('data-idx', String(idx)); return;
+      }
+      var out = Math.round(dur * 0.45), inn = Math.max(dur - out, 40);
+      text.style.transition = 'transform ' + out + 'ms ease, opacity ' + out + 'ms ease';
+      text.style.opacity = '0'; text.style.transform = transOut(tr);
+      setTimeout(function () {
+        text.innerHTML = html; text.style.display = html ? 'flex' : 'none';   // keep flex so the text stays vertically centred
+        text.style.transition = 'none'; text.style.opacity = '0'; text.style.transform = transIn(tr); void text.offsetWidth;
+        text.style.transition = 'transform ' + inn + 'ms ease, opacity ' + inn + 'ms ease';
+        text.style.opacity = '1'; text.style.transform = 'none';
+        el.setAttribute('data-idx', String(idx));
+      }, out);
+    });
+  }
+
   var active = {};   // id -> { el, sig }
   function applyChroma(c) {
     var col = urlChroma || (c ? (CMAP[c] || c) : '');
@@ -217,7 +252,10 @@
       onIds[it.id] = true;
       var row = (it.rows && it.rows.length) ? it.rows[Math.max(0, Math.min(it.rows.length - 1, it.rowIndex || 0))] : null;
       var layers = fillLayers(it.payload.layers, row);
-      var sig = JSON.stringify(layers), rowSig = it.rowIndex || 0;
+      // Slide `index` is neutralised in the signature: advancing a slide must NOT rebuild the
+      // whole preset (that hard-cut the text and restarted any tickers) — refreshSlides animates it.
+      var sig = JSON.stringify(layers, function (k, v) { return k === 'index' ? 0 : v; });
+      var rowSig = it.rowIndex || 0;
       var a = active[it.id];
       if (!a) {
         var el = document.createElement('div'); el.className = 'preset in'; el.setAttribute('data-id', it.id);
@@ -236,6 +274,7 @@
           buildInto(a.el, layers); tagTimers(a.el, layers);   // hard cut (default) or a live edit
         }
       }
+      refreshSlides(active[it.id] && active[it.id].el, layers);
     });
     // Turn OFF: play each layer's Animate-OFF, then remove after the longest exit finishes.
     Object.keys(active).forEach(function (id) {

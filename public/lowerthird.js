@@ -4,10 +4,23 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var SCALE = 0.375;                 // canvas is 1920x1080 shown at 720x405
+  var SCALE = 0.375;                 // 1920x1080 stage shown inside a fluid 16:9 canvas — recomputed by fitStage()
   var layers = [], selId = null, selIds = [], loaded = false, seq = 0, editing = false;
   var showsMeta = [], editingShowId = '', templates = [];   // Show-Library metadata, editing link, Templates list
   var cstage = $('cstage');
+
+  // The canvas resizes with the window (so the side panel never gets pushed off the edge).
+  // Every mouse<->stage conversion reads SCALE at call time, so re-scaling here is enough.
+  function fitStage() {
+    var c = $('canvas'); if (!c) return;
+    var w = c.clientWidth; if (!w) return;
+    SCALE = w / 1920;
+    cstage.style.transform = 'scale(' + SCALE + ')';
+    if (typeof renderHandles === 'function' && loaded) renderHandles();
+  }
+  if (window.ResizeObserver) { try { new ResizeObserver(fitStage).observe($('canvas')); } catch (e) {} }
+  window.addEventListener('resize', fitStage);
+  fitStage();
 
   function uid() { return 'L' + Date.now().toString(36) + (seq++); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
@@ -85,8 +98,68 @@
     else if (cmd === 'first') { i = cnt ? 0 : -1; }
     else if (cmd === 'blank') { i = -1; }
     else if (cmd === 'goto') { i = Math.max(-1, Math.min(cnt - 1, n)); }
-    l.index = i; renderCanvas(); updateSlideIdxLabel();
+    var prev = l.index; l.index = i;
+    // Animate the swap in place. A full renderCanvas() would rebuild the DOM and hard-cut,
+    // which is why the "Between slides" setting never appeared to do anything in the builder.
+    if (!animateSlideTo(l, prev)) renderCanvas();
+    updateSlideIdxLabel();
     fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_slides', id: selId, cmd: cmd, n: n }) }).catch(function () {});
+  }
+
+  // ---- between-slide transition, shown live in the builder preview ----
+  // Kept in step with the same three offsets used by lowerthird-output.js / program-output.js.
+  function transOut(tr) {
+    return tr === 'slide-up' ? 'translateY(-26px)' : tr === 'slide-down' ? 'translateY(26px)'
+      : tr === 'slide-left' ? 'translateX(-44px)' : tr === 'slide-right' ? 'translateX(44px)'
+      : tr === 'zoom' ? 'scale(1.12)' : 'none';
+  }
+  function transIn(tr) {
+    return tr === 'slide-up' ? 'translateY(26px)' : tr === 'slide-down' ? 'translateY(-26px)'
+      : tr === 'slide-left' ? 'translateX(44px)' : tr === 'slide-right' ? 'translateX(-44px)'
+      : tr === 'zoom' ? 'scale(.88)' : 'none';
+  }
+  function transDurOf(l) { var d = (l && l.transDur != null) ? +l.transDur : 220; return (isFinite(d) && d >= 0) ? d : 220; }
+
+  // Cross-fades the .slide-text of a slides layer to its current index.
+  // Returns false when it can't (no element yet) so the caller can fall back to a full render.
+  function animateSlideTo(l, prevIdx) {
+    var el = cstage.querySelector('.ly[data-id="' + l.id + '"] .slide-text');
+    var wrap = cstage.querySelector('.ly[data-id="' + l.id + '"] .li');
+    if (!el || !wrap) return false;
+    var idx = (l.index == null ? -1 : l.index);
+    if (idx === prevIdx) return true;
+    var txt = (idx >= 0 && l.slides && l.slides[idx] != null) ? l.slides[idx] : '';
+    var html = txt ? slideHtml(txt) : '';
+    var tr = l.trans || 'fade', dur = transDurOf(l);
+    // Going to/from a blank index changes the placeholder too — cheapest to just rebuild.
+    if (idx < 0 || prevIdx < 0 || prevIdx == null) { renderCanvas(); return true; }
+    if (tr === 'none' || dur === 0) { el.innerHTML = html; return true; }
+    var out = Math.round(dur * 0.45), inn = Math.max(dur - out, 40);
+    el.style.transition = 'transform ' + out + 'ms ease, opacity ' + out + 'ms ease';
+    el.style.opacity = '0'; el.style.transform = transOut(tr);
+    setTimeout(function () {
+      el.innerHTML = html;
+      el.style.transition = 'none'; el.style.opacity = '0'; el.style.transform = transIn(tr); void el.offsetWidth;
+      el.style.transition = 'transform ' + inn + 'ms ease, opacity ' + inn + 'ms ease';
+      el.style.opacity = '1'; el.style.transform = 'none';
+    }, out);
+    return true;
+  }
+
+  // Replays the current slide's transition on the spot, so tweaking style/speed is visible.
+  function previewSlideTrans() {
+    var l = selected(); if (!l || l.type !== 'slides') return;
+    var el = cstage.querySelector('.ly[data-id="' + l.id + '"] .slide-text'); if (!el) return;
+    var tr = l.trans || 'fade', dur = transDurOf(l);
+    if (tr === 'none' || dur === 0) return;
+    var out = Math.round(dur * 0.45), inn = Math.max(dur - out, 40);
+    el.style.transition = 'transform ' + out + 'ms ease, opacity ' + out + 'ms ease';
+    el.style.opacity = '0'; el.style.transform = transOut(tr);
+    setTimeout(function () {
+      el.style.transition = 'none'; el.style.opacity = '0'; el.style.transform = transIn(tr); void el.offsetWidth;
+      el.style.transition = 'transform ' + inn + 'ms ease, opacity ' + inn + 'ms ease';
+      el.style.opacity = '1'; el.style.transform = 'none';
+    }, out);
   }
   function updateSlideIdxLabel() { var l = selected(); if (!l || l.type !== 'slides') return; var n = (l.slides || []).length, i = (l.index == null ? -1 : l.index); if ($('pSlIdx')) $('pSlIdx').textContent = (i < 0 ? 'blank' : (i + 1)) + ' / ' + n; }
 
@@ -327,7 +400,7 @@
       $('pSlText').value = (l.slides || []).join('\n\n');
       $('pSlColor').value = l.color || '#ffffff'; $('pSlSize').value = l.size || 54; $('pSlBold').checked = l.bold !== false; $('pSlAlign').value = l.align || 'center'; $('pSlFont').value = l.font || "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
       $('pSlBg').value = l.bg || '#0b1f3a'; $('pSlBgA').value = l.bgOpacity == null ? 0 : l.bgOpacity; $('pSlPad').value = l.pad == null ? 28 : l.pad; $('pSlRadius').value = l.radius || 0;
-      $('pSlTrans').value = l.trans || 'fade';
+      $('pSlTrans').value = l.trans || 'fade'; $('pSlTransDur').value = transDurOf(l);
       updateSlideIdxLabel();
     }
     $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h;
@@ -429,7 +502,11 @@
   $('pSlBgA').oninput = function () { mutate(function (l) { l.bgOpacity = +$('pSlBgA').value; }); };
   $('pSlPad').oninput = function () { mutate(function (l) { l.pad = +$('pSlPad').value; }); };
   $('pSlRadius').oninput = function () { mutate(function (l) { l.radius = +$('pSlRadius').value; }); };
-  $('pSlTrans').onchange = function () { mutate(function (l) { l.trans = $('pSlTrans').value; }); };
+  // Changing the style or the speed plays it back straight away, so the setting is visibly doing something.
+  $('pSlTrans').onchange = function () { mutate(function (l) { l.trans = $('pSlTrans').value; }); previewSlideTrans(); };
+  $('pSlTransDur').oninput = function () { mutate(function (l) { l.transDur = Math.max(0, Math.min(3000, +$('pSlTransDur').value || 0)); }); };
+  $('pSlTransDur').onchange = function () { previewSlideTrans(); };
+  $('pSlTransTest').onclick = function () { previewSlideTrans(); };
   ['pX', 'pY', 'pW', 'pH'].forEach(function (id) { $(id).oninput = function () { mutate(function (l) { l[id.slice(1).toLowerCase()] = Math.round(+$(id).value); }); }; });
   $('pInAnim').onchange = function () { mutateSel(function (l) { l.inAnim = $('pInAnim').value; }); };
   $('pInDelay').oninput = function () { mutateSel(function (l) { l.inDelay = +$('pInDelay').value; }); };
