@@ -39,6 +39,11 @@ if [ -n "$BAD_FILES" ] || [ -n "$BAD_TEXT" ]; then
   echo "!! ABORT: sensitive item in stage:"; [ -n "$BAD_FILES" ] && echo "$BAD_FILES"; [ -n "$BAD_TEXT" ] && echo "$BAD_TEXT"; exit 1
 fi
 
+echo ">> compiling the .exe launcher (so the app can be pinned to the taskbar)"
+APPVER="$(node -e 'process.stdout.write(require("'"$ROOT"'/package.json").version)' 2>/dev/null || echo 1.0.0)"
+makensis -DAPPVER="$APPVER" "$HERE/launcher.nsi"
+cp "$HERE/build/StreamGraphics Pro.exe" "$STAGE/"
+
 echo ">> compiling installer with makensis"
 makensis "$HERE/installer.nsi"
 

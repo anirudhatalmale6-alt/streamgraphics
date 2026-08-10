@@ -5,8 +5,18 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--txt);font:15px/1.4 'Segoe UI','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased}
-.top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:#0a0e14;position:sticky;top:0;z-index:5}
+/* The header has to wrap. Parked in a narrow window beside OBS it used to run off the right
+   edge and put a sideways scrollbar on the whole page, which took the connection light with it. */
+.top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:#0a0e14;position:sticky;top:0;z-index:5;flex-wrap:wrap;gap:8px 14px}
+.top > div{min-width:0;flex-wrap:wrap}
 .topnav{display:flex;gap:8px;margin-left:18px;flex-wrap:wrap}
+@media(max-width:700px){
+  /* reclaim the row for the controls themselves */
+  .brand small{display:none}
+  .topnav{margin-left:0}
+  .top{padding:10px 12px}
+  main{padding:12px}
+}
 .topnav a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border:1px solid var(--line);border-radius:7px;white-space:nowrap}
 .topnav a:hover{color:var(--txt);border-color:var(--accent)}
 .brand{font-weight:800;letter-spacing:.02em;display:flex;align-items:center;gap:10px}

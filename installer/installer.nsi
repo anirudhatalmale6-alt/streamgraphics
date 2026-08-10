@@ -60,11 +60,13 @@ Section "Install"
   File /r "${STAGE}\*.*"
 
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
-  CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"                  "$INSTDIR\StreamGraphics Pro.vbs"                 "" "$INSTDIR\assets\streamgraphics.ico" 0
+  ; Point at the compiled launcher, not the .vbs — Windows refuses to pin a script shortcut
+  ; to the taskbar, and shows wscript's icon rather than ours when it runs one.
+  CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"                  "$INSTDIR\StreamGraphics Pro.exe"                 "" "$INSTDIR\assets\streamgraphics.ico" 0
   CreateShortcut "$SMPROGRAMS\${APPNAME}\Troubleshoot (show console).lnk" "$INSTDIR\StreamGraphics Pro (troubleshoot).bat" "" "$INSTDIR\assets\streamgraphics.ico" 0
   CreateShortcut "$SMPROGRAMS\${APPNAME}\Getting Started.lnk"             "$INSTDIR\README.txt"
   CreateShortcut "$SMPROGRAMS\${APPNAME}\Uninstall ${APPNAME}.lnk"        "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\StreamGraphics Pro.vbs" "" "$INSTDIR\assets\streamgraphics.ico" 0
+  CreateShortcut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\StreamGraphics Pro.exe" "" "$INSTDIR\assets\streamgraphics.ico" 0
 
   WriteRegStr HKCU "Software\${APPDIRNAME}" "InstallDir" "$INSTDIR"
 

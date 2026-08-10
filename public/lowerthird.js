@@ -587,7 +587,13 @@
   $('pBuMarker').onchange = function () { mutate(function (l) { l.marker = $('pBuMarker').value; }); };
   $('pBuMarkerColor').oninput = function () { mutate(function (l) { l.markerColor = $('pBuMarkerColor').value; }); };
   $('pBuReveal').onchange = function () { mutate(function (l) { l.reveal = $('pBuReveal').value; }); previewBulletBuild(); };
-  $('pBuRevealDur').oninput = function () { mutate(function (l) { l.revealDur = Math.max(0, Math.min(3000, +$('pBuRevealDur').value || 0)); }); };
+  // Clearing the box used to leave the layer at 0ms, which silently turned the reveal into a hard
+  // cut with the style dropdown still saying "Slide up". If you want a cut there's an option for it.
+  $('pBuRevealDur').oninput = function () {
+    var v = parseInt($('pBuRevealDur').value, 10);
+    if (!isFinite(v)) v = 380;
+    mutate(function (l) { l.revealDur = Math.max(0, Math.min(3000, v)); });
+  };
   $('pBuRevealDur').onchange = function () { previewBulletBuild(); };
   $('pBuRevealTest').onclick = function () { previewBulletBuild(); };
   $('pBuColor').oninput = function () { mutate(function (l) { l.color = $('pBuColor').value; }); };

@@ -8,6 +8,9 @@ together, so reach out with questions, thoughts, comments and ideas.
 
 To start: use the Start Menu or Desktop shortcut 'StreamGraphics Pro'.
 
+Want it on the taskbar? Right-click the Start Menu entry (or the desktop icon)
+and choose 'Pin to taskbar'. One click to start the app from then on.
+
 Your browser opens automatically at http://localhost:4000 - that's your control panel.
 (If it doesn't open on its own, just type that address into any browser.)
 
