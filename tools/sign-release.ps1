@@ -58,6 +58,25 @@ $json = @'
 '@
 [System.IO.File]::WriteAllText($conf, $json, (New-Object System.Text.UTF8Encoding($false)))
 
+# --- Azure CLI ---------------------------------------------------------------
+# A computer you've never signed from won't have this, and without the check the
+# script died on a raw "'az' is not recognized" error instead of just fixing it.
+Step "Checking the Azure CLI"
+if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+    Write-Host "   Not on this computer yet - installing it (one-time, a minute or two)..."
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Fail "The Azure CLI isn't installed and winget isn't available to install it.`nInstall it by hand from https://aka.ms/installazurecliwindows then run this again."
+    }
+    winget install -e --id Microsoft.AzureCLI --accept-package-agreements --accept-source-agreements
+    # winget doesn't touch the PATH of the window it was run from — pick it up ourselves.
+    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+                [Environment]::GetEnvironmentVariable('Path', 'User')
+    if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+        Fail "Azure CLI is installed, but this window still can't see it.`nClose PowerShell, open a new one, and run this script again — that's all it needs."
+    }
+}
+Write-Host "   Azure CLI present."
+
 # --- Azure sign-in -----------------------------------------------------------
 Step "Checking Azure sign-in"
 $acct = (az account show 2>$null | Out-String)
