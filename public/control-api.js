@@ -75,6 +75,18 @@
         pr.push({ el: row('Next row', b + '/api/preset/next?name=' + e) });
         pr.push({ el: row('Previous row', b + '/api/preset/prev?name=' + e) });
       }
+      // Bullet / slide reveal. Only shown for graphics that actually have something to step,
+      // and the layer name is only added to the URL when the graphic holds more than one list.
+      (p.reveals || []).forEach(function (r, i) {
+        var multi = (p.reveals.length > 1);
+        var suffix = multi ? '&layer=' + enc(r.name) : '';
+        var what = (r.type === 'slides' ? 'slide' : 'bullet');
+        var tag = multi ? (' — ' + r.name) : '';
+        pr.push({ el: row('Next ' + what + tag + '   (' + r.at + '/' + r.of + ')', b + '/api/bullets/next?preset=' + e + suffix) });
+        pr.push({ el: row('Previous ' + what + tag, b + '/api/bullets/prev?preset=' + e + suffix) });
+        pr.push({ el: row('Reveal all' + tag, b + '/api/bullets/all?preset=' + e + suffix) });
+        pr.push({ el: row('Back to blank' + tag, b + '/api/bullets/blank?preset=' + e + suffix) });
+      });
     });
     var pel = $('presets'); pel.innerHTML = '';
     if (!pr.length) pel.innerHTML = '<div class="empty">No saved presets yet. Save graphics in the Show Library, then Refresh.</div>';

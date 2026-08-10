@@ -146,6 +146,7 @@
             <button class="btn" id="addTicker">＋ Ticker</button>
             <button class="btn" id="addTimer" title="live clock / countdown / count-up as a layer">＋ Timer</button>
             <button class="btn" id="addSlides" title="advance blocks of text next/next/next, like lyrics">＋ Slides</button>
+            <button class="btn" id="addBullets" title="reveal bullet points one at a time, like a PowerPoint build">＋ Bullets</button>
             <button class="btn" id="addBg" title="full-screen background colour">＋ BG</button>
           </div>
         </section>
@@ -316,6 +317,83 @@
               </select>
             </div>
 
+            <div class="row only-bullets" style="flex-direction:column;align-items:stretch;gap:4px">
+              <label style="width:100%;color:var(--muted);font-size:11px">Bullets — one per line. Blank lines are ignored.</label>
+              <textarea id="pBuText" rows="6" style="width:100%;resize:vertical;font:14px/1.4 'Segoe UI',Arial,sans-serif;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px" placeholder="First point&#10;Second point&#10;Third point"></textarea>
+            </div>
+            <div class="row only-bullets">
+              <button class="btn ghost" id="pBuFirst" style="font-size:12px">⏮ First</button>
+              <button class="btn ghost" id="pBuPrev" style="font-size:12px">◀ Prev</button>
+              <span id="pBuIdx" class="mono" style="min-width:64px;text-align:center">0 / 0</span>
+              <button class="btn go" id="pBuNext" style="font-size:12px">Next ▶</button>
+              <button class="btn ghost" id="pBuAll" style="font-size:12px" title="reveal every bullet">All</button>
+              <button class="btn ghost" id="pBuBlank" style="font-size:12px" title="back to nothing revealed">Blank</button>
+            </div>
+            <div class="row only-bullets"><label>Reveal style</label>
+              <select class="inp" id="pBuMode" style="width:auto">
+                <option value="build">Build — earlier points stay</option>
+                <option value="fade">Fade — earlier points dim</option>
+                <option value="highlight">Highlight — all on screen, current lit</option>
+                <option value="replace">Replace — one at a time, same spot</option>
+              </select>
+            </div>
+            <div class="row only-bullets" id="pBuDimRow"><label>Dimmed at</label>
+              <input class="inp s" id="pBuDim" type="number" min="0" max="100" value="45" title="how strongly a point that isn't the current one is dimmed"> %
+              <span class="mini2" id="pBuHlWrap" style="color:var(--muted2);font-size:11px">highlight colour</span>
+              <input type="color" id="pBuHl" value="#ffd166" title="colour of the current point (Highlight mode)">
+              <input class="inp t" id="pBuHlScale" type="number" min="1" max="1.6" step="0.02" value="1" title="how much bigger the current point gets (1 = same size)">
+            </div>
+            <div class="row only-bullets"><label>Layout</label>
+              <select class="inp" id="pBuGrow" style="width:auto" title="which way the list grows as points appear">
+                <option value="down">Grow downward</option>
+                <option value="up">Grow upward</option>
+              </select>
+              <input class="inp t" id="pBuGap" type="number" min="0" max="200" value="14" title="gap between points, px">
+            </div>
+            <div class="row only-bullets"><label>Marker</label>
+              <select class="inp" id="pBuMarker" style="width:auto" title="bullet marker">
+                <option value="bullet">• Dot</option>
+                <option value="dash">– Dash</option>
+                <option value="arrow">▸ Arrow</option>
+                <option value="check">✓ Tick</option>
+                <option value="number">1. Numbers</option>
+                <option value="none">No marker</option>
+              </select>
+              <input type="color" id="pBuMarkerColor" value="#ffffff" title="marker colour">
+            </div>
+            <div class="row only-bullets"><label>Arrives</label>
+              <select class="inp" id="pBuReveal" style="width:auto"><option value="fade">Fade</option><option value="slide-up">Slide up</option><option value="slide-down">Slide down</option><option value="slide-left">Slide left</option><option value="slide-right">Slide right</option><option value="pop">Pop</option><option value="none">Cut (no animation)</option></select>
+              <input class="inp t" id="pBuRevealDur" type="number" min="0" max="3000" step="20" value="380" title="how long one point takes to arrive, in milliseconds"> <span class="mini2" style="color:var(--muted2);font-size:11px">ms</span>
+              <button class="btn ghost" id="pBuRevealTest" style="font-size:12px" title="replay the build here in the preview">▶ Test</button>
+            </div>
+            <div class="row only-bullets"><label>Look</label>
+              <input type="color" id="pBuColor" value="#ffffff">
+              <input class="inp t" id="pBuSize" type="number" min="14" max="300" value="44" title="size">
+              <label style="width:auto"><input type="checkbox" id="pBuBold"> B</label>
+              <select class="inp" id="pBuAlign" style="width:auto"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select>
+            </div>
+            <div class="row only-bullets"><label>Background</label>
+              <input type="color" id="pBuBg" value="#0b1f3a">
+              <input class="inp s" id="pBuBgA" type="number" min="0" max="100" value="0" title="opacity % — 0 = no background"> %
+              <input class="inp t" id="pBuPad" type="number" min="0" max="200" value="24" title="padding px">
+              <input class="inp t" id="pBuRadius" type="number" min="0" max="120" value="14" title="corner radius px">
+            </div>
+            <div class="row only-bullets"><label>Font</label>
+              <select class="inp" id="pBuFont" style="width:auto">
+                <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Clean</option>
+                <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
+                <option value="Georgia, 'Times New Roman', serif">Serif</option>
+                <option value="'Courier New', ui-monospace, monospace">Mono</option>
+                <option value="Impact, Haettenschweiler, sans-serif">Impact</option>
+              </select>
+            </div>
+            <div class="row only-bullets">
+              <label style="width:auto"><input type="checkbox" id="pBuReset" checked> Start from blank each time it goes on air</label>
+            </div>
+            <div class="row only-bullets" style="margin-top:-4px">
+              <label style="width:auto;color:var(--muted2);font-size:11px">Save this graphic to the Show Library and you can step the build from the Library, a Stream Deck or Companion while it's on air.</label>
+            </div>
+
             <div class="multi-only cap" style="text-align:left;color:#8ab4ff;font-size:11px;margin:4px 0">Multiple layers selected — Animate settings below apply to all of them. Use Group to link them. Tip: inside a group, set a layer's animation to "None" and it will follow the group's animation (so a background box flies in with the group instead of just popping on).</div>
             <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
             <div class="cap" style="text-align:left;color:var(--muted);font-size:11px;margin-bottom:4px">Align <span style="color:var(--muted2)">— to frame (or to selection when several are picked) · arrow keys nudge, Shift = 10px</span></div>
@@ -430,6 +508,7 @@
 
   <script src="/sg-live.js"></script>
   <script src="/sg-autoreload.js"></script>
+  <script src="/sg-bullets.js"></script>
   <script src="/lowerthird.js"></script>
   <script src="/ver.js"></script>
   <script src="/update.js"></script>

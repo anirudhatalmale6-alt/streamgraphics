@@ -136,6 +136,8 @@
         var sidx = (l.index == null ? -1 : l.index);
         var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
         inner = slideWrap(l, sidx, slideHtml(stxt));
+      } else if (l.type === 'bullets') {
+        inner = SGBullets.html(l);
       } else if (l.type === 'timer') {
         var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
           + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
@@ -290,6 +292,8 @@
     var newSig = JSON.stringify(lt.layers, function (k, v) { return k === 'index' ? 0 : v; });
     if (newSig !== sig) { sig = newSig; buildLayers(lt.layers || []); snap(visibleNow); }
     refreshSlides(lt);
+    // Same idea for a bullet build: only the newly-revealed line animates, everything else stays put.
+    (lt.layers || []).forEach(function (l) { if (l.type === 'bullets') SGBullets.refresh(stage, l); });
     if (!!lt.visible !== visibleNow) { visibleNow = !!lt.visible; requestAnimationFrame(function () { if (visibleNow) { animateOn(); playAutoVideos(); } else { animateOff(); pauseVideos(); } }); }
     applyVcmd(lt.vcmd);
   }

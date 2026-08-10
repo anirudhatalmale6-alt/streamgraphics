@@ -87,7 +87,7 @@
         var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
         var bg = (l.bgOpacity > 0 && l.bg) ? '<div style="position:absolute;inset:0;background:' + rgba(l.bg, l.bgOpacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>' : '';
         inner = '<div class="li ly-slide" data-idx="' + sidx + '" style="position:relative;overflow:visible;width:100%;height:100%">' + bg + '<div class="ly-slide-text" style="' + (stxt ? '' : 'display:none;') + slideTextStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
-      }
+      } else if (l.type === 'bullets') inner = SGBullets.html(l);
       html += '<div class="ly" data-id="' + l.id + '" style="' + box + '">' + inner + '</div>';
     });
     container.innerHTML = html;
@@ -185,6 +185,12 @@
       if (!l.field) return l;
       var v = val(l.field); if (v == null) return l;
       if (l.type === 'text') return Object.assign({}, l, { text: v });
+      // A bullets layer can take its whole list from one spreadsheet cell — split on "//" or a
+      // real line break, so a "Talking points" column drives a different build for every guest.
+      if (l.type === 'bullets') {
+        var parts = String(v).split(/\s*\/\/\s*|\r?\n/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length; });
+        return Object.assign({}, l, { items: parts });
+      }
       if (l.type === 'image') {
         var s = String(v);
         // A browser can't load a local path like C:\...\pic.jpg. Resolve by filename against the
@@ -275,6 +281,8 @@
         }
       }
       refreshSlides(active[it.id] && active[it.id].el, layers);
+      // Bullet builds step in place too — a rebuild would hard-cut every line already revealed.
+      if (active[it.id]) layers.forEach(function (l) { if (l.type === 'bullets') SGBullets.refresh(active[it.id].el, l); });
     });
     // Turn OFF: play each layer's Animate-OFF, then remove after the longest exit finishes.
     Object.keys(active).forEach(function (id) {

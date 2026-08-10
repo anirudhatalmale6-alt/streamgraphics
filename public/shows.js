@@ -5,6 +5,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var shows = [], ltLayers = [], lastSig = '';
+  var revPick = {};   // preset id -> which bullets/slides layer its transport is driving
 
   function post(action) {
     return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action) }).catch(function () {});
@@ -274,7 +275,30 @@
           + '<button class="minibtn danger" data-act="clearcsv" title="remove the CSV">Clear CSV</button>'
           + '</div>';
       }
-      return '<div class="libitem' + (it.on ? ' on' : '') + '" data-id="' + it.id + '" style="flex-direction:column;align-items:stretch">' + main + csv + '</div>';
+      // Reveal transport — bullet builds and slide decks stepped while the preset is on air.
+      // Before this the index could only be moved from inside the builder, so anything saved
+      // to the Library was frozen on whatever bullet it happened to be showing.
+      var rev = '';
+      var reveals = it.reveals || [];
+      if (reveals.length) {
+        var pick = revPick[it.id];
+        var cur = reveals.filter(function (r) { return r.id === pick; })[0] || reveals[0];
+        var picker = reveals.length > 1
+          ? '<select class="inp" data-act="revsel" style="width:auto">' + reveals.map(function (r) {
+              return '<option value="' + esc(r.id) + '"' + (r.id === cur.id ? ' selected' : '') + '>' + esc(r.name || (r.type === 'bullets' ? 'Bullets' : 'Slides')) + '</option>';
+            }).join('') + '</select>'
+          : '<span class="kind">' + esc(cur.name || (cur.type === 'bullets' ? 'bullets' : 'slides')) + '</span>';
+        rev = '<div class="revrow" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">'
+          + '<span class="kind">Reveal</span>' + picker
+          + '<button class="minibtn" data-act="revfirst" title="back to the first one">⏮</button>'
+          + '<button class="minibtn" data-act="revprev" title="step back">◀</button>'
+          + '<span class="mono" style="color:var(--muted);min-width:56px;text-align:center">' + (cur.index < 0 ? '–' : (cur.index + 1)) + ' / ' + cur.count + '</span>'
+          + '<button class="minibtn" data-act="revnext" title="reveal the next one" style="border-color:#2f7d5a;color:#7ee2b0">Next ▶</button>'
+          + '<button class="minibtn" data-act="revall" title="reveal everything at once">All</button>'
+          + '<button class="minibtn" data-act="revblank" title="back to nothing revealed">Blank</button>'
+          + '</div>';
+      }
+      return '<div class="libitem' + (it.on ? ' on' : '') + '" data-id="' + it.id + '" style="flex-direction:column;align-items:stretch">' + main + csv + rev + '</div>';
     }).join('');
     box.querySelectorAll('.libitem').forEach(function (row) {
       var id = row.dataset.id, it = shows.filter(function (x) { return x.id === id; })[0];
@@ -290,6 +314,14 @@
       var an = row.querySelector('[data-act="anim"]'); if (an) an.onchange = function () { post({ type: 'show_rowmode', id: id, mode: an.checked ? 'reanimate' : 'cut' }); };
       var dl = row.querySelector('[data-act="delay"]'); if (dl) dl.onchange = function () { post({ type: 'show_rowdelay', id: id, ms: +dl.value }); };
       var er = row.querySelector('[data-act="editrows"]'); if (er) er.onclick = function () { openRows(id); };
+      var rvSel = row.querySelector('[data-act="revsel"]'); if (rvSel) rvSel.onchange = function () { revPick[id] = rvSel.value; render(); };
+      ['first', 'prev', 'next', 'all', 'blank'].forEach(function (cmd) {
+        var b = row.querySelector('[data-act="rev' + cmd + '"]'); if (!b) return;
+        b.onclick = function () {
+          var picked = revPick[id] || ((it.reveals || [])[0] || {}).id;
+          post({ type: 'show_layercmd', id: id, layerId: picked, cmd: cmd });
+        };
+      });
       var cc = row.querySelector('[data-act="clearcsv"]'); if (cc) cc.onclick = function () { if (confirm('Remove the CSV from "' + it.name + '"?')) post({ type: 'show_clear_csv', id: id }); };
       row.querySelector('[data-act="load"]').onclick = function () {
         var b = row.querySelector('[data-act="load"]'); b.textContent = '…';
@@ -416,7 +448,12 @@
         }
 
         // Only rebuild the list when the library actually changed (not on every unrelated update).
-        var sig = shows.map(function (x) { return x.id + '|' + x.name + '|' + (x.on ? 1 : 0) + '|' + (x.rowCount != null ? x.rowCount : (x.rows ? x.rows.length : 0)) + '|' + (x.rowIndex || 0) + '|' + (x.rowKey || '') + '|' + (x.rowTransition || 'cut'); }).join(',');
+        var sig = shows.map(function (x) {
+          // Reveal position is in the signature so the transport's "3 / 6" keeps up with whoever
+          // pressed Next — this page, another operator's browser, or a Companion button.
+          var rv = (x.reveals || []).map(function (r) { return r.id + ':' + r.index + '/' + r.count + ':' + (r.name || ''); }).join('~');
+          return x.id + '|' + x.name + '|' + (x.on ? 1 : 0) + '|' + (x.rowCount != null ? x.rowCount : (x.rows ? x.rows.length : 0)) + '|' + (x.rowIndex || 0) + '|' + (x.rowKey || '') + '|' + (x.rowTransition || 'cut') + '|' + rv;
+        }).join(',');
         if (sig !== lastSig) { lastSig = sig; render(); }
       } catch (x) {}
     };

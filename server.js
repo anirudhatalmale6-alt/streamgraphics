@@ -451,9 +451,16 @@ function hasFeature(f) { return isLicensed() && (state.license.features || []).i
 // needs names + on/off. Full payloads are fetched on demand (GET /show-payload?id=).
 function wireState() {
   const shows = (state.shows || []).map(function (it) {
-    if (it.on) return it; // ON presets travel in full (payload + rows) for the Program output
+    // Reveal transport travels for every preset, on air or not, so the Show Library can offer
+    // Next/Previous without pulling the whole payload down for presets that are off.
+    const reveals = stepLayers(it).map(function (l) {
+      return { id: l.id, name: l.name || '', type: l.type, index: (l.index == null ? -1 : l.index),
+               count: (l.type === 'bullets' ? (l.items || []) : (l.slides || [])).length };
+    });
+    if (it.on) return Object.assign({}, it, { reveals: reveals }); // ON: in full (payload + rows) for the Program output
     // OFF: metadata only + light row info (labels for the picker), but not the heavy payload/rows.
     return {
+      reveals: reveals,
       id: it.id, name: it.name, kind: it.kind, on: it.on,
       columns: it.columns || [], rowKey: it.rowKey || '', rowIndex: it.rowIndex || 0, rowTransition: it.rowTransition || 'cut', rowDelay: it.rowDelay == null ? 1000 : it.rowDelay,
       rowCount: it.rows ? it.rows.length : 0,
@@ -495,6 +502,38 @@ function liveValueMs(t, now) {
   // countdown — in overtime mode it may go negative (past zero into overtime)
   const rem = t.baseMs - (t.running ? now - t.anchorServer : 0);
   return t.overtime ? rem : Math.max(0, rem);
+}
+
+/* ---- reveal transport, shared by slides and bullets ----
+ * Mirrors public/sg-bullets.js step() so the server and every browser land on the same index.
+ * slidesStyle: slides stop at the first slide when you step back; bullets step back to blank,
+ * because "undo that last bullet" is a thing an operator does and un-showing slide 1 isn't. */
+function stepIndex(cmd, index, n, gotoN, slidesStyle) {
+  let i = (index == null ? -1 : index);
+  if (cmd === 'next') { i = (i < 0 ? 0 : i + 1); i = n ? Math.min(i, n - 1) : -1; }
+  else if (cmd === 'prev') { if (i > 0) i = i - 1; else if (i === 0 && !slidesStyle) i = -1; }
+  else if (cmd === 'first') { i = n ? 0 : -1; }
+  else if (cmd === 'last' || cmd === 'all') { i = n ? n - 1 : -1; }
+  else if (cmd === 'blank' || cmd === 'reset') { i = -1; }
+  else if (cmd === 'goto') { i = parseInt(gotoN, 10); if (isNaN(i)) i = -1; }
+  return Math.max(-1, Math.min(n - 1, i));
+}
+// Every layer in a preset that can be stepped, in z order — what the transport UI and API drive.
+function stepLayers(it) {
+  if (!it || !it.payload || !Array.isArray(it.payload.layers)) return [];
+  return it.payload.layers
+    .filter(l => (l.type === 'bullets' && (l.items || []).length) || (l.type === 'slides' && (l.slides || []).length))
+    .sort((a, b) => (a.z || 0) - (b.z || 0));
+}
+// Address a steppable layer by its id, or by the name shown in the Layers list, or take the first.
+function findStepLayer(it, key) {
+  const list = stepLayers(it);
+  if (!list.length) return null;
+  const k = String(key == null ? '' : key).trim();
+  if (!k) return list[0];
+  return list.find(l => l.id === k)
+      || list.find(l => String(l.name || '').trim().toLowerCase() === k.toLowerCase())
+      || null;
 }
 
 function applyAction(action) {
@@ -738,17 +777,29 @@ function applyAction(action) {
     case 'lt_slides': { // advance a SLIDES layer (next/prev/first/last/blank/goto) — index synced to every machine
       const L = (state.lowerthird.layers || []).find(x => x.id === action.id && x.type === 'slides');
       if (L) {
-        const n = (L.slides || []).length, cmd = String(action.cmd || '');
-        let i = (L.index == null ? -1 : L.index);
-        if (cmd === 'next') { i = (i < 0 ? 0 : i + 1); i = n ? Math.min(i, n - 1) : -1; }
-        else if (cmd === 'prev') { if (i > 0) i = i - 1; }
-        else if (cmd === 'first') { i = n ? 0 : -1; }
-        else if (cmd === 'last') { i = n ? n - 1 : -1; }
-        else if (cmd === 'blank') { i = -1; }
-        else if (cmd === 'goto') { i = parseInt(action.n, 10); if (isNaN(i)) i = -1; i = Math.max(-1, Math.min(n - 1, i)); }
-        L.index = i;
+        L.index = stepIndex(String(action.cmd || ''), L.index, (L.slides || []).length, action.n, true);
         saveLowerThird();
       }
+      break;
+    }
+    case 'lt_bullets': { // advance a BULLETS layer on the builder canvas
+      const L = (state.lowerthird.layers || []).find(x => x.id === action.id && x.type === 'bullets');
+      if (L) {
+        L.index = stepIndex(String(action.cmd || ''), L.index, (L.items || []).length, action.n, false);
+        saveLowerThird();
+      }
+      break;
+    }
+    case 'show_layercmd': {
+      // Advance a bullets/slides layer INSIDE a saved preset. Until this existed a reveal could
+      // only be driven from the builder, so anything in the Show Library was frozen on air.
+      const it = state.shows.find(x => x.id === action.id);
+      if (!it || !it.payload || !Array.isArray(it.payload.layers)) break;
+      const L = findStepLayer(it, action.layerId);
+      if (!L) break;
+      const n = (L.type === 'bullets' ? (L.items || []) : (L.slides || [])).length;
+      L.index = stepIndex(String(action.cmd || ''), L.index, n, action.n, L.type === 'slides');
+      saveShows();
       break;
     }
     case 'lt_timer': { // transport for a TIMER layer — time is stamped on the SERVER so every machine agrees
@@ -797,7 +848,21 @@ function applyAction(action) {
     }
     case 'show_delete': state.shows = state.shows.filter(x => x.id !== action.id); saveShows(); break;
     case 'show_rename': { const it = state.shows.find(x => x.id === action.id); if (it) { it.name = String(action.name || it.name).slice(0, 120); saveShows(); } break; }
-    case 'show_toggle': { const it = state.shows.find(x => x.id === action.id); if (it) { it.on = (action.on == null ? !it.on : !!action.on); saveShows(); } break; }
+    case 'show_toggle': {
+      const it = state.shows.find(x => x.id === action.id);
+      if (it) {
+        const wasOn = !!it.on;
+        it.on = (action.on == null ? !it.on : !!action.on);
+        // Taking a build to air starts it from the top. Otherwise a graphic saved with every
+        // bullet showing comes back on air fully revealed and the operator has to blank it first,
+        // every single show. Switch it off per layer if you want a static list.
+        if (it.on && !wasOn && it.payload && Array.isArray(it.payload.layers)) {
+          it.payload.layers.forEach(l => { if (l.type === 'bullets' && l.resetOnAir !== false) l.index = -1; });
+        }
+        saveShows();
+      }
+      break;
+    }
     case 'show_alloff': state.shows.forEach(x => { x.on = false; }); saveShows(); break;
     case 'show_reorder': {   // move a preset up (dir -1) or down (dir +1) in the Library list
       const i = state.shows.findIndex(x => x.id === action.id);
@@ -1065,7 +1130,8 @@ const server = http.createServer((req, res) => {
     // Discovery — lists the names you can drive (powers the Control API help page + lets Companion see names)
     if (group === 'list') {
       return okJson({ ok: true,
-        presets: state.shows.map(s => ({ name: s.name, on: !!s.on, csv: !!(s.rows && s.rows.length), rows: (s.rows || []).length, row: (s.rows && s.rows.length) ? (s.rowIndex || 0) + 1 : 0 })),
+        presets: state.shows.map(s => ({ name: s.name, on: !!s.on, csv: !!(s.rows && s.rows.length), rows: (s.rows || []).length, row: (s.rows && s.rows.length) ? (s.rowIndex || 0) + 1 : 0,
+          reveals: stepLayers(s).map(l => ({ name: l.name || l.type, type: l.type, at: (l.index == null ? -1 : l.index) + 1, of: (l.type === 'bullets' ? (l.items || []) : (l.slides || [])).length })) })),
         scoreboards: (state.scoreboards || []).map(b => ({ name: b.name, visible: !!b.visible })),
         timer: { visible: !!state.timer.visible, mode: state.timer.mode },
         baseball: { visible: !!state.baseball.visible } });
@@ -1083,6 +1149,29 @@ const server = http.createServer((req, res) => {
       if (cmd === 'prev')   { applyAction({ type: 'show_rowselect', id: it.id, cmd: 'prev' }); return did({ name: it.name, row: (it.rowIndex || 0) + 1 }); }
       if (cmd === 'row')    { applyAction({ type: 'show_rowselect', id: it.id, cmd: 'goto', n: (parseInt(q.get('n'), 10) || 1) - 1 }); return did({ name: it.name, row: (it.rowIndex || 0) + 1 }); }
       return fail('unknown preset command: "' + cmd + '" (use on/off/toggle/next/prev/row)');
+    }
+
+    // Bullet / slide reveal inside a preset — the "next bullet" button on a Stream Deck.
+    // ?preset=NAME [&layer=NAME]  — layer is optional; without it the first steppable layer wins.
+    if (group === 'bullets' || group === 'reveal') {
+      const it = findShow(q.get('preset') || q.get('name'));
+      if (!it) return fail('preset not found: "' + (q.get('preset') || q.get('name') || '') + '"', 404);
+      const L = findStepLayer(it, q.get('layer'));
+      if (!L) return fail('preset "' + it.name + '" has no bullets or slides layer to step', 404);
+      const total = (L.type === 'bullets' ? (L.items || []) : (L.slides || [])).length;
+      const at = () => ({ preset: it.name, layer: L.name || L.type, type: L.type, at: (L.index == null ? -1 : L.index) + 1, of: total });
+      if (cmd === 'status') return okJson(Object.assign({ ok: true }, at()));
+      if (['next', 'prev', 'first', 'last', 'all', 'blank', 'reset'].indexOf(cmd) >= 0) {
+        applyAction({ type: 'show_layercmd', id: it.id, layerId: L.id, cmd });
+        return did(at());
+      }
+      if (cmd === 'goto') {
+        const n = parseInt(q.get('n'), 10);
+        if (isNaN(n)) return fail('provide ?n=N (1 = first bullet, 0 = blank)');
+        applyAction({ type: 'show_layercmd', id: it.id, layerId: L.id, cmd: 'goto', n: n - 1 });
+        return did(at());
+      }
+      return fail('unknown bullets command: "' + cmd + '" (use next/prev/first/last/all/blank/goto/status)');
     }
 
     // Presenter timer

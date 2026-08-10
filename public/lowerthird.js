@@ -163,6 +163,37 @@
   }
   function updateSlideIdxLabel() { var l = selected(); if (!l || l.type !== 'slides') return; var n = (l.slides || []).length, i = (l.index == null ? -1 : l.index); if ($('pSlIdx')) $('pSlIdx').textContent = (i < 0 ? 'blank' : (i + 1)) + ' / ' + n; }
 
+  /* ---- bullets layer: one line per point, stepped like slides but with four looks ---- */
+  function parseBullets(v) { return String(v || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length; }); }
+  function updateBulletIdxLabel() {
+    var l = selected(); if (!l || l.type !== 'bullets') return;
+    var n = (l.items || []).length, i = (l.index == null ? -1 : l.index);
+    if ($('pBuIdx')) $('pBuIdx').textContent = (i < 0 ? 'blank' : (i + 1)) + ' / ' + n;
+  }
+  function bulletsCmd(cmd, n) {
+    if (!selId) return; var l = byId(selId); if (!l || l.type !== 'bullets') return;
+    // Move locally first so the canvas reacts on the click, then tell the server (which is what
+    // every other machine, and the output, is actually watching).
+    l.index = SGBullets.step(cmd, l.index, (l.items || []).length, n);
+    if (!SGBullets.refresh(cstage, l)) renderCanvas();
+    updateBulletIdxLabel();
+    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_bullets', id: selId, cmd: cmd, n: n }) }).catch(function () {});
+  }
+  // Replays the whole build in the preview so the arrival style and speed are visibly doing something.
+  function previewBulletBuild() {
+    var l = selected(); if (!l || l.type !== 'bullets') return;
+    var n = (l.items || []).length; if (!n) return;
+    var was = (l.index == null ? -1 : l.index);
+    var step = Math.max(120, Math.min(600, (l.revealDur == null ? 380 : +l.revealDur) + 90));
+    l.index = -1; if (!SGBullets.refresh(cstage, l)) renderCanvas();
+    var i = 0;
+    (function go() {
+      if (i >= n) { l.index = was; SGBullets.refresh(cstage, l); updateBulletIdxLabel(); return; }
+      l.index = i++; SGBullets.refresh(cstage, l); updateBulletIdxLabel();
+      setTimeout(go, step);
+    })();
+  }
+
   // ---- animation preview in the builder (mirrors the output's animateOn/Off) ----
   var A_BOUNCE = 'cubic-bezier(.34,1.62,.5,1)', A_EASE = 'cubic-bezier(.16,1,.3,1)';
   function animHidden(type) {
@@ -246,6 +277,7 @@
       if (!stxt) return '<div class="li" style="' + swrap + '">' + slideBgHtml(l) + '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#6b7a90;font-size:26px">(blank — Next to show a slide)</div></div>';
       return '<div class="li ly-slide" style="' + swrap + '">' + slideBgHtml(l) + '<div class="slide-text" style="' + slideTextStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
     }
+    if (l.type === 'bullets') return SGBullets.html(l);
     if (l.type === 'timer') {
       var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
         + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
@@ -276,6 +308,7 @@
     if (l.type === 'text' || l.type === 'ticker') return l.text || (l.type === 'ticker' ? 'Ticker' : 'Text');
     if (l.type === 'timer') return l.mode === 'clock' ? 'Clock' : (l.mode === 'up' ? 'Count-up' : l.mode === 'tod' ? 'Countdown to' : 'Countdown');
     if (l.type === 'slides') return (l.slides && l.slides.length) ? ('Slides (' + l.slides.length + ')') : 'Slides';
+    if (l.type === 'bullets') return (l.items && l.items.length) ? ('Bullets (' + l.items.length + ')') : 'Bullets';
     return l.type === 'box' ? 'Box' : l.type === 'video' ? 'Video' : 'Image';
   }
   function renderList() {
@@ -364,17 +397,18 @@
     if (multi) {
       var grouped = selIds.every(function (id) { var m = byId(id); return m && m.group && m.group === l.group; });
       $('propTitle').textContent = selIds.length + ' layers selected' + (grouped ? ' (grouped)' : '');
-      show('.only-text', false); show('.only-box', false); show('.only-image', false); show('.only-video', false); show('.only-ticker', false); show('.only-timer', false); show('.only-slides', false); show('.fieldrow', false);
+      show('.only-text', false); show('.only-box', false); show('.only-image', false); show('.only-video', false); show('.only-ticker', false); show('.only-timer', false); show('.only-slides', false); show('.only-bullets', false); show('.fieldrow', false);
     } else {
       $('propTitle').textContent = l.type.charAt(0).toUpperCase() + l.type.slice(1) + ' layer' + (l.group ? ' (grouped)' : '');
       show('.only-text', l.type === 'text'); show('.only-box', l.type === 'box'); show('.only-image', l.type === 'image');
       show('.only-video', l.type === 'video'); show('.only-ticker', l.type === 'ticker'); show('.only-timer', l.type === 'timer'); show('.only-slides', l.type === 'slides');
-      show('.fieldrow', l.type === 'text' || l.type === 'image');   // CSV field only for text/image
+      show('.only-bullets', l.type === 'bullets');
+      show('.fieldrow', l.type === 'text' || l.type === 'image' || l.type === 'bullets');   // CSV field: text, image, or a whole bullet list from one cell
     }
     if (l.type === 'text') { $('pText').value = l.text || ''; $('pFont').value = l.font || "'Segoe UI', Arial, sans-serif"; $('pSize').value = l.size || 34; $('pBold').checked = !!l.bold; $('pItalic').checked = !!l.italic; $('pShadow').checked = (l.shadow !== false); $('pColor').value = l.color || '#ffffff'; $('pAlign').value = l.align || 'left'; }
     if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
     if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; $('pImgShadow').checked = !!l.shadow; }
-    if (l.type === 'text' || l.type === 'image') { $('pField').value = l.field || ''; }
+    if (l.type === 'text' || l.type === 'image' || l.type === 'bullets') { $('pField').value = l.field || ''; }
     if (l.type === 'video') { $('pVSrc').value = l.src || ''; $('pAutoplay').checked = l.autoplay !== false; $('pLoop').checked = !!l.loop; $('pMuted').checked = l.muted !== false; $('pVFit').value = l.fit || 'contain'; $('pWhenDone').value = l.whenDone || 'hold'; }
     if (l.type === 'ticker') { $('pTkText').value = l.text || ''; $('pTkSpeed').value = l.speed == null ? 120 : l.speed; $('pTkSpeedV').textContent = l.speed == null ? 120 : l.speed; $('pTkDir').value = l.dir || 'left'; $('pTkColor').value = l.color || '#ffffff'; $('pTkSize').value = l.size || 28; $('pTkBold').checked = !!l.bold; $('pTkFill').value = l.fill || '#0b1f3a'; $('pTkOpacity').value = l.opacity == null ? 90 : l.opacity; $('pTkRadius').value = l.radius || 0; }
     if (l.type === 'timer') {
@@ -402,6 +436,27 @@
       $('pSlBg').value = l.bg || '#0b1f3a'; $('pSlBgA').value = l.bgOpacity == null ? 0 : l.bgOpacity; $('pSlPad').value = l.pad == null ? 28 : l.pad; $('pSlRadius').value = l.radius || 0;
       $('pSlTrans').value = l.trans || 'fade'; $('pSlTransDur').value = transDurOf(l);
       updateSlideIdxLabel();
+    }
+    if (l.type === 'bullets') {
+      $('pBuText').value = (l.items || []).join('\n');
+      $('pBuMode').value = l.mode || 'build';
+      $('pBuDim').value = l.dimOpacity == null ? 45 : l.dimOpacity;
+      $('pBuHl').value = l.hlColor || '#ffd166'; $('pBuHlScale').value = l.hlScale == null ? 1 : l.hlScale;
+      $('pBuGrow').value = l.grow || 'down'; $('pBuGap').value = l.gap == null ? 14 : l.gap;
+      $('pBuMarker').value = l.marker || 'bullet'; $('pBuMarkerColor').value = l.markerColor || l.color || '#ffffff';
+      $('pBuReveal').value = l.reveal || 'fade'; $('pBuRevealDur').value = l.revealDur == null ? 380 : l.revealDur;
+      $('pBuColor').value = l.color || '#ffffff'; $('pBuSize').value = l.size || 44;
+      $('pBuBold').checked = l.bold !== false; $('pBuAlign').value = l.align || 'left';
+      $('pBuFont').value = l.font || "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+      $('pBuBg').value = l.bg || '#0b1f3a'; $('pBuBgA').value = l.bgOpacity == null ? 0 : l.bgOpacity;
+      $('pBuPad').value = l.pad == null ? 24 : l.pad; $('pBuRadius').value = l.radius || 0;
+      $('pBuReset').checked = (l.resetOnAir !== false);
+      // Dimming and the highlight colour only mean something in the modes that use them.
+      var md = l.mode || 'build';
+      $('pBuDimRow').style.display = (md === 'fade' || md === 'highlight') ? '' : 'none';
+      var hl = (md === 'highlight');
+      $('pBuHl').style.display = hl ? '' : 'none'; $('pBuHlScale').style.display = hl ? '' : 'none'; $('pBuHlWrap').style.display = hl ? '' : 'none';
+      updateBulletIdxLabel();
     }
     $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h;
     $('pInAnim').value = l.inAnim || 'fade'; $('pInDelay').value = l.inDelay || 0; $('pInDur').value = l.inDur == null ? 500 : l.inDur;
@@ -507,6 +562,42 @@
   $('pSlTransDur').oninput = function () { mutate(function (l) { l.transDur = Math.max(0, Math.min(3000, +$('pSlTransDur').value || 0)); }); };
   $('pSlTransDur').onchange = function () { previewSlideTrans(); };
   $('pSlTransTest').onclick = function () { previewSlideTrans(); };
+  /* ---- bullets layer: content + transport + the four reveal styles ---- */
+  $('pBuText').oninput = function () {
+    mutate(function (l) {
+      l.items = parseBullets($('pBuText').value);
+      if (l.index != null && l.index > l.items.length - 1) l.index = l.items.length - 1;
+    });
+    updateBulletIdxLabel();
+  };
+  $('pBuFirst').onclick = function () { bulletsCmd('first'); };
+  $('pBuPrev').onclick = function () { bulletsCmd('prev'); };
+  $('pBuNext').onclick = function () { bulletsCmd('next'); };
+  $('pBuAll').onclick = function () { bulletsCmd('all'); };
+  $('pBuBlank').onclick = function () { bulletsCmd('blank'); };
+  // Changing the mode re-renders rather than refreshes: which lines are on screen changes wholesale.
+  $('pBuMode').onchange = function () { mutate(function (l) { l.mode = $('pBuMode').value; }); syncProps(); };
+  $('pBuDim').oninput = function () { mutate(function (l) { l.dimOpacity = Math.max(0, Math.min(100, +$('pBuDim').value || 0)); }); };
+  $('pBuHl').oninput = function () { mutate(function (l) { l.hlColor = $('pBuHl').value; }); };
+  $('pBuHlScale').oninput = function () { mutate(function (l) { l.hlScale = Math.max(1, Math.min(1.6, +$('pBuHlScale').value || 1)); }); };
+  $('pBuGrow').onchange = function () { mutate(function (l) { l.grow = $('pBuGrow').value; }); };
+  $('pBuGap').oninput = function () { mutate(function (l) { l.gap = Math.max(0, +$('pBuGap').value || 0); }); };
+  $('pBuMarker').onchange = function () { mutate(function (l) { l.marker = $('pBuMarker').value; }); };
+  $('pBuMarkerColor').oninput = function () { mutate(function (l) { l.markerColor = $('pBuMarkerColor').value; }); };
+  $('pBuReveal').onchange = function () { mutate(function (l) { l.reveal = $('pBuReveal').value; }); previewBulletBuild(); };
+  $('pBuRevealDur').oninput = function () { mutate(function (l) { l.revealDur = Math.max(0, Math.min(3000, +$('pBuRevealDur').value || 0)); }); };
+  $('pBuRevealDur').onchange = function () { previewBulletBuild(); };
+  $('pBuRevealTest').onclick = function () { previewBulletBuild(); };
+  $('pBuColor').oninput = function () { mutate(function (l) { l.color = $('pBuColor').value; }); };
+  $('pBuSize').oninput = function () { mutate(function (l) { l.size = +$('pBuSize').value; }); };
+  $('pBuBold').onchange = function () { mutate(function (l) { l.bold = $('pBuBold').checked; }); };
+  $('pBuAlign').onchange = function () { mutate(function (l) { l.align = $('pBuAlign').value; }); };
+  $('pBuFont').onchange = function () { mutate(function (l) { l.font = $('pBuFont').value; }); };
+  $('pBuBg').oninput = function () { mutate(function (l) { l.bg = $('pBuBg').value; }); };
+  $('pBuBgA').oninput = function () { mutate(function (l) { l.bgOpacity = +$('pBuBgA').value; }); };
+  $('pBuPad').oninput = function () { mutate(function (l) { l.pad = +$('pBuPad').value; }); };
+  $('pBuRadius').oninput = function () { mutate(function (l) { l.radius = +$('pBuRadius').value; }); };
+  $('pBuReset').onchange = function () { mutate(function (l) { l.resetOnAir = $('pBuReset').checked; }); };
   ['pX', 'pY', 'pW', 'pH'].forEach(function (id) { $(id).oninput = function () { mutate(function (l) { l[id.slice(1).toLowerCase()] = Math.round(+$(id).value); }); }; });
   $('pInAnim').onchange = function () { mutateSel(function (l) { l.inAnim = $('pInAnim').value; }); };
   $('pInDelay').oninput = function () { mutateSel(function (l) { l.inDelay = +$('pInDelay').value; }); };
@@ -799,6 +890,7 @@
   $('addVideo').onclick = function () { add(merge({ type: 'video', x: 660, y: 340, w: 600, h: 338, src: '', autoplay: true, loop: false, muted: true, fit: 'contain', shape: 'none' }, A('fade'))); };
   $('addTicker').onclick = function () { add(merge({ type: 'ticker', x: 0, y: 1000, w: 1920, h: 60, text: 'BREAKING: your scrolling headline goes here', speed: 120, dir: 'left', font: 'Arial, Helvetica, sans-serif', size: 30, bold: true, color: '#ffffff', fill: '#0b1f3a', opacity: 92, radius: 0 }, A('slide-up'))); };
   $('addTimer').onclick = function () { add(merge({ type: 'timer', x: 710, y: 440, w: 500, h: 160, mode: 'down', durationMs: 300000, baseMs: 300000, running: false, anchorServer: 0, targetEpoch: 0, showHours: false, overtime: false, use24h: false, warnMs: 10000, warnColor: '#ff3b30', flash: true, font: "'Segoe UI', Arial, sans-serif", size: 110, bold: true, italic: false, color: '#ffffff', align: 'center' }, A('fade'))); };
+  $('addBullets').onclick = function () { add(merge({ type: 'bullets', x: 200, y: 260, w: 1100, h: 560, items: ['Opening point of the segment', 'The thing everyone came to hear', 'What it means for next season', 'Where to find the full story'], index: -1, mode: 'build', grow: 'down', gap: 18, marker: 'bullet', markerGap: 18, reveal: 'slide-up', revealDur: 380, dimOpacity: 45, hlColor: '#ffd166', hlScale: 1, font: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif", size: 44, bold: true, italic: false, color: '#ffffff', align: 'left', bg: '#0b1f3a', bgOpacity: 0, pad: 24, radius: 14 }, A('fade'))); };
   $('addSlides').onclick = function () { add(merge({ type: 'slides', x: 360, y: 300, w: 1200, h: 480, slides: ['Amazing grace, how sweet the sound', 'That saved a wretch like me', 'I once was lost, but now am found'], index: 0, font: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif", size: 64, bold: true, italic: false, color: '#ffffff', align: 'center', bg: '#0b1f3a', bgOpacity: 0, pad: 28, radius: 14, trans: 'fade' }, A('fade'))); };
   // full-screen background colour box (goes to the very back)
   $('addBg').onclick = function () {
