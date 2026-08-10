@@ -49,7 +49,10 @@
   #btnOffAir.standby{background:#eab308;border-color:#eab308;color:#111;box-shadow:0 0 0 2px rgba(234,179,8,.35)}
   @media(min-width:881px){.stagewrap{position:sticky;top:14px;align-self:start}}
   /* Nothing on this page may push the document wider than the window. */
-  html,body{overflow-x:hidden}
+  /* clip, NOT hidden. overflow-x:hidden makes html/body a scroll container, which silently
+     stops the sticky preview above from sticking — clip guards against sideways overflow
+     without creating one. (The real overflow fix is the minmax(0,1fr) grid track.) */
+  html,body{overflow-x:clip}
   @media(min-width:1240px){main{max-width:1240px}}   /* roomier preview on a big monitor */
 </style>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f97316'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='34' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3EGX%3C/text%3E%3C/svg%3E">

@@ -174,8 +174,39 @@
           }
         ]
       },
-      "on": false,
-      "rowIndex": 0
+      "on": true,
+      "rowIndex": 1,
+      "columns": [
+        "Name",
+        "Title"
+      ],
+      "rows": [
+        {
+          "Name": "Alexa Romero",
+          "Title": "Outside Hitter"
+        },
+        {
+          "Name": "Jordan W-C",
+          "Title": "Defensive Specialist / Captain"
+        },
+        {
+          "Name": "Mia Chen",
+          "Title": "Setter"
+        },
+        {
+          "Name": "Sofia Delgado",
+          "Title": "Libero"
+        },
+        {
+          "Name": "Priya Nair",
+          "Title": "Middle Blocker"
+        },
+        {
+          "Name": "Tess Okonkwo",
+          "Title": "Opposite"
+        }
+      ],
+      "rowKey": "Name"
     },
     {
       "id": "Smsj9mzex2",
