@@ -7,7 +7,17 @@ Unicode true
 
 !define APPNAME     "StreamGraphics Pro"
 !define COMPANY     "Manhattan Beach Studios LLC"
-!define VERSION     "1.0.4"
+; VERSION and VERPE come from build.sh, which reads the real version out of package.json and
+; passes them in with -D. They used to be hardcoded here and nobody remembered to bump them, so
+; every installer from 1.0.4 onwards claimed to be 1.0.4 in its Properties - which makes two
+; downloads in the same folder impossible to tell apart. The fallback below only applies when
+; makensis is run by hand.
+!ifndef VERSION
+  !define VERSION   "0.0.0"
+!endif
+!ifndef VERPE
+  !define VERPE     "0.0.0.0"
+!endif
 !define APPDIRNAME  "StreamGraphics Pro"
 !define STAGE       "build\app"          ; staging dir created by build.sh (relative to this script)
 
@@ -19,7 +29,7 @@ RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "${APPNAME} ${VERSION} - ${COMPANY}"
 
-VIProductVersion "1.0.4.0"
+VIProductVersion "${VERPE}"
 VIAddVersionKey "ProductName" "${APPNAME}"
 VIAddVersionKey "CompanyName" "${COMPANY}"
 VIAddVersionKey "FileDescription" "${APPNAME} Setup"

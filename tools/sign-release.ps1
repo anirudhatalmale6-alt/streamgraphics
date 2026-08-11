@@ -1,12 +1,12 @@
 ﻿# StreamGraphics Pro - sign a release with Azure Artifact Signing.
 #
-#   .\sign-release.ps1                      signs Downloads\StreamGraphicsProSetup.exe
+#   .\sign-release.ps1                      signs the NEWEST installer in your Downloads folder
 #   .\sign-release.ps1 -File C:\path\to.exe signs a specific file
 #
 # One command per release. Everything else (tool paths, config file, Azure sign-in)
 # is worked out or repaired automatically each run.
 
-param([string]$File = "$HOME\Downloads\StreamGraphicsProSetup.exe")
+param([string]$File)
 
 $ErrorActionPreference = 'Stop'
 $tools = "$HOME\sgpro-tools"
@@ -14,8 +14,41 @@ $conf  = "$HOME\sgpro-signing.json"
 
 function Fail($m) { Write-Host ""; Write-Host "STOPPED: $m" -ForegroundColor Red; exit 1 }
 function Step($m) { Write-Host ""; Write-Host "-> $m" -ForegroundColor Cyan }
+function Warn($m) { Write-Host "   $m" -ForegroundColor Yellow }
 
-if (-not (Test-Path $File)) { Fail "Can't find the file to sign:`n  $File`nDownload the installer first, or pass -File with the full path." }
+# --- which file -------------------------------------------------------------
+# Downloading the installer twice does NOT overwrite it: Windows keeps the first one and saves
+# the new one as "StreamGraphicsProSetup (1).exe". A fixed default path therefore signs the OLD
+# download while the new one sits there untouched - you get a cheerful "signed and verified" and
+# an unsigned installer. So take the NEWEST matching file, and say out loud which one it is.
+Step "Finding the installer"
+if (-not $File) {
+    $dl = Join-Path $HOME 'Downloads'
+    $cands = @(Get-ChildItem $dl -Filter 'StreamGraphicsProSetup*.exe' -File -ErrorAction SilentlyContinue |
+               Sort-Object LastWriteTime -Descending)
+    if ($cands.Count -eq 0) {
+        Fail "No StreamGraphicsProSetup*.exe in $dl`nDownload the installer first, or pass -File with the full path."
+    }
+    $File = $cands[0].FullName
+    if ($cands.Count -gt 1) {
+        Warn "$($cands.Count) installers in Downloads - using the newest. The others are older downloads:"
+        $cands | Select-Object -Skip 1 | ForEach-Object {
+            Write-Host ("     {0}   {1}" -f $_.LastWriteTime.ToString('yyyy-MM-dd HH:mm'), $_.Name)
+        }
+    }
+}
+if (-not (Test-Path $File)) { Fail "Can't find the file to sign:`n  $File" }
+
+$item = Get-Item $File
+$ver  = $item.VersionInfo.ProductVersion
+Write-Host ("   {0}" -f $item.FullName)
+Write-Host ("   version {0}   {1:N0} bytes   downloaded {2}" -f `
+            $(if ($ver) { $ver } else { 'unknown' }), $item.Length,
+            $item.LastWriteTime.ToString('yyyy-MM-dd HH:mm'))
+
+# Already signed? Worth knowing before rather than after - it usually means the wrong file.
+$existing = (Get-AuthenticodeSignature $File).Status
+if ($existing -eq 'Valid') { Warn "Heads up: this file is ALREADY signed. Signing it again is harmless." }
 
 # --- the two tools -----------------------------------------------------------
 Step "Locating signing tools"
@@ -99,8 +132,20 @@ Step "Verifying the signature"
 & $st.FullName verify /pa /v $File
 if ($LASTEXITCODE -ne 0) { Fail "Signed, but verification failed - don't upload this one." }
 
+# Prove it on the finished file, using Windows' own check rather than signtool's - this is the
+# same answer Explorer's Properties tab and SmartScreen will give.
+$sig = Get-AuthenticodeSignature $File
+if ($sig.Status -ne 'Valid') { Fail "Signed, but Windows still reports '$($sig.Status)' - do not upload this one." }
+
 Write-Host ""
 Write-Host "DONE - signed and verified." -ForegroundColor Green
-Write-Host "Upload this file to public_html/download on the website:" -ForegroundColor Green
-Write-Host "  $File"
+Write-Host ("  signer   {0}" -f $sig.SignerCertificate.Subject)
+Write-Host ("  version  {0}" -f $(if ($ver) { $ver } else { 'unknown' }))
+Write-Host ("  sha256   {0}" -f (Get-FileHash $File -Algorithm SHA256).Hash.ToLower())
+Write-Host ""
+Write-Host "UPLOAD EXACTLY THIS FILE to public_html/download on the website:" -ForegroundColor Green
+Write-Host "  $File" -ForegroundColor Green
+Write-Host ""
+Write-Host "If Downloads has several StreamGraphicsProSetup files, that path above is the signed"
+Write-Host "one - the others are older and unsigned. Check the name matches before you upload."
 Write-Host ""

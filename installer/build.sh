@@ -56,7 +56,13 @@ else
 fi
 
 echo ">> compiling installer with makensis"
-makensis "$HERE/installer.nsi"
+# Feed the REAL version in from package.json. It used to be hardcoded in installer.nsi and was
+# never bumped, so every installer since 1.0.4 reported "1.0.4" in its Properties - which makes
+# two downloads sitting in the same folder impossible to tell apart, exactly when you most need
+# to know which one you just signed.
+VER="$(node -p "require('$ROOT/package.json').version")"
+echo "   version $VER"
+makensis "-DVERSION=$VER" "-DVERPE=$VER.0" "$HERE/installer.nsi"
 
 echo ">> DONE: $HERE/build/StreamGraphicsProSetup.exe"
 ls -la "$HERE/build/StreamGraphicsProSetup.exe"
