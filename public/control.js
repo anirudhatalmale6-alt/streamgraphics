@@ -40,7 +40,9 @@
       color: $('stColor').value,
       accent: $('stAccent').value,
       bg: bgHex(),
-      size: +$('stSize').value,
+      // Read the typed box, not the slider — the slider tops out at 760 and would
+      // silently throw away a bigger number the moment you typed one.
+      size: (function () { var v = parseInt($('stSizeV').value, 10); return isFinite(v) ? Math.max(24, Math.min(1000, v)) : +$('stSize').value; })(),
       font: $('stFont').value,
       animation: $('stAnim').value
     }});
@@ -86,7 +88,16 @@
   ['stColor','stAccent','stBg','stBgA','stFont','stAnim'].forEach(function (id) {
     $(id).oninput = pushStyle;
   });
-  $('stSize').oninput = function () { $('stSizeV').textContent = $('stSize').value; pushStyle(); };
+  // Slider for a quick look, number box for an exact value. A presenter countdown on a
+  // full-screen slide wants 500px+, which no sensible slider range covers on its own.
+  $('stSize').oninput = function () { $('stSizeV').value = $('stSize').value; pushStyle(); };
+  $('stSizeV').oninput = function () {
+    var v = parseInt($('stSizeV').value, 10);
+    if (!isFinite(v)) return;                       // mid-typing, leave it alone
+    v = Math.max(24, Math.min(1000, v));
+    $('stSize').value = Math.min(760, v);           // the slider just tracks it as far as it goes
+    pushStyle();
+  };
   document.querySelectorAll('#posGrid button').forEach(function (b) {
     b.onclick = function () {
       document.querySelectorAll('#posGrid button').forEach(function (x) { x.classList.remove('on'); });
@@ -97,7 +108,7 @@
 
   /* ---- reflect server state into the UI ---- */
   var editingLook = false; // avoid clobbering a control the user is dragging
-  ['stColor','stAccent','stBg','stBgA','stSize','stFont','stAnim'].forEach(function (id) {
+  ['stColor','stAccent','stBg','stBgA','stSize','stSizeV','stFont','stAnim'].forEach(function (id) {
     $(id).addEventListener('focus', function () { editingLook = true; });
     $(id).addEventListener('blur', function () { editingLook = false; });
     $(id).addEventListener('change', function () { editingLook = false; });
@@ -125,7 +136,7 @@
         $('stBg').value = s.bg.slice(0, 7);
         $('stBgA').value = Math.round(parseInt(s.bg.slice(7), 16) / 255 * 100);
       }
-      if (s.size) { $('stSize').value = s.size; $('stSizeV').textContent = s.size; }
+      if (s.size) { $('stSize').value = Math.min(760, s.size); $('stSizeV').value = s.size; }
       if (s.font) $('stFont').value = s.font;
       if (s.animation) $('stAnim').value = s.animation;
       if (s.position) document.querySelectorAll('#posGrid button').forEach(function (b) {
