@@ -82,6 +82,16 @@ select.inp{min-width:180px}
 .posgrid button:hover{border-color:var(--muted2)}
 .posgrid button.on{background:var(--accent);border-color:var(--accent)}
 
+/* Fine position nudge - same 3x3 footprint as the position grid above it, so the two read as
+   one control: pick the corner, then walk it off that corner a few pixels at a time. */
+.nudgepad{display:grid;grid-template-columns:repeat(3,26px);grid-gap:5px}
+.nudgepad button{width:26px;height:20px;border:1px solid var(--line);background:var(--panel2);
+  color:var(--txt);border-radius:5px;cursor:pointer;font-size:10px;line-height:1;padding:0}
+.nudgepad button:hover{border-color:var(--muted2)}
+.nudgepad button:active{background:var(--accent);border-color:var(--accent);color:#fff}
+.nudgepad button[data-nreset]{font-weight:800;color:var(--muted2)}
+.row .hint{color:var(--muted2);font-size:12px}
+
 .foot{max-width:1000px;margin:0 auto;padding:14px 20px 30px;color:var(--muted);font-size:13px}
 .foot code{background:#0a0e14;border:1px solid var(--line);padding:3px 8px;border-radius:6px;color:#cfe0f5}
 .foot .hint{color:var(--muted2)}

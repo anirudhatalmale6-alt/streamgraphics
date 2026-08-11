@@ -7,6 +7,14 @@
   var card = $('blCard'), bug = $('bug'), lineEl = $('line');
   var POSITIONS = ['top-left','top-center','top-right','mid-left','mid-center','mid-right','bottom-left','bottom-center','bottom-right'];
 
+  // A position nudge, in stage pixels, forced to a safe number. Capped to match the server so
+  // the board cannot be pushed so far off-stage that it looks lost.
+  function nudge(v) {
+    var n = Math.round(Number(v));
+    if (!isFinite(n)) return 0;
+    return n < -600 ? -600 : (n > 600 ? 600 : n);
+  }
+
   var visibleNow = false, hideTimer = null;
   // preview mode (used by the control panel's iframe) always shows the board, even off air
   var FORCE = new URLSearchParams(location.search).get('preview') === '1';
@@ -42,6 +50,9 @@
     card.className = 'bb ' + pos + (visibleNow ? '' : ' is-out') + (card.classList.contains('is-hidden') ? ' is-hidden' : '');
     card.setAttribute('data-anim', ['slide-up', 'fade', 'scale'].indexOf(st.animation) >= 0 ? st.animation : 'slide-up');
     card.style.setProperty('--accent', st.accent || '#f4a63c');
+    // Fine position nudge - set every render, including back to 0, so clearing it moves home.
+    card.style.setProperty('--nx', nudge(st.offsetX) + 'px');
+    card.style.setProperty('--ny', nudge(st.offsetY) + 'px');
     applyChroma(st.chroma);
 
     var away = bb.teams[0], home = bb.teams[1];

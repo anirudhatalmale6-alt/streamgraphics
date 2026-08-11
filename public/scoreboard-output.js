@@ -9,6 +9,15 @@
   var rowsEl = $('rows'), backdrop = $('backdrop');
   var POSITIONS = ['top-left','top-center','top-right','mid-left','mid-center','mid-right','bottom-left','bottom-center','bottom-right'];
 
+
+  // A position nudge, in stage pixels, forced to a safe number. Capped to match the server so
+  // the board cannot be pushed so far off-stage that it looks lost.
+  function nudge(v) {
+    var n = Math.round(Number(v));
+    if (!isFinite(n)) return 0;
+    return n < -600 ? -600 : (n > 600 ? 600 : n);
+  }
+
   var visibleNow = false, hideTimer = null;
   var prevScores = {};   // "team-game" -> last value, to detect changes for the flash
 
@@ -136,6 +145,11 @@
         POSITIONS.forEach(function (p) { card.classList.remove('pos-' + p); });
         card.classList.add('pos-' + sb.style.position);
       }
+      // Fine position nudge. Set every render, including back to 0, so clearing it moves the
+      // board home again. Re-checked here as well as on the server: this value is written into
+      // a stylesheet, and a saved file from an older build could hold anything.
+      card.style.setProperty('--nx', nudge(sb.style.offsetX) + 'px');
+      card.style.setProperty('--ny', nudge(sb.style.offsetY) + 'px');
       if (sb.style.animation) card.setAttribute('data-anim', sb.style.animation);
       applyChroma(sb.style.chroma);
     }

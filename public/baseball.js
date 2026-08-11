@@ -23,6 +23,28 @@
   /* ---- game setup ---- */
   $('innings').onchange = function () { send({ type: 'bl_innings', n: +this.value }); };
   $('stPos').onchange   = function () { send({ type: 'bl_style', style: { position: this.value } }); };
+
+  /* ---- fine position nudge ----
+   * Walks the board off whichever of the 9 anchors is selected. Steps apply to the last value
+   * the SERVER sent back rather than to a local counter, so two panels on the same board stay
+   * in step. See scoreboard.js - same control, same reasoning. */
+  var NUDGE_MAX = 600, curStyle = {};
+  function showNudge(x, y) { $('nudgeV').textContent = x + ', ' + y; }
+  document.querySelectorAll('#nudgePad button').forEach(function (b) {
+    b.onclick = function (e) {
+      var x, y;
+      if (b.dataset.nreset) { x = 0; y = 0; }
+      else {
+        var step = e.shiftKey ? 25 : 5;
+        x = (Math.round(Number(curStyle.offsetX)) || 0) + (+b.dataset.nx) * step;
+        y = (Math.round(Number(curStyle.offsetY)) || 0) + (+b.dataset.ny) * step;
+        x = Math.max(-NUDGE_MAX, Math.min(NUDGE_MAX, x));
+        y = Math.max(-NUDGE_MAX, Math.min(NUDGE_MAX, y));
+      }
+      showNudge(x, y);
+      send({ type: 'bl_style', style: { offsetX: x, offsetY: y } });
+    };
+  });
   $('stAnim').onchange  = function () { send({ type: 'bl_style', style: { animation: this.value } }); };
   $('stAccent').oninput = function () { send({ type: 'bl_style', style: { accent: this.value } }); };
   $('chromaSel').onchange = function () { send({ type: 'bl_style', style: { chroma: this.value } }); };
@@ -101,6 +123,8 @@
     $('airState').className = 'airstate' + (bb.visible ? ' live' : '');
     setVal($('innings'), String(bb.innings));
     setVal($('stPos'), st.position || 'bottom-left');
+    curStyle = st;
+    showNudge(Math.round(Number(st.offsetX)) || 0, Math.round(Number(st.offsetY)) || 0);
     setVal($('stAnim'), st.animation || 'slide-up');
     if (document.activeElement !== $('stAccent')) $('stAccent').value = st.accent || '#f4a63c';
     setVal($('chromaSel'), st.chroma || '');

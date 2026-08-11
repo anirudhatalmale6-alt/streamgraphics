@@ -186,6 +186,15 @@
             <button data-pos="bottom-left" class="on"></button><button data-pos="bottom-center"></button><button data-pos="bottom-right"></button>
           </div>
         </div>
+        <div class="row"><label>Nudge</label>
+          <div class="nudgepad" id="nudgePad">
+            <span></span><button data-nx="0" data-ny="-1" title="Up">&#9650;</button><span></span>
+            <button data-nx="-1" data-ny="0" title="Left">&#9664;</button><button data-nreset="1" title="Back to the exact corner">0</button><button data-nx="1" data-ny="0" title="Right">&#9654;</button>
+            <span></span><button data-nx="0" data-ny="1" title="Down">&#9660;</button><span></span>
+          </div>
+          <span id="nudgeV" class="mono">0, 0</span>
+        </div>
+        <div class="row"><label></label><span class="hint">5px a click &middot; hold Shift for 25 &middot; 0 puts it back</span></div>
         <div class="row"><label>Animation</label>
           <select class="inp" id="stAnim"><option value="slide-up">Slide up</option><option value="fade">Fade</option><option value="scale">Scale</option></select>
         </div>

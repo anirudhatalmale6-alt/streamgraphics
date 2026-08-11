@@ -107,6 +107,30 @@
     };
   });
 
+  /* ---- fine position nudge ----
+   * The 9 anchors are deliberately fixed, so this walks the board off whichever one is
+   * selected. Steps are applied to the last value the SERVER sent back, not to a counter kept
+   * here, so two panels open on the same board can't drift apart. Readout updates optimistically
+   * so a click feels instant; the next state push corrects it if the server clamped the value. */
+  var NUDGE_MAX = 600;
+  function nudgeNow(axis) { return Math.round(Number((sb && sb.style && sb.style[axis]) || 0)) || 0; }
+  function showNudge(x, y) { $('nudgeV').textContent = x + ', ' + y; }
+  document.querySelectorAll('#nudgePad button').forEach(function (b) {
+    b.onclick = function (e) {
+      var x, y;
+      if (b.dataset.nreset) { x = 0; y = 0; }
+      else {
+        var step = e.shiftKey ? 25 : 5;
+        x = nudgeNow('offsetX') + (+b.dataset.nx) * step;
+        y = nudgeNow('offsetY') + (+b.dataset.ny) * step;
+        x = Math.max(-NUDGE_MAX, Math.min(NUDGE_MAX, x));
+        y = Math.max(-NUDGE_MAX, Math.min(NUDGE_MAX, y));
+      }
+      showNudge(x, y);
+      send({ type: 'sb_style', style: { offsetX: x, offsetY: y } });
+    };
+  });
+
   /* ---- Browse for a local image: upload it, then use the returned URL ---- */
   function uploadFile(file, done) {
     if (file.size > 25 * 1024 * 1024) { alert('That image is ' + Math.round(file.size / 1048576) + ' MB - too large. Use one under 25 MB, or drop it in the "media" folder and reference it by URL.'); return; }
@@ -300,6 +324,7 @@
       if (s.style.position) document.querySelectorAll('#posGrid button').forEach(function (b) {
         b.classList.toggle('on', b.dataset.pos === s.style.position);
       });
+      showNudge(Math.round(Number(s.style.offsetX)) || 0, Math.round(Number(s.style.offsetY)) || 0);
     }
 
     // compact preview

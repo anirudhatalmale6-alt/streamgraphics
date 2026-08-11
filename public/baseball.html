@@ -88,6 +88,16 @@
         <select class="inp" id="stAnim" style="width:auto"><option value="slide-up">Slide up</option><option value="fade">Fade</option><option value="scale">Scale</option></select>
       </div>
       <div class="frow">
+        <label style="width:auto">Nudge</label>
+        <div class="nudgepad" id="nudgePad">
+          <span></span><button data-nx="0" data-ny="-1" title="Up">&#9650;</button><span></span>
+          <button data-nx="-1" data-ny="0" title="Left">&#9664;</button><button data-nreset="1" title="Back to the exact corner">0</button><button data-nx="1" data-ny="0" title="Right">&#9654;</button>
+          <span></span><button data-nx="0" data-ny="1" title="Down">&#9660;</button><span></span>
+        </div>
+        <span id="nudgeV" class="mono">0, 0</span>
+        <span class="mini" style="color:var(--muted)">5px a click &middot; hold Shift for 25 &middot; 0 puts it back</span>
+      </div>
+      <div class="frow">
         <label class="mini" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stLine" checked> Show line score (runs by inning + R/H/E)</label>
         <label class="mini" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stClock"> Show clock slot</label>
         <input class="inp" id="stClockText" placeholder="clock text e.g. 0:00" style="width:120px;display:none">

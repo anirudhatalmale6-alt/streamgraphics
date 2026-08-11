@@ -14,9 +14,14 @@ body.chroma { background: var(--chroma) !important; }
 .bb.is-hidden { display: none; }
 
 /* positions (match the other boards) */
-.pos-top-left{top:40px;left:40px}.pos-top-center{top:40px;left:50%;transform:translateX(-50%)}.pos-top-right{top:40px;right:40px}
-.pos-mid-left{top:50%;left:40px;transform:translateY(-50%)}.pos-mid-center{top:50%;left:50%;transform:translate(-50%,-50%)}.pos-mid-right{top:50%;right:40px;transform:translateY(-50%)}
-.pos-bottom-left{bottom:40px;left:40px}.pos-bottom-center{bottom:40px;left:50%;transform:translateX(-50%)}.pos-bottom-right{bottom:40px;right:40px}
+/* The nudge (--nx/--ny) is applied to the EDGE OFFSETS, never as a transform: the centred
+   positions already spend their transform on translate(-50%), and the show/hide animation
+   spends another one on the inner .anim. Adding a third would fight both. Signs are flipped
+   on the right/bottom anchors so a positive nudge always means right/down on screen,
+   whichever corner the board is pinned to. */
+.pos-top-left{top:calc(40px + var(--ny,0px));left:calc(40px + var(--nx,0px))}.pos-top-center{top:calc(40px + var(--ny,0px));left:calc(50% + var(--nx,0px));transform:translateX(-50%)}.pos-top-right{top:calc(40px + var(--ny,0px));right:calc(40px - var(--nx,0px))}
+.pos-mid-left{top:calc(50% + var(--ny,0px));left:calc(40px + var(--nx,0px));transform:translateY(-50%)}.pos-mid-center{top:calc(50% + var(--ny,0px));left:calc(50% + var(--nx,0px));transform:translate(-50%,-50%)}.pos-mid-right{top:calc(50% + var(--ny,0px));right:calc(40px - var(--nx,0px));transform:translateY(-50%)}
+.pos-bottom-left{bottom:calc(40px - var(--ny,0px));left:calc(40px + var(--nx,0px))}.pos-bottom-center{bottom:calc(40px - var(--ny,0px));left:calc(50% + var(--nx,0px));transform:translateX(-50%)}.pos-bottom-right{bottom:calc(40px - var(--ny,0px));right:calc(40px - var(--nx,0px))}
 
 /* ---- the bug ---- */
 .bug { display: flex; align-items: stretch; background: #12161d; border-radius: 8px; overflow: hidden;

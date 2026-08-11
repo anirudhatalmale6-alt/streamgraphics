@@ -662,7 +662,7 @@ function applyAction(action) {
       if (action.eventLogoSize != null) sb.eventLogoSize = Math.max(40, Math.min(600, parseInt(action.eventLogoSize, 10) || 150));
     } break; }
 
-    case 'sb_style': { const sb = boardOf(action.board); if (sb) Object.assign(sb.style, action.style || {}); break; }
+    case 'sb_style': { const sb = boardOf(action.board); if (sb) Object.assign(sb.style, styleIn(action.style)); break; }
 
     /* ---- board management (create / rename / delete scoreboards) ---- */
     case 'sb_board_add': { if ((state.scoreboards || []).length < 24) state.scoreboards.push(defaultScoreboard(String(action.name || ('Court ' + (state.scoreboards.length + 1))).slice(0, 60))); break; }
@@ -736,7 +736,7 @@ function applyAction(action) {
       bb.teams.forEach(function (t, idx) { t.line = new Array(n).fill(null); t.hits = 0; t.errors = 0; if (idx === 0) t.line[0] = 0; });
       break;
     }
-    case 'bl_style': { Object.assign(state.baseball.style, action.style || {}); break; }
+    case 'bl_style': { Object.assign(state.baseball.style, styleIn(action.style)); break; }
 
     /* -------- team library (mail-merge) -------- */
     case 'lib_import': { // replace the library with an imported list of teams
@@ -1029,6 +1029,22 @@ function liveTimerMs(t, now) {
 }
 
 function clampGame(g) { g = parseInt(g, 10) || 0; return g < 0 ? 0 : (g > 2 ? 2 : g); }
+
+/* Board style, cleaned on the way in.
+ * offsetX/offsetY are the position nudge. They end up in a CSS custom property on the output
+ * page, so they must be NUMBERS - a string would be pasted straight into the stylesheet.
+ * Anything unparseable becomes 0 rather than being kept, and the range is capped so a board
+ * can never be nudged so far off-stage that it looks like it vanished and can't be found. */
+const NUDGE_MAX = 600;
+function styleIn(style) {
+  const s = Object.assign({}, style || {});
+  for (const k of ['offsetX', 'offsetY']) {
+    if (!(k in s)) continue;
+    const n = Math.round(Number(s[k]));
+    s[k] = !isFinite(n) ? 0 : Math.max(-NUDGE_MAX, Math.min(NUDGE_MAX, n));
+  }
+  return s;
+}
 
 /* ------------------------------------------------------------------ *
  *  HTTP
