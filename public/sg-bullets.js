@@ -117,10 +117,16 @@
       + bgHtml(l) + '<div class="bul-list" style="' + listStyle(l) + '">' + body + '</div></div>';
   }
 
-  /* Where a line starts from when it reveals. */
-  function revealFrom(tr) {
-    return tr === 'slide-up' ? 'translateY(26px)' : tr === 'slide-down' ? 'translateY(-26px)'
-      : tr === 'slide-left' ? 'translateX(-44px)' : tr === 'slide-right' ? 'translateX(44px)'
+  /* Where a line starts from when it reveals.
+   * The travel scales with the type size. A fixed 26px was half a line at 44px text and
+   * almost nothing at 90px, so on a big build the move was too small to read as a move —
+   * it looked like the line simply cut in. */
+  function revealFrom(tr, l) {
+    var size = num(l && l.size, 44);
+    var v = Math.round(Math.max(26, Math.min(90, size * 0.66)));    // vertical travel
+    var h = Math.round(v * 1.7);                                     // horizontal reads shorter, so give it more
+    return tr === 'slide-up' ? 'translateY(' + v + 'px)' : tr === 'slide-down' ? 'translateY(-' + v + 'px)'
+      : tr === 'slide-left' ? 'translateX(-' + h + 'px)' : tr === 'slide-right' ? 'translateX(' + h + 'px)'
       : tr === 'pop' ? 'scale(.72)' : 'none';
   }
 
@@ -154,7 +160,7 @@
           if (dur && tr !== 'none') {
             bi.style.transition = 'none';
             bi.style.opacity = 0;
-            bi.style.transform = revealFrom(tr);
+            bi.style.transform = revealFrom(tr, l);
             void bi.offsetWidth;                                    // commit the start state
             bi.style.transition = 'opacity ' + dur + 'ms ease, transform ' + dur + 'ms cubic-bezier(.16,1,.3,1), color 220ms ease';
           }
