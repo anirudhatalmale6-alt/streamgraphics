@@ -1,4 +1,4 @@
-# StreamGraphics Pro - sign a release with Azure Artifact Signing.
+﻿# StreamGraphics Pro - sign a release with Azure Artifact Signing.
 #
 #   .\sign-release.ps1                      signs Downloads\StreamGraphicsProSetup.exe
 #   .\sign-release.ps1 -File C:\path\to.exe signs a specific file
@@ -68,11 +68,11 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
         Fail "The Azure CLI isn't installed and winget isn't available to install it.`nInstall it by hand from https://aka.ms/installazurecliwindows then run this again."
     }
     winget install -e --id Microsoft.AzureCLI --accept-package-agreements --accept-source-agreements
-    # winget doesn't touch the PATH of the window it was run from — pick it up ourselves.
+    # winget doesn't touch the PATH of the window it was run from - pick it up ourselves.
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
                 [Environment]::GetEnvironmentVariable('Path', 'User')
     if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-        Fail "Azure CLI is installed, but this window still can't see it.`nClose PowerShell, open a new one, and run this script again — that's all it needs."
+        Fail "Azure CLI is installed, but this window still can't see it.`nClose PowerShell, open a new one, and run this script again - that's all it needs."
     }
 }
 Write-Host "   Azure CLI present."
