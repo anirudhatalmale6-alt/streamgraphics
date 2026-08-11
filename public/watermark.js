@@ -30,12 +30,19 @@
 
   function css(el, s) { el.style.cssText = s; }
 
+  /* Deliberately light. What makes this hard to remove is WHERE it sits, not how loud it is -
+   * so the fill can be soft without weakening it. Weight 500, not bold.
+   *
+   * The thin dark outline is not decoration and must stay: the fill is white, and the
+   * scoreboard is a white card. Without the outline the mark would all but vanish exactly
+   * where it is needed most, and the free version would look unwatermarked on the one graphic
+   * people use the most. The outline is what makes it legible on white and on dark alike. */
   function markStyle(size) {
     return 'position:absolute;left:0;top:0;white-space:nowrap;'
-         + 'font:700 ' + size + 'px system-ui,Arial,sans-serif;'
-         + 'color:rgba(255,255,255,.62);'
-         + 'text-shadow:0 2px 10px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9);'
-         + 'letter-spacing:.02em;pointer-events:none;will-change:transform';
+         + 'font:500 ' + size + 'px system-ui,Arial,sans-serif;'
+         + 'color:rgba(255,255,255,.38);'
+         + 'text-shadow:0 0 1px rgba(0,0,0,.55),0 0 3px rgba(0,0,0,.40),0 2px 12px rgba(0,0,0,.35);'
+         + 'letter-spacing:.03em;pointer-events:none;will-change:transform';
   }
 
   function build() {
