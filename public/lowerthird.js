@@ -446,7 +446,8 @@
       $('pBuHl').value = l.hlColor || '#ffd166'; $('pBuHlScale').value = l.hlScale == null ? 1 : l.hlScale;
       $('pBuGrow').value = l.grow || 'down'; $('pBuGap').value = l.gap == null ? 14 : l.gap;
       $('pBuMarker').value = l.marker || 'bullet'; $('pBuMarkerColor').value = l.markerColor || l.color || '#ffffff';
-      $('pBuReveal').value = l.reveal || 'fade'; $('pBuRevealDur').value = l.revealDur == null ? 380 : l.revealDur;
+      // Show the duration that will actually play, not the stored 0 an old template may carry.
+      $('pBuReveal').value = l.reveal || 'fade'; $('pBuRevealDur').value = SGBullets.revealMs(l);
       $('pBuColor').value = l.color || '#ffffff'; $('pBuSize').value = l.size || 44;
       $('pBuBold').checked = l.bold !== false; $('pBuAlign').value = l.align || 'left';
       $('pBuFont').value = l.font || "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";

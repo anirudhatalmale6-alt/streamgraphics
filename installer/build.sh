@@ -39,10 +39,21 @@ if [ -n "$BAD_FILES" ] || [ -n "$BAD_TEXT" ]; then
   echo "!! ABORT: sensitive item in stage:"; [ -n "$BAD_FILES" ] && echo "$BAD_FILES"; [ -n "$BAD_TEXT" ] && echo "$BAD_TEXT"; exit 1
 fi
 
-echo ">> compiling the .exe launcher (so the app can be pinned to the taskbar)"
-APPVER="$(node -e 'process.stdout.write(require("'"$ROOT"'/package.json").version)' 2>/dev/null || echo 1.0.0)"
-makensis -DAPPVER="$APPVER" "$HERE/launcher.nsi"
-cp "$HERE/build/StreamGraphics Pro.exe" "$STAGE/"
+echo ">> the .exe launcher (so the app can be pinned to the taskbar)"
+# Prefer a signed copy if we have one. The launcher is the file the customer actually clicks
+# every day, so it needs a signature of its own — the installer's signature does not carry
+# over to the files it extracts. Signing it once is enough: the stub has a fixed version and
+# does not change between releases, so the same signed binary is reused every time.
+SIGNED="$HERE/launcher-signed/StreamGraphics Pro.exe"
+if [ -f "$SIGNED" ]; then
+  echo "   using the signed launcher"
+  cp "$SIGNED" "$STAGE/"
+else
+  echo "   !! no signed launcher - compiling an UNSIGNED one"
+  echo "   !! customers will get a SmartScreen warning on this file. See BUILD.md."
+  makensis "$HERE/launcher.nsi"
+  cp "$HERE/build/StreamGraphics Pro.exe" "$STAGE/"
+fi
 
 echo ">> compiling installer with makensis"
 makensis "$HERE/installer.nsi"

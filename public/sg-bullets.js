@@ -130,6 +130,20 @@
       : tr === 'pop' ? 'scale(.72)' : 'none';
   }
 
+  /* How long a reveal actually runs.
+   * A layer saved before the duration box was guarded can carry 0ms while the style dropdown
+   * still says "Slide up" — and 0ms is a hard cut with nothing on screen to explain why. An
+   * old template would keep cutting no matter how many updates you installed. So a blank or
+   * near-zero duration is treated as "never set", not as a choice: wanting no movement is
+   * what the "None" style is for, and that still cuts instantly.
+   * Shared with the builder panel so the number you're shown is the number that plays. */
+  function revealMs(l) {
+    var tr = (l && l.reveal) || 'fade';
+    var d = num(l && l.revealDur, 380);
+    if (!isFinite(d) || d < 0) d = 380;
+    return (tr !== 'none' && d < 120) ? 380 : d;
+  }
+
   /* Move an existing bullets element to the layer's current index, animating only what changed.
    * Rebuilding the DOM instead would hard-cut every line and restart anything else in the preset. */
   function refresh(root, l) {
@@ -140,7 +154,7 @@
     if (String(idx) === el.getAttribute('data-idx')) return true;
     el.setAttribute('data-idx', String(idx));
 
-    var dur = Math.max(0, num(l.revealDur, 380));
+    var dur = revealMs(l);
     var tr = l.reveal || 'fade';
     // In replace mode the two lines are on top of each other, so the old one has to fade at the
     // same rate the new one arrives — otherwise the spot goes dark in the middle of the swap.
@@ -192,5 +206,5 @@
     return Math.max(-1, Math.min(n - 1, i));
   }
 
-  window.SGBullets = { html: html, look: look, refresh: refresh, step: step, count: count, index: idxOf, items: items };
+  window.SGBullets = { html: html, look: look, refresh: refresh, step: step, count: count, index: idxOf, items: items, revealMs: revealMs };
 })();

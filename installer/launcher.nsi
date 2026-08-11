@@ -18,9 +18,14 @@ VIAddVersionKey "ProductName"     "StreamGraphics Pro"
 VIAddVersionKey "FileDescription" "StreamGraphics Pro"
 VIAddVersionKey "CompanyName"     "Manhattan Beach Studios LLC"
 VIAddVersionKey "LegalCopyright"  "Manhattan Beach Studios LLC"
-VIAddVersionKey "FileVersion"     "${APPVER}.0"
-VIAddVersionKey "ProductVersion"  "${APPVER}.0"
-VIProductVersion "${APPVER}.0"
+; Deliberately NOT the app version. This stub carries its own, and it only changes if the
+; stub itself changes — so the compiled file stays the same release after release, which
+; means it can be code-signed once and that one signed copy reused forever (see build.sh).
+; If it tracked the app version, every release would ship an unsigned .exe that Defender has
+; never seen before, on the very file the customer clicks every day.
+VIAddVersionKey "FileVersion"     "1.0.0.0"
+VIAddVersionKey "ProductVersion"  "1.0.0.0"
+VIProductVersion "1.0.0.0"
 
 Section
   ; Run from wherever the launcher itself lives, so a copied/renamed install still works.
