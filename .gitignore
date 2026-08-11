@@ -17,3 +17,7 @@ data/license.json
 installer/build/
 installer/node-*.exe
 *.exe
+# ...except the signed launcher. This one is SOURCE, not a build artifact: it is signed once
+# by hand and then reused by every build (see installer/BUILD.md). Losing it would mean going
+# back to shipping an unsigned launcher, which is what caused the antivirus trouble.
+!installer/launcher-signed/*.exe
