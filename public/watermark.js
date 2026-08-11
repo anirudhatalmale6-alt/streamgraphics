@@ -9,9 +9,10 @@
  *   1. A mark centred on EVERY graphic on screen. To crop this one away you have to crop the
  *      lower third or the scoreboard away with it, which defeats the point of running the app.
  *      Covering it with a box in OBS means covering your own graphic.
- *   2. A mark in the middle of frame, drifting slowly on a long loop. A static crop or a
- *      parked cover-up box cannot sit on a moving target, and with nothing on air it is still
- *      obvious the output is unlicensed.
+ *   2. A mark dead centre of frame, so that with nothing on air it is still obvious the
+ *      output is unlicensed. This one used to drift, which made it harder to park a cover-up
+ *      box over; it sits still now because that is what Mark wanted, and the protection was
+ *      never really coming from the wander - it comes from (1).
  *
  * It also puts itself back if it is deleted from the page. That stops the casual "open dev
  * tools and remove the element" trick. It is NOT meant to stop someone determined - this is
@@ -23,26 +24,27 @@
 
   var TEXT = 'StreamGraphics Pro';
   var TICK = 250;          // how often the marks are re-measured, ms
-  var DRIFT_MS = 23000;    // one full loop of the centre mark's wander
   var MIN_BOX = 70;        // ignore anything smaller than this - not a real graphic
 
-  var root = null, centre = null, on = false, timer = null, t0 = Date.now();
+  var root = null, centre = null, on = false, timer = null;
 
   function css(el, s) { el.style.cssText = s; }
 
-  /* Deliberately light. What makes this hard to remove is WHERE it sits, not how loud it is -
-   * so the fill can be soft without weakening it. Weight 500, not bold.
+  /* Embossed, and deliberately faint. What makes this hard to remove is WHERE it sits, not how
+   * loud it is, so the fill can go very soft without weakening it.
    *
-   * The thin dark outline is not decoration and must stay: the fill is white, and the
-   * scoreboard is a white card. Without the outline the mark would all but vanish exactly
-   * where it is needed most, and the free version would look unwatermarked on the one graphic
-   * people use the most. The outline is what makes it legible on white and on dark alike. */
+   * Emboss is doing real work here, not just decoration. A dark edge below the letters and a
+   * light edge above them means the mark is carrying BOTH a dark and a light contrast, so it
+   * stays readable on a white scoreboard card and on dark video alike. A plain fill at this
+   * opacity would vanish on one or the other - and the white card is the graphic people use
+   * most, which is the worst possible place to disappear. Change the alphas if you like, but
+   * keep one light edge and one dark edge. */
   function markStyle(size) {
     return 'position:absolute;left:0;top:0;white-space:nowrap;'
-         + 'font:500 ' + size + 'px system-ui,Arial,sans-serif;'
-         + 'color:rgba(255,255,255,.38);'
-         + 'text-shadow:0 0 1px rgba(0,0,0,.55),0 0 3px rgba(0,0,0,.40),0 2px 12px rgba(0,0,0,.35);'
-         + 'letter-spacing:.03em;pointer-events:none;will-change:transform';
+         + 'font:600 ' + size + 'px system-ui,Arial,sans-serif;'
+         + 'color:rgba(255,255,255,.16);'
+         + 'text-shadow:0 1px 0 rgba(0,0,0,.42),0 -1px 0 rgba(255,255,255,.34),0 2px 5px rgba(0,0,0,.20);'
+         + 'letter-spacing:.04em;pointer-events:none;will-change:transform';
   }
 
   function build() {
@@ -112,12 +114,12 @@
     for (var i = 0; i < boxes.length; i++) markAt(i, boxes[i]);
     for (var j = boxes.length; j < pool.length; j++) if (pool[j]) pool[j].style.display = 'none';
 
-    // the drifting centre mark - a slow Lissajous so it never repeats a straight line
-    var p = ((Date.now() - t0) % DRIFT_MS) / DRIFT_MS * Math.PI * 2;
+    // The centre mark sits dead centre and stays there. It used to wander, which made it
+    // harder to park a cover-up box on - but Mark wanted it still, and the marks riding the
+    // graphics are what actually defeat a crop, so the wander was not carrying the protection.
     var cw = centre.offsetWidth, ch = centre.offsetHeight;
-    var cx = (innerWidth - cw) / 2 + Math.cos(p) * innerWidth * 0.16;
-    var cy = (innerHeight - ch) / 2 + Math.sin(p * 2) * innerHeight * 0.13;
-    centre.style.transform = 'translate(' + Math.round(cx) + 'px,' + Math.round(cy) + 'px)';
+    centre.style.transform = 'translate(' + Math.round((innerWidth - cw) / 2) + 'px,'
+                           + Math.round((innerHeight - ch) / 2) + 'px)';
   }
 
   function apply(licensed) {
