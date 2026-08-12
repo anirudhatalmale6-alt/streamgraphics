@@ -31,6 +31,9 @@
   }
   function byId(id) { for (var i = 0; i < layers.length; i++) if (layers[i].id === id) return layers[i]; return null; }
   function selected() { return byId(selId); }
+  // A blank number box reads as NaN, which would otherwise be written into the layer and render
+  // as nothing at all. Fall back to the low end rather than storing a value that breaks the CSS.
+  function clamp(v, lo, hi) { v = +v; if (!isFinite(v)) v = lo; return Math.max(lo, Math.min(hi, v)); }
   // Slide text: "//" or a real newline = line break; a line starting with - or * = bullet.
   function slideHtml(txt) { return esc(txt).replace(/\s*\/\/\s*/g, '\n').replace(/\n/g, '<br>').replace(/(^|<br>)\s*[-*•]\s+/g, '$1• '); }
   function slideTextStyle(l) {
@@ -250,7 +253,7 @@
 
   /* ---- render the canvas ---- */
   function innerHtml(l) {
-    if (l.type === 'box') return '<div class="li ly-box" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>';
+    if (l.type === 'box') return SGBox.html(l);
     if (l.type === 'text') {
       var st = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 24) + 'px;color:' + esc(l.color || '#fff')
         + ';font-weight:' + (l.bold ? '800' : '400') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'left')
@@ -270,7 +273,7 @@
     }
     if (l.type === 'ticker') {
       var tk = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
-      return '<div class="li" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px;overflow:hidden;display:flex;align-items:center;padding:0 12px"><span style="white-space:nowrap;' + tk + '">' + esc(l.text || 'scrolling text') + '</span></div>';
+      return '<div class="li" style="width:100%;height:100%;' + SGBox.style(l) + 'overflow:hidden;display:flex;align-items:center;padding:0 12px"><span style="white-space:nowrap;' + tk + '">' + esc(l.text || 'scrolling text') + '</span></div>';
     }
     if (l.type === 'slides') {
       var sidx = (l.index == null ? -1 : l.index);
@@ -280,6 +283,7 @@
       return '<div class="li ly-slide" style="' + swrap + '">' + slideBgHtml(l) + '<div class="slide-text" style="' + slideTextStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
     }
     if (l.type === 'bullets') return SGBullets.html(l);
+    if (l.type === 'qr') return SGQR.layerHtml(l, true);
     if (l.type === 'timer') {
       var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
         + ';font-weight:' + (l.bold ? '800' : '600') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'center')
@@ -311,6 +315,7 @@
     if (l.type === 'timer') return l.mode === 'clock' ? 'Clock' : (l.mode === 'up' ? 'Count-up' : l.mode === 'tod' ? 'Countdown to' : 'Countdown');
     if (l.type === 'slides') return (l.slides && l.slides.length) ? ('Slides (' + l.slides.length + ')') : 'Slides';
     if (l.type === 'bullets') return (l.items && l.items.length) ? ('Bullets (' + l.items.length + ')') : 'Bullets';
+    if (l.type === 'qr') return l.text ? ('QR — ' + String(l.text).replace(/^https?:\/\//, '').slice(0, 28)) : 'QR code';
     return l.type === 'box' ? 'Box' : l.type === 'video' ? 'Video' : 'Image';
   }
   function renderList() {
@@ -399,18 +404,43 @@
     if (multi) {
       var grouped = selIds.every(function (id) { var m = byId(id); return m && m.group && m.group === l.group; });
       $('propTitle').textContent = selIds.length + ' layers selected' + (grouped ? ' (grouped)' : '');
-      show('.only-text', false); show('.only-box', false); show('.only-image', false); show('.only-video', false); show('.only-ticker', false); show('.only-timer', false); show('.only-slides', false); show('.only-bullets', false); show('.fieldrow', false);
+      show('.only-text', false); show('.only-box', false); show('.only-image', false); show('.only-video', false); show('.only-ticker', false); show('.only-timer', false); show('.only-slides', false); show('.only-bullets', false); show('.only-qr', false); show('.only-surface', false); show('.fieldrow', false);
     } else {
       $('propTitle').textContent = l.type.charAt(0).toUpperCase() + l.type.slice(1) + ' layer' + (l.group ? ' (grouped)' : '');
       show('.only-text', l.type === 'text'); show('.only-box', l.type === 'box'); show('.only-image', l.type === 'image');
       show('.only-video', l.type === 'video'); show('.only-ticker', l.type === 'ticker'); show('.only-timer', l.type === 'timer'); show('.only-slides', l.type === 'slides');
       show('.only-bullets', l.type === 'bullets');
-      show('.fieldrow', l.type === 'text' || l.type === 'image' || l.type === 'bullets');   // CSV field: text, image, or a whole bullet list from one cell
+      show('.only-qr', l.type === 'qr');
+      // A ticker is a filled rectangle with words scrolling in it, so it gets the same gradient,
+      // soft-edge and shadow controls a box does - one implementation, one set of controls.
+      show('.only-surface', l.type === 'box' || l.type === 'ticker');
+      show('.fieldrow', l.type === 'text' || l.type === 'image' || l.type === 'bullets' || l.type === 'qr');   // CSV field: text, image, a whole bullet list, or a per-row QR
     }
     if (l.type === 'text') { $('pText').value = l.text || ''; $('pFont').value = l.font || "'Segoe UI', Arial, sans-serif"; $('pSize').value = l.size || 34; $('pBold').checked = !!l.bold; $('pItalic').checked = !!l.italic; $('pShadow').checked = (l.shadow !== false); $('pColor').value = l.color || '#ffffff'; $('pAlign').value = l.align || 'left'; }
     if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
     if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; $('pImgShadow').checked = !!l.shadow; }
-    if (l.type === 'text' || l.type === 'image' || l.type === 'bullets') { $('pField').value = l.field || ''; }
+    if (l.type === 'text' || l.type === 'image' || l.type === 'bullets' || l.type === 'qr') { $('pField').value = l.field || ''; }
+    if (l.type === 'box' || l.type === 'ticker') {
+      $('pFillMode').value = l.fillMode || 'solid';
+      $('pFill2').value = l.fill2 || '#12b886';
+      $('pOpacity2').value = l.opacity2 == null ? 0 : l.opacity2;
+      $('pGradAngle').value = l.gradAngle == null ? 90 : l.gradAngle; $('pGradAngleV').textContent = (l.gradAngle == null ? 90 : l.gradAngle) + '\u00b0';
+      $('pFeather').value = l.feather || 0; $('pFeatherV').textContent = l.feather || 0;
+      $('pFeatherEdges').value = l.featherEdges || 'all';
+      $('pBoxShadow').checked = !!l.shadow;
+      $('pShadowBlur').value = l.shadowBlur == null ? 18 : l.shadowBlur;
+      $('pShadowY').value = l.shadowY == null ? 6 : l.shadowY;
+      $('pShadowOpacity').value = l.shadowOpacity == null ? 55 : l.shadowOpacity;
+      surfaceRows();
+    }
+    if (l.type === 'qr') {
+      $('pQrText').value = l.text || '';
+      $('pQrDark').value = l.dark || '#000000'; $('pQrLight').value = l.light || '#ffffff';
+      $('pQrTransparent').checked = !!l.transparent;
+      $('pQrLevel').value = l.level || 'M';
+      $('pQrShadow').checked = !!l.shadow;
+      qrInfo(l);
+    }
     if (l.type === 'video') { $('pVSrc').value = l.src || ''; $('pAutoplay').checked = l.autoplay !== false; $('pLoop').checked = !!l.loop; $('pMuted').checked = l.muted !== false; $('pVFit').value = l.fit || 'contain'; $('pWhenDone').value = l.whenDone || 'hold'; }
     if (l.type === 'ticker') { $('pTkText').value = l.text || ''; $('pTkSpeed').value = l.speed == null ? 120 : l.speed; $('pTkSpeedV').textContent = l.speed == null ? 120 : l.speed; $('pTkDir').value = l.dir || 'left'; $('pTkColor').value = l.color || '#ffffff'; $('pTkSize').value = l.size || 28; $('pTkBold').checked = !!l.bold; $('pTkFill').value = l.fill || '#0b1f3a'; $('pTkOpacity').value = l.opacity == null ? 90 : l.opacity; $('pTkRadius').value = l.radius || 0; }
     if (l.type === 'timer') {
@@ -483,6 +513,50 @@
   $('pRadius').oninput = function () { $('pRadiusV').textContent = $('pRadius').value; mutate(function (l) { l.radius = +$('pRadius').value; }); };
   $('pSrc').oninput = function () { mutate(function (l) { l.src = $('pSrc').value; }); };
   $('pField').oninput = function () { mutate(function (l) { var v = $('pField').value.trim(); if (v) l.field = v; else delete l.field; }); };
+
+  /* ---- surface controls: gradient, soft edges, drop shadow (boxes and tickers) ---- */
+  // Only show the sub-controls that are doing anything, so the panel doesn't grow a row of
+  // gradient settings for a solid colour.
+  function surfaceRows() {
+    var grad = $('pFillMode').value !== 'solid';
+    $('pGradWrap').style.display = grad ? 'inline-flex' : 'none';
+    $('pGradAngleRow').style.display = ($('pFillMode').value === 'linear') ? '' : 'none';
+    $('pGradHint').style.display = grad ? '' : 'none';
+    $('pShadowWrap').style.display = $('pBoxShadow').checked ? 'inline-flex' : 'none';
+  }
+  $('pFillMode').onchange = function () { mutate(function (l) { l.fillMode = $('pFillMode').value; }); surfaceRows(); };
+  $('pFill2').oninput = function () { mutate(function (l) { l.fill2 = $('pFill2').value; }); };
+  $('pOpacity2').oninput = function () { mutate(function (l) { l.opacity2 = clamp(+$('pOpacity2').value, 0, 100); }); };
+  $('pGradAngle').oninput = function () { var v = +$('pGradAngle').value; $('pGradAngleV').textContent = v + '\u00b0'; mutate(function (l) { l.gradAngle = v; }); };
+  $('pFeather').oninput = function () { var v = +$('pFeather').value; $('pFeatherV').textContent = v; mutate(function (l) { l.feather = v; }); };
+  $('pFeatherEdges').onchange = function () { mutate(function (l) { l.featherEdges = $('pFeatherEdges').value; }); };
+  $('pBoxShadow').onchange = function () { mutate(function (l) { l.shadow = $('pBoxShadow').checked; }); surfaceRows(); };
+  $('pShadowBlur').oninput = function () { mutate(function (l) { l.shadowBlur = clamp(+$('pShadowBlur').value, 0, 200); }); };
+  $('pShadowY').oninput = function () { mutate(function (l) { l.shadowY = clamp(+$('pShadowY').value, -100, 100); }); };
+  $('pShadowOpacity').oninput = function () { mutate(function (l) { l.shadowOpacity = clamp(+$('pShadowOpacity').value, 0, 100); }); };
+
+  /* ---- QR ----
+   * The readout is the useful part: it tells you how dense the code came out and, when the code
+   * is a tight one, that shortening the link would make the squares bigger. A QR nobody's phone
+   * can lock onto from the sofa is just a grey square on the screen. */
+  function qrInfo(l) {
+    var box = $('pQrInfo'); if (!box) return;
+    var txt = String((l && l.text) || '').trim();
+    if (!txt) { box.textContent = 'Point it at a page you control, so you can change where it goes later without re-recording.'; box.style.color = 'var(--muted2)'; return; }
+    var r = window.SGQR && SGQR.build(txt, (l && l.level) || 'M');
+    if (!r) { box.textContent = 'That is too much text for a single QR code. Shorten it, or point it at a link instead.'; box.style.color = '#e08a72'; return; }
+    var modes = { numeric: 'numbers', alnum: 'upper-case', byte: 'plain text' };
+    var px = Math.round(Math.min(l.w || 300, l.h || 300) / (r.size + 8) * 10) / 10;
+    box.textContent = r.size + '\u00d7' + r.size + ' squares (' + modes[r.mode] + ', version ' + r.version + ') \u00b7 about ' + px + 'px per square on screen'
+      + (px < 4 ? ' \u2014 make the layer bigger or shorten the link, this will be hard to scan' : '');
+    box.style.color = px < 4 ? '#e08a72' : 'var(--muted2)';
+  }
+  $('pQrText').oninput = function () { mutate(function (l) { l.text = $('pQrText').value; }); qrInfo(byId(selId)); };
+  $('pQrDark').oninput = function () { mutate(function (l) { l.dark = $('pQrDark').value; }); };
+  $('pQrLight').oninput = function () { mutate(function (l) { l.light = $('pQrLight').value; }); };
+  $('pQrTransparent').onchange = function () { mutate(function (l) { l.transparent = $('pQrTransparent').checked; }); };
+  $('pQrLevel').onchange = function () { mutate(function (l) { l.level = $('pQrLevel').value; }); qrInfo(byId(selId)); };
+  $('pQrShadow').onchange = function () { mutate(function (l) { l.shadow = $('pQrShadow').checked; }); };
   $('pShape').onchange = function () { mutate(function (l) { l.shape = $('pShape').value; }); };
   $('pFit').onchange = function () { mutate(function (l) { l.fit = $('pFit').value; }); };
   $('pImgShadow').onchange = function () { mutate(function (l) { l.shadow = $('pImgShadow').checked; }); };
@@ -902,6 +976,7 @@
   $('addBullets').onclick = function () { add(merge({ type: 'bullets', x: 200, y: 260, w: 1100, h: 560, items: ['Opening point of the segment', 'The thing everyone came to hear', 'What it means for next season', 'Where to find the full story'], index: -1, mode: 'build', grow: 'down', gap: 18, marker: 'bullet', markerGap: 18, reveal: 'slide-up', revealDur: 520, dimOpacity: 45, hlColor: '#ffd166', hlScale: 1, font: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif", size: 44, bold: true, italic: false, color: '#ffffff', align: 'left', bg: '#0b1f3a', bgOpacity: 0, pad: 24, radius: 14 }, A('fade'))); };
   $('addSlides').onclick = function () { add(merge({ type: 'slides', x: 360, y: 300, w: 1200, h: 480, slides: ['Amazing grace, how sweet the sound', 'That saved a wretch like me', 'I once was lost, but now am found'], index: 0, font: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif", size: 64, bold: true, italic: false, color: '#ffffff', align: 'center', bg: '#0b1f3a', bgOpacity: 0, pad: 28, radius: 14, trans: 'fade' }, A('fade'))); };
   // full-screen background colour box (goes to the very back)
+  $('addQR').onclick = function () { add(merge({ type: 'qr', x: 1500, y: 700, w: 300, h: 300, text: '', level: 'M', dark: '#000000', light: '#ffffff', transparent: false, shadow: false }, A('fade'))); };
   $('addBg').onclick = function () {
     var bg = merge({ type: 'box', x: 0, y: 0, w: 1920, h: 1080, fill: '#0b1f3a', opacity: 100, radius: 0 }, A('fade'));
     bg.id = uid(); bg.z = layers.length ? Math.min.apply(null, layers.map(function (l) { return l.z || 0; })) - 1 : 0;

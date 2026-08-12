@@ -121,7 +121,7 @@
       var box = 'left:' + (l.x || 0) + 'px;top:' + (l.y || 0) + 'px;width:' + (l.w || 0) + 'px;height:' + (l.h || 0) + 'px;z-index:' + (l.z || 0) + ';';
       if (l.rot) box += 'transform:rotate(' + l.rot + 'deg);transform-origin:center;';
       var inner = '';
-      if (l.type === 'box') inner = '<div class="li ly-box" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>';
+      if (l.type === 'box') inner = SGBox.html(l);
       else if (l.type === 'text') {
         var st = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 24) + 'px;color:' + esc(l.color || '#fff')
           + ';font-weight:' + (l.bold ? '800' : '400') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'left')
@@ -134,11 +134,13 @@
       } else if (l.type === 'ticker') {
         var ts = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
         var gap = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
-        inner = '<div class="li ly-ticker" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px;overflow:hidden;display:flex;align-items:center">' + '<div class="tick-track" style="display:inline-flex;white-space:nowrap;will-change:transform;' + ts + '">' + '<span class="tc">' + esc(l.text || '') + gap + '</span><span class="tc">' + esc(l.text || '') + gap + '</span></div></div>';
+        inner = '<div class="li ly-ticker" style="width:100%;height:100%;' + SGBox.style(l) + 'overflow:hidden;display:flex;align-items:center">' + '<div class="tick-track" style="display:inline-flex;white-space:nowrap;will-change:transform;' + ts + '">' + '<span class="tc">' + esc(l.text || '') + gap + '</span><span class="tc">' + esc(l.text || '') + gap + '</span></div></div>';
       } else if (l.type === 'slides') {
         var sidx = (l.index == null ? -1 : l.index);
         var stxt = (sidx >= 0 && l.slides && l.slides[sidx] != null) ? l.slides[sidx] : '';
         inner = slideWrap(l, sidx, slideHtml(stxt));
+      } else if (l.type === 'qr') {
+        inner = SGQR.layerHtml(l, false);
       } else if (l.type === 'bullets') {
         inner = SGBullets.html(l);
       } else if (l.type === 'timer') {

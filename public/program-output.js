@@ -63,7 +63,7 @@
       var box = 'left:' + (l.x || 0) + 'px;top:' + (l.y || 0) + 'px;width:' + (l.w || 0) + 'px;height:' + (l.h || 0) + 'px;z-index:' + (l.z || 0) + ';';
       if (l.rot) box += 'transform:rotate(' + l.rot + 'deg);transform-origin:center;';
       var inner = '';
-      if (l.type === 'box') inner = '<div class="li" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>';
+      if (l.type === 'box') inner = SGBox.html(l);
       else if (l.type === 'text') {
         var st = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 24) + 'px;color:' + esc(l.color || '#fff')
           + ';font-weight:' + (l.bold ? '800' : '400') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'left')
@@ -76,7 +76,7 @@
       } else if (l.type === 'ticker') {
         var ts = 'font-family:' + (l.font || 'Arial') + ';font-size:' + (l.size || 28) + 'px;color:' + esc(l.color || '#fff') + ';font-weight:' + (l.bold ? '800' : '600');
         var gap = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
-        inner = '<div class="li" style="width:100%;height:100%;background:' + rgba(l.fill, l.opacity) + ';border-radius:' + (l.radius || 0) + 'px;overflow:hidden;display:flex;align-items:center"><div class="tick-track" style="display:inline-flex;white-space:nowrap;will-change:transform;' + ts + '"><span class="tc">' + esc(l.text || '') + gap + '</span><span class="tc">' + esc(l.text || '') + gap + '</span></div></div>';
+        inner = '<div class="li" style="width:100%;height:100%;' + SGBox.style(l) + 'overflow:hidden;display:flex;align-items:center"><div class="tick-track" style="display:inline-flex;white-space:nowrap;will-change:transform;' + ts + '"><span class="tc">' + esc(l.text || '') + gap + '</span><span class="tc">' + esc(l.text || '') + gap + '</span></div></div>';
       } else if (l.type === 'timer') {
         var tmst = 'font-family:' + (l.font || "'Segoe UI', Arial, sans-serif") + ';font-size:' + (l.size || 96) + 'px;color:' + esc(l.color || '#fff')
           + ';font-weight:' + (l.bold ? '800' : '600') + ';text-align:' + (l.align || 'center')
@@ -88,6 +88,7 @@
         var bg = (l.bgOpacity > 0 && l.bg) ? '<div style="position:absolute;inset:0;background:' + rgba(l.bg, l.bgOpacity) + ';border-radius:' + (l.radius || 0) + 'px"></div>' : '';
         inner = '<div class="li ly-slide" data-idx="' + sidx + '" style="position:relative;overflow:visible;width:100%;height:100%">' + bg + '<div class="ly-slide-text" style="' + (stxt ? '' : 'display:none;') + slideTextStyle(l) + '">' + slideHtml(stxt) + '</div></div>';
       } else if (l.type === 'bullets') inner = SGBullets.html(l);
+      else if (l.type === 'qr') inner = SGQR.layerHtml(l, false);
       html += '<div class="ly" data-id="' + l.id + '" style="' + box + '">' + inner + '</div>';
     });
     container.innerHTML = html;
@@ -194,6 +195,9 @@
         var parts = String(v).split(/\s*\/\/\s*|\r?\n/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length; });
         return Object.assign({}, l, { items: parts });
       }
+      // A QR is just text that happens to be drawn as squares, so a column of links gives every
+      // row its own scannable code - one graphic, a different QR per guest, product or session.
+      if (l.type === 'qr') return Object.assign({}, l, { text: String(v) });
       if (l.type === 'image') {
         var s = String(v);
         // A browser can't load a local path like C:\...\pic.jpg. Resolve by filename against the

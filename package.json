@@ -1,6 +1,6 @@
 {
   "name": "streamgraphics",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "private": true,
   "description": "Realtime livestream graphics engine — browser-source output driven from a browser control panel. Milestone 1: the timer family.",
   "scripts": {

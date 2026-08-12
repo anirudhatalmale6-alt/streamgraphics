@@ -148,6 +148,7 @@
             <button class="btn" id="addTimer" title="live clock / countdown / count-up as a layer">＋ Timer</button>
             <button class="btn" id="addSlides" title="advance blocks of text next/next/next, like lyrics">＋ Slides</button>
             <button class="btn" id="addBullets" title="reveal bullet points one at a time, like a PowerPoint build">＋ Bullets</button>
+            <button class="btn" id="addQR" title="a scannable QR code, generated in the app - no internet needed">＋ QR</button>
             <button class="btn" id="addBg" title="full-screen background colour">＋ BG</button>
           </div>
         </section>
@@ -200,6 +201,53 @@
 
             <div class="row only-box"><label>Fill</label><input type="color" id="pFill" value="#0b1f3a"><input class="inp s" id="pOpacity" type="number" min="0" max="100" value="95" title="opacity %"> %</div>
             <div class="row only-box"><label>Radius</label><input class="range" id="pRadius" type="range" min="0" max="120" value="12"><span id="pRadiusV" class="mono">12</span></div>
+
+            <div class="row only-surface"><label>Fill style</label>
+              <select class="inp" id="pFillMode" style="width:auto"><option value="solid">Solid</option><option value="linear">Gradient</option><option value="radial">Gradient (radial)</option></select>
+              <span id="pGradWrap" style="display:none;align-items:center;gap:6px">
+                <span class="mini" style="color:var(--muted2)">to</span>
+                <input type="color" id="pFill2" value="#12b886">
+                <input class="inp s" id="pOpacity2" type="number" min="0" max="100" value="0" title="opacity of the far end — set 0 to fade out to nothing"> %
+              </span>
+            </div>
+            <div class="row only-surface" id="pGradAngleRow" style="display:none"><label>Direction</label>
+              <input class="range" id="pGradAngle" type="range" min="0" max="360" step="15" value="90"><span id="pGradAngleV" class="mono">90°</span>
+            </div>
+            <div class="mini only-surface" id="pGradHint" style="display:none;color:var(--muted2);font-size:11px;margin:-4px 0 8px">Set the far end's opacity to 0 for a bar that fades out instead of stopping on a hard line.</div>
+
+            <div class="row only-surface"><label>Soft edges</label>
+              <input class="range" id="pFeather" type="range" min="0" max="200" value="0"><span id="pFeatherV" class="mono">0</span>
+              <select class="inp" id="pFeatherEdges" style="width:auto;margin-left:6px">
+                <option value="all">All edges</option><option value="sides">Left + right</option><option value="topbottom">Top + bottom</option>
+                <option value="left">Left only</option><option value="right">Right only</option><option value="top">Top only</option><option value="bottom">Bottom only</option>
+              </select>
+            </div>
+            <div class="row only-surface"><label>Drop shadow</label>
+              <label style="width:auto"><input type="checkbox" id="pBoxShadow"> on</label>
+              <span id="pShadowWrap" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+                <span class="mini" style="color:var(--muted2)">blur</span><input class="inp s" id="pShadowBlur" type="number" min="0" max="200" value="18">
+                <span class="mini" style="color:var(--muted2)">drop</span><input class="inp s" id="pShadowY" type="number" min="-100" max="100" value="6">
+                <input class="inp s" id="pShadowOpacity" type="number" min="0" max="100" value="55" title="shadow strength %"> %
+              </span>
+            </div>
+
+            <div class="row only-qr"><label>Link / text</label><input class="inp" id="pQrText" placeholder="https://yoursite.com  — or any text" style="flex:1;min-width:0"></div>
+            <div class="mini only-qr" id="pQrInfo" style="color:var(--muted2);font-size:11px;margin:-4px 0 8px"></div>
+            <div class="row only-qr"><label>Colours</label>
+              <input type="color" id="pQrDark" value="#000000" title="the squares">
+              <input type="color" id="pQrLight" value="#ffffff" title="the background">
+              <label style="width:auto;margin-left:6px" title="drop the white background and let the video show through — only do this over something plain and light"><input type="checkbox" id="pQrTransparent"> clear background</label>
+            </div>
+            <div class="row only-qr"><label>Robustness</label>
+              <select class="inp" id="pQrLevel" style="width:auto">
+                <option value="L">Low — biggest squares</option>
+                <option value="M" selected>Normal</option>
+                <option value="Q">High</option>
+                <option value="H">Highest — survives a logo on top</option>
+              </select>
+              <label style="width:auto;margin-left:6px"><input type="checkbox" id="pQrShadow"> shadow</label>
+            </div>
+            <div class="mini only-qr" style="color:var(--muted2);font-size:11px;margin:-4px 0 10px">Scan it yourself off the actual output before you go live. Keep it on screen for at least 10 seconds — people have to notice it, pick up a phone and aim.</div>
 
             <div class="row only-image"><label>Image</label><input class="inp" id="pSrc" placeholder="URL or Browse"><label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="image/*" id="pFile" style="display:none"></label></div>
             <div class="row only-image"><label>Shape</label>
@@ -510,6 +558,8 @@
   <script src="/sg-live.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/sg-bullets.js"></script>
+  <script src="/sg-box.js"></script>
+  <script src="/sg-qr.js"></script>
   <script src="/lowerthird.js"></script>
   <script src="/ver.js"></script>
   <script src="/update.js"></script>
