@@ -30,8 +30,11 @@ To put a graphic into an ATEM:
   infinite number of background colors, so you can easily choose how you want to key
   out (remove) the background.
 
-If you are going to use another computer on the network, use this PC's address,
-e.g. http://192.168.1.50:4000
+To use a phone, tablet or another computer on the same network:
+  Open StreamGraphics Pro on this PC and look at the box near the top of the
+  home page, 'Use on another device (same network)'. It shows this computer's
+  own address. Type that on the other device. Read it from there every time -
+  network addresses are different on every network and can change.
 (Windows may ask to allow network access the first time - click Allow.)
 
 Nothing runs in the cloud. Everything is on this computer. No internet required -

@@ -125,7 +125,7 @@ Milestone 1 delivers the full pipeline plus the **timer family**:
    ```
    Control panel (this computer):  http://localhost:4000/control
    Output for OBS/vMix (this PC):   http://localhost:4000/output
-   Output from ANOTHER computer:    http://192.168.1.50:4000/output
+   Output from ANOTHER computer:    http://<this machine's LAN address>:4000/output
    ```
 
 ## Wire it into OBS or vMix

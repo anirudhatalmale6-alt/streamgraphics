@@ -922,6 +922,54 @@
   };
   $('refOpacity').oninput = function () { refimg.style.opacity = $('refOpacity').value / 100; var r = JSON.parse(localStorage.getItem('lt_ref') || '{}'); r.opacity = +$('refOpacity').value; saveRef(r); };
   $('refClear').onclick = function () { refimg.removeAttribute('src'); refimg.style.display = 'none'; localStorage.removeItem('lt_ref'); };
+
+  // Same job as the Browse button, from a File the user got here some other way.
+  function useAsRef(f) {
+    if (!f || !/^image\//.test(f.type || '')) return false;
+    if (tooBigImage(f)) return true;                       // it WAS an image, we just refused it
+    var r = new FileReader();
+    r.onload = function () {
+      fetch('/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name || 'reference.png', data: r.result }) })
+        .then(function (x) { return x.json(); }).then(function (res) {
+          if (!res || !res.ok) return;
+          refimg.src = res.url; refimg.style.display = 'block';
+          saveRef({ url: res.url, opacity: +$('refOpacity').value });
+          var h = $('refHint'); if (h) { var was = h.innerHTML; h.textContent = 'Reference image set.'; setTimeout(function () { h.innerHTML = was; }, 2500); }
+        });
+    };
+    r.readAsDataURL(f);
+    return true;
+  }
+
+  // Ctrl+V a screen grab straight in. This is the one that works with EVERY switcher - vMix,
+  // OBS, an ATEM multiviewer, a photo of a whiteboard - with nothing to configure. Windows'
+  // own Win+Shift+S puts the grab on the clipboard; this catches it.
+  // Ignored while a text layer is being edited, so pasting words into a caption still pastes words.
+  document.addEventListener('paste', function (e) {
+    if (editing) return;
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        if (useAsRef(items[i].getAsFile())) { e.preventDefault(); return; }
+      }
+    }
+  });
+
+  // Drag an image file onto the canvas for the same result.
+  (function () {
+    var zone = $('cstage') || document.body;
+    ['dragover', 'drop'].forEach(function (ev) {
+      zone.addEventListener(ev, function (e) {
+        e.preventDefault();
+        if (ev !== 'drop') return;
+        var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        useAsRef(f);
+      });
+    });
+  })();
+
   loadRef();
   $('btnReset').onclick = function () { if (confirm('Reset the lower third to the default design?')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_reset' }) }); };
 

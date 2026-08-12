@@ -7,6 +7,31 @@
   // Default to however this page was opened (localhost or the PC's IP), so URLs are copy-ready.
   baseInput.value = location.protocol + '//' + location.host;
 
+  // Offer this machine's REAL network address rather than printing a made-up example one.
+  // A sample address in the text was being read as "the address you should use", which it
+  // never is - every network hands out different ones. Ask the app what it actually has.
+  (function () {
+    var hint = $('lanHint'); if (!hint) return;
+    fetch('/netinfo').then(function (r) { return r.json(); }).then(function (n) {
+      var ips = (n && n.ips) || [], port = (n && n.port) || 4000;
+      if (!ips.length) { hint.textContent = 'This computer has no network address right now — connect it to Wi-Fi or Ethernet and reload this page.'; return; }
+      hint.textContent = 'On this computer that address is ';
+      ips.forEach(function (ip, i) {
+        var url = 'http://' + ip + ':' + port;
+        var a = document.createElement('a');
+        a.href = '#'; a.textContent = url;
+        a.addEventListener('click', function (e) {
+          e.preventDefault();
+          baseInput.value = url;
+          baseInput.dispatchEvent(new Event('input'));   // rebuild every URL on the page
+        });
+        if (i) hint.appendChild(document.createTextNode(' or '));
+        hint.appendChild(a);
+      });
+      hint.appendChild(document.createTextNode(' — click it to fill the box.'));
+    }).catch(function () { hint.textContent = ''; });
+  })();
+
   function base() { return baseInput.value.replace(/\/+$/, ''); }
   function enc(s) { return encodeURIComponent(s); }
 
