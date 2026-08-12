@@ -455,7 +455,7 @@ function wireState() {
     // Next/Previous without pulling the whole payload down for presets that are off.
     const reveals = stepLayers(it).map(function (l) {
       return { id: l.id, name: l.name || '', type: l.type, index: (l.index == null ? -1 : l.index),
-               count: (l.type === 'bullets' ? (l.items || []) : (l.slides || [])).length };
+               count: stepCount(it, l) };
     });
     if (it.on) return Object.assign({}, it, { reveals: reveals }); // ON: in full (payload + rows) for the Program output
     // OFF: metadata only + light row info (labels for the picker), but not the heavy payload/rows.
@@ -518,12 +518,58 @@ function stepIndex(cmd, index, n, gotoN, slidesStyle) {
   else if (cmd === 'goto') { i = parseInt(gotoN, 10); if (isNaN(i)) i = -1; }
   return Math.max(-1, Math.min(n - 1, i));
 }
+/* ---- what a CSV-fed bullets layer is ACTUALLY showing right now ----
+ * A bullets layer can take its whole list from one spreadsheet cell (the layer's "CSV field"
+ * naming a column), split on "//" or a line break — so a "Talking points" column drives a
+ * different build for every guest. The output has always drawn it that way; the transport
+ * didn't. It counted the placeholder list typed into the design instead, so a row holding six
+ * points reported "1 of 1" and Next stopped dead on the first one — and a design that left the
+ * list empty on purpose (the spreadsheet supplies it) got no transport at all.
+ * These three mirror fillLayers() in public/program-output.js exactly; if that splitting rule
+ * ever changes, it changes in both places or the count and the screen disagree again. */
+function csvCell(it, field) {
+  if (!field || !it || !Array.isArray(it.rows) || !it.rows.length) return null;
+  const row = it.rows[Math.max(0, Math.min(it.rows.length - 1, it.rowIndex || 0))];
+  if (!row) return null;
+  const f = String(field).toLowerCase();
+  const k = Object.keys(row).find(x => x.toLowerCase() === f);   // column names are matched case-insensitively
+  return k == null ? null : row[k];
+}
+function bulletItems(it, l) {
+  if (!l || l.type !== 'bullets') return [];
+  const v = csvCell(it, l.field);
+  if (v == null || String(v).trim() === '') return l.items || [];   // no column, or an empty cell: use the design's own list
+  return String(v).split(/\s*\/\/\s*|\r?\n/).map(s => s.trim()).filter(s => s.length);
+}
+// How many steps a layer has at this moment — bullets from the live list, slides from the deck.
+function stepCount(it, l) {
+  return (l && l.type === 'bullets') ? bulletItems(it, l).length : ((l && l.slides) || []).length;
+}
 // Every layer in a preset that can be stepped, in z order — what the transport UI and API drive.
 function stepLayers(it) {
   if (!it || !it.payload || !Array.isArray(it.payload.layers)) return [];
   return it.payload.layers
-    .filter(l => (l.type === 'bullets' && (l.items || []).length) || (l.type === 'slides' && (l.slides || []).length))
+    .filter(l => (l.type === 'bullets' || l.type === 'slides') && stepCount(it, l) > 0)
     .sort((a, b) => (a.z || 0) - (b.z || 0));
+}
+
+/* Moving to another spreadsheet row swaps the whole list, so the build goes back to the start.
+ * Carrying "4 of 4" onto a guest with two points would dump their entire list on screen the
+ * instant the row changed. Layers with "reset on air" switched off are left alone (a deliberate
+ * static list), and so is any bullets layer the spreadsheet isn't feeding. */
+function resetCsvBullets(it) {
+  if (!it || !it.payload || !Array.isArray(it.payload.layers)) return;
+  it.payload.layers.forEach(l => {
+    if (l.type === 'bullets' && l.field && l.resetOnAir !== false && csvCell(it, l.field) != null) l.index = -1;
+  });
+}
+// Editing a cell can shorten the list under a build that's already part-way through it.
+function clampReveals(it) {
+  if (!it || !it.payload || !Array.isArray(it.payload.layers)) return;
+  it.payload.layers.forEach(l => {
+    if (l.type !== 'bullets' || l.index == null) return;
+    l.index = Math.max(-1, Math.min(l.index, stepCount(it, l) - 1));
+  });
 }
 // Address a steppable layer by its id, or by the name shown in the Layers list, or take the first.
 function findStepLayer(it, key) {
@@ -797,7 +843,7 @@ function applyAction(action) {
       if (!it || !it.payload || !Array.isArray(it.payload.layers)) break;
       const L = findStepLayer(it, action.layerId);
       if (!L) break;
-      const n = (L.type === 'bullets' ? (L.items || []) : (L.slides || [])).length;
+      const n = stepCount(it, L);   // the CSV row's list if one feeds this layer, else the design's
       L.index = stepIndex(String(action.cmd || ''), L.index, n, action.n, L.type === 'slides');
       saveShows();
       break;
@@ -929,6 +975,7 @@ function applyAction(action) {
       });
       it.columns = cols; it.rows = rows; it.rowIndex = 0;
       it.rowKey = (it.rowKey && cols.indexOf(it.rowKey) >= 0) ? it.rowKey : (cols[0] || '');
+      resetCsvBullets(it);   // a new spreadsheet means new lists — start every build from the top
       saveShows(); break;
     }
     case 'show_rowselect': {
@@ -937,7 +984,10 @@ function applyAction(action) {
       if (cmd === 'next') i = Math.min(n - 1, i + 1);
       else if (cmd === 'prev') i = Math.max(0, i - 1);
       else { i = parseInt(action.n, 10); if (isNaN(i)) i = 0; i = Math.max(0, Math.min(n - 1, i)); }
-      it.rowIndex = i; saveShows(); break;
+      const moved = (i !== (it.rowIndex || 0));
+      it.rowIndex = i;
+      if (moved) resetCsvBullets(it);
+      saveShows(); break;
     }
     case 'show_setkey': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowKey = String(action.key || ''); saveShows(); } break; }
     case 'show_rowmode': { const it = state.shows.find(x => x.id === action.id); if (it) { it.rowTransition = (action.mode === 'reanimate') ? 'reanimate' : 'cut'; saveShows(); } break; }
@@ -951,9 +1001,10 @@ function applyAction(action) {
       // keepIndex: the row editor appends without yanking whatever is currently on air.
       if (it.rows.length < 3000) { it.rows.push(o); if (!action.keepIndex) it.rowIndex = it.rows.length - 1; }
       if (!it.rowKey) it.rowKey = it.columns[0] || '';
+      if (!action.keepIndex) resetCsvBullets(it);
       saveShows(); break;
     }
-    case 'show_clear_csv': { const it = state.shows.find(x => x.id === action.id); if (it) { delete it.rows; delete it.columns; delete it.rowKey; it.rowIndex = 0; saveShows(); } break; }
+    case 'show_clear_csv': { const it = state.shows.find(x => x.id === action.id); if (it) { delete it.rows; delete it.columns; delete it.rowKey; it.rowIndex = 0; clampReveals(it); saveShows(); } break; }
 
     /* ---- Live row editing. A name is too long, an entry is wrong, someone didn't show up —
        the operator fixes it mid-event without re-exporting the spreadsheet and re-importing.
@@ -965,6 +1016,7 @@ function applyAction(action) {
       const n = parseInt(action.n, 10); if (isNaN(n) || n < 0 || n >= it.rows.length) break;
       const col = String(action.col || ''); if (!col || (it.columns || []).indexOf(col) < 0) break;
       it.rows[n][col] = String(action.value == null ? '' : action.value).slice(0, 600);
+      clampReveals(it);   // shortening a talking-points cell must not leave the build past the end
       saveShows(); break;
     }
     case 'show_delrow': {
@@ -977,6 +1029,7 @@ function applyAction(action) {
       if (n < i) i--;
       it.rowIndex = it.rows.length ? Math.max(0, Math.min(it.rows.length - 1, i)) : 0;
       if (!it.rows.length) { delete it.rows; delete it.columns; delete it.rowKey; }  // last row gone = no spreadsheet
+      clampReveals(it);
       saveShows(); break;
     }
     case 'show_moverow': {
@@ -987,6 +1040,7 @@ function applyAction(action) {
       const cur = it.rowIndex || 0;
       it.rows.splice(to, 0, it.rows.splice(n, 1)[0]);
       if (cur === n) it.rowIndex = to; else if (cur === to) it.rowIndex = n;   // selection travels with the row
+      clampReveals(it);
       saveShows(); break;
     }
     case 'show_insertrow': {   // add at a position — also how Undo puts a deleted row back where it was
@@ -1002,6 +1056,7 @@ function applyAction(action) {
       const cur = it.rowIndex || 0;
       it.rowIndex = (n <= cur) ? Math.min(it.rows.length - 1, cur + 1) : cur;   // whatever was on air stays on air
       if (!it.rowKey) it.rowKey = it.columns[0] || '';
+      clampReveals(it);
       saveShows(); break;
     }
     case 'show_addcol': {   // a spreadsheet arrived missing a field the design needs
@@ -1147,7 +1202,7 @@ const server = http.createServer((req, res) => {
     if (group === 'list') {
       return okJson({ ok: true,
         presets: state.shows.map(s => ({ name: s.name, on: !!s.on, csv: !!(s.rows && s.rows.length), rows: (s.rows || []).length, row: (s.rows && s.rows.length) ? (s.rowIndex || 0) + 1 : 0,
-          reveals: stepLayers(s).map(l => ({ name: l.name || l.type, type: l.type, at: (l.index == null ? -1 : l.index) + 1, of: (l.type === 'bullets' ? (l.items || []) : (l.slides || [])).length })) })),
+          reveals: stepLayers(s).map(l => ({ name: l.name || l.type, type: l.type, at: (l.index == null ? -1 : l.index) + 1, of: stepCount(s, l) })) })),
         scoreboards: (state.scoreboards || []).map(b => ({ name: b.name, visible: !!b.visible })),
         timer: { visible: !!state.timer.visible, mode: state.timer.mode },
         baseball: { visible: !!state.baseball.visible } });
@@ -1174,8 +1229,8 @@ const server = http.createServer((req, res) => {
       if (!it) return fail('preset not found: "' + (q.get('preset') || q.get('name') || '') + '"', 404);
       const L = findStepLayer(it, q.get('layer'));
       if (!L) return fail('preset "' + it.name + '" has no bullets or slides layer to step', 404);
-      const total = (L.type === 'bullets' ? (L.items || []) : (L.slides || [])).length;
-      const at = () => ({ preset: it.name, layer: L.name || L.type, type: L.type, at: (L.index == null ? -1 : L.index) + 1, of: total });
+      // Read the total fresh each time: a CSV-fed build is a different length on every row.
+      const at = () => ({ preset: it.name, layer: L.name || L.type, type: L.type, at: (L.index == null ? -1 : L.index) + 1, of: stepCount(it, L) });
       if (cmd === 'status') return okJson(Object.assign({ ok: true }, at()));
       if (['next', 'prev', 'first', 'last', 'all', 'blank', 'reset'].indexOf(cmd) >= 0) {
         applyAction({ type: 'show_layercmd', id: it.id, layerId: L.id, cmd });
