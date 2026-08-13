@@ -18,17 +18,26 @@
  */
 'use strict';
 const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 
-let pkgMajor = 0;
-try { pkgMajor = parseInt(String(require('./package.json').version).split('.')[0], 10) || 0; } catch (e) {}
+/* The major version a "this version only" key should cap at.
+ * The fallback matters: this script also lives in the standalone License Maker folder, which has
+ * no package.json. Reading it there would give 0, and a key capped at v0 unlocks nothing at all —
+ * it would look perfectly fine here and be refused on the customer's machine. */
+let pkgMajor = 1;
+try { pkgMajor = parseInt(String(require('./package.json').version).split('.')[0], 10) || pkgMajor; } catch (e) {}
+
+// Beside THIS file, not beside wherever the terminal happened to be sitting — a key file found
+// by accident (or not found at all) is the one mistake in this script that costs a customer.
+const KEY_FILE = path.join(__dirname, '.license-private-key.pem');
 
 function sign(name, tier, features, exp, upto) {
   let priv;
-  try { priv = fs.readFileSync('.license-private-key.pem', 'utf8'); }
+  try { priv = fs.readFileSync(KEY_FILE, 'utf8'); }
   catch (e) {
     console.error('\nMissing .license-private-key.pem (your secret signing key).');
-    console.error('Run  node setup-key.js  first to create it.\n');
+    console.error('Copy it into this folder: ' + KEY_FILE + '\n');
     process.exit(1);
   }
   const claims = { name, tier, features, exp };
