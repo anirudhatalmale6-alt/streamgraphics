@@ -131,28 +131,53 @@
         <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px">
           <span class="mini" style="color:var(--muted)">Reference image (design aid — not on air):</span>
           <label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="image/*" id="refFile" style="display:none"></label>
-          <button class="btn ghost" id="obsBtn" style="font-size:12px">Grab from OBS</button>
+          <button class="btn ghost" id="obsBtn" style="font-size:12px">Grab from switcher</button>
           <span class="mini" style="color:var(--muted)">opacity</span><input class="range" id="refOpacity" type="range" min="0" max="100" value="50" style="width:90px">
           <button class="btn ghost" id="refClear" style="font-size:12px">Clear</button>
         </div>
 
-        <!-- OBS grab. Hidden until asked for: most people paste a screen grab and never open this. -->
-        <div id="obsPanel" style="display:none;max-width:560px;margin:10px auto 0;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
-          <div class="mini" style="color:var(--muted);margin-bottom:8px">
-            In OBS: <b>Tools &gt; WebSocket Server Settings</b> &rarr; tick <b>Enable WebSocket server</b>, then <b>Show Connect Info</b> for the port and password.
+        <!-- Grab from the switcher. Hidden until asked for: most people paste a screen grab and never open this. -->
+        <div id="obsPanel" style="display:none;max-width:580px;margin:10px auto 0;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <button class="btn ghost" id="tabObs" style="font-size:12px">OBS</button>
+            <button class="btn ghost" id="tabVmix" style="font-size:12px">vMix</button>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <input class="inp" id="obsHost" placeholder="127.0.0.1" style="width:150px" title="the computer running OBS — leave as is if that's this one">
-            <input class="inp" id="obsPort" placeholder="4455" style="width:80px">
-            <input class="inp" id="obsPass" type="password" placeholder="password (if set)" style="width:170px">
-            <button class="btn ghost" id="obsTest" style="font-size:12px">Connect</button>
+
+          <div id="obsFields">
+            <div class="mini" style="color:var(--muted);margin-bottom:8px">
+              In OBS: <b>Tools &gt; WebSocket Server Settings</b> &rarr; tick <b>Enable WebSocket server</b>, then <b>Show Connect Info</b> for the port and password.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input class="inp" id="obsHost" placeholder="127.0.0.1" style="width:150px" title="the computer running OBS — leave as is if that's this one">
+              <input class="inp" id="obsPort" placeholder="4455" style="width:80px">
+              <input class="inp" id="obsPass" type="password" placeholder="password (if set)" style="width:170px">
+              <button class="btn ghost" id="obsTest" style="font-size:12px">Connect</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+              <select class="inp" id="obsScene" style="width:auto;display:none"></select>
+              <button class="btn" id="obsGrab" style="font-size:12px;display:none">Grab frame</button>
+              <span class="mini" id="obsMsg" style="color:var(--muted2)"></span>
+            </div>
+            <div class="mini" style="color:var(--muted2);margin-top:8px">The password is kept for this browser session only and is never saved to disk.</div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
-            <select class="inp" id="obsScene" style="width:auto;display:none"></select>
-            <button class="btn" id="obsGrab" style="font-size:12px;display:none">Grab frame</button>
-            <span class="mini" id="obsMsg" style="color:var(--muted2)"></span>
+
+          <div id="vmixFields" style="display:none">
+            <div class="mini" style="color:var(--muted);margin-bottom:8px">
+              In vMix: <b>Settings &gt; Web Controller</b> &rarr; tick <b>Enabled</b>. Use the <b>Web Site Address</b> vMix shows you there —
+              vMix will not answer to <code>localhost</code>, only to the computer's own network address.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input class="inp" id="vmixHost" placeholder="192.168.1.10" style="width:170px" title="the address vMix shows under Settings > Web Controller">
+              <input class="inp" id="vmixPort" placeholder="8088" style="width:80px">
+              <button class="btn ghost" id="vmixTest" style="font-size:12px">Connect</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+              <select class="inp" id="vmixSource" style="width:auto;display:none"></select>
+              <button class="btn" id="vmixGrab" style="font-size:12px;display:none">Grab frame</button>
+              <span class="mini" id="vmixMsg" style="color:var(--muted2)"></span>
+            </div>
+            <div class="mini" style="color:var(--muted2);margin-top:8px">vMix saves the still on its own computer, so this needs vMix and StreamGraphics on the same machine.</div>
           </div>
-          <div class="mini" style="color:var(--muted2);margin-top:8px">The password is kept for this browser session only and is never saved to disk.</div>
         </div>
 
         <p class="mini" id="refHint" style="text-align:center;color:var(--muted2);margin-top:5px">Grab a frame off your switcher with <b>Win + Shift + S</b>, then press <b>Ctrl + V</b> here — or drag an image straight onto the canvas.</p>

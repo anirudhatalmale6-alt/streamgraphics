@@ -23,6 +23,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const obsGrab = require('./obs-grab');
+const vmixGrab = require('./vmix-grab');
 
 const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -1324,6 +1325,38 @@ const server = http.createServer((req, res) => {
           if (e2) return sendJson(200, { ok: false, error: 'Could not save the grabbed frame.' });
           sendJson(200, { ok: true, url: '/uploads/' + fname, source: out.source });
         });
+      });
+    });
+    return;
+  }
+
+  /* --- the same grab, from vMix ---
+   * vMix cannot hand a picture back over HTTP; its only stills function writes a file to disk on
+   * the vMix machine. So we ask it to write into our own uploads folder, which works when
+   * StreamGraphics and vMix share a computer and is explained plainly when they do not. */
+  if ((pathname === '/vmix/state' || pathname === '/vmix/grab') && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', () => {
+      const sendJson = (code, obj) => {
+        res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify(obj));
+      };
+      let j;
+      try { j = JSON.parse(body || '{}'); } catch (e) { return sendJson(400, { ok: false, error: 'bad request' }); }
+      const opts = { host: String(j.host || '').trim(), port: j.port || 8088 };
+
+      if (pathname === '/vmix/state') {
+        return vmixGrab.state(opts, (err, st) => {
+          if (err) return sendJson(200, { ok: false, error: err.message });
+          sendJson(200, Object.assign({ ok: true }, st));
+        });
+      }
+      opts.dir = UPLOAD_DIR;
+      if (j.input) opts.input = parseInt(j.input, 10) || 0;
+      vmixGrab.grab(opts, (err, out) => {
+        if (err) return sendJson(200, { ok: false, error: err.message });
+        sendJson(200, { ok: true, url: '/uploads/' + out.name, source: opts.input ? ('input ' + opts.input) : 'the program output' });
       });
     });
     return;

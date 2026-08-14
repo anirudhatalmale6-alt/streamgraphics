@@ -1022,9 +1022,28 @@
     }
     function say(t, bad) { msg.textContent = t; msg.style.color = bad ? '#e08a72' : 'var(--muted2)'; }
 
+    /* OBS or vMix. Remembered, because nobody switches brand of switcher mid-season. */
+    function showTab(which) {
+      var isV = which === 'vmix';
+      $('obsFields').style.display = isV ? 'none' : '';
+      $('vmixFields').style.display = isV ? '' : 'none';
+      $('tabObs').classList.toggle('on', !isV);
+      $('tabVmix').classList.toggle('on', isV);
+      $('tabObs').style.opacity = isV ? '.55' : '1';
+      $('tabVmix').style.opacity = isV ? '1' : '.55';
+      try { localStorage.setItem('grab_switcher', which); } catch (e) {}
+    }
+    $('tabObs').onclick = function () { showTab('obs'); };
+    $('tabVmix').onclick = function () { showTab('vmix'); };
+    var startTab = 'obs';
+    try { startTab = localStorage.getItem('grab_switcher') || 'obs'; } catch (e) {}
+    showTab(startTab);
+
     $('obsBtn').onclick = function () {
       panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-      if (panel.style.display === 'block' && !pick.options.length) $('obsTest').click();
+      if (panel.style.display !== 'block') return;
+      if (startTab === 'vmix') { if (!$('vmixSource').options.length && $('vmixHost').value) $('vmixTest').click(); return; }
+      if (!pick.options.length) $('obsTest').click();
     };
 
     $('obsTest').onclick = function () {
@@ -1062,6 +1081,66 @@
           say('Grabbed ' + (res.source || 'the live scene') + '.');
         })
         .catch(function () { say('Grab failed.', true); });
+    };
+
+    /* ---- the vMix side ----
+     * Different mechanics entirely: vMix cannot hand a picture back down the wire, it writes one
+     * to disk. No password here — vMix's API has no login of its own for this. */
+    var vMsg = $('vmixMsg'), vPick = $('vmixSource'), vGrab = $('vmixGrab');
+    function vsay(t, bad) { vMsg.textContent = t; vMsg.style.color = bad ? '#e08a72' : 'var(--muted2)'; }
+    function vconn() {
+      var o = { host: $('vmixHost').value.trim(), port: $('vmixPort').value.trim() || 8088 };
+      try {
+        localStorage.setItem('vmix_host', o.host);
+        localStorage.setItem('vmix_port', String(o.port));
+      } catch (e) {}
+      return o;
+    }
+    try {
+      $('vmixHost').value = localStorage.getItem('vmix_host') || '';
+      $('vmixPort').value = localStorage.getItem('vmix_port') || '';
+    } catch (e) {}
+
+    $('vmixTest').onclick = function () {
+      if (!$('vmixHost').value.trim()) return vsay('Put in the address vMix shows under Settings > Web Controller.', true);
+      vsay('Connecting…');
+      vPick.style.display = vGrab.style.display = 'none';
+      fetch('/vmix/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vconn()) })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.ok) return vsay(res.error || 'Could not reach vMix.', true);
+          vPick.innerHTML = '';
+          // Program output first: it is the composited picture, overlays and all, which is the
+          // thing you are actually trying to line a graphic up against.
+          var prog = document.createElement('option');
+          prog.value = ''; prog.textContent = 'Program output (what’s on air)';
+          vPick.appendChild(prog);
+          (res.inputs || []).forEach(function (inp) {
+            var o = document.createElement('option');
+            o.value = inp.number;
+            o.textContent = inp.number + '. ' + inp.title + (inp.number === res.active ? '  — on air' : (inp.number === res.preview ? '  — preview' : ''));
+            vPick.appendChild(o);
+          });
+          vPick.style.display = vGrab.style.display = '';
+          vsay('vMix ' + (res.version || '') + (res.edition ? ' ' + res.edition : '') + ' connected.');
+        })
+        .catch(function () { vsay('Could not reach vMix.', true); });
+    };
+
+    vGrab.onclick = function () {
+      vsay('Asking vMix for a frame…');
+      var body = vconn(); body.input = vPick.value || '';
+      fetch('/vmix/grab', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.ok) return vsay(res.error || 'Grab failed.', true);
+          refimg.src = res.url;
+          refimg.style.display = 'block';
+          refimg.style.opacity = $('refOpacity').value / 100;
+          saveRef({ url: res.url, opacity: +$('refOpacity').value });
+          vsay('Grabbed ' + (res.source || 'the program output') + '.');
+        })
+        .catch(function () { vsay('Grab failed.', true); });
     };
   })();
 
