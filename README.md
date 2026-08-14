@@ -47,6 +47,26 @@ drag them on the 1920×1080 canvas (or type exact pixel X/Y/W/H), and style each
 The design is saved (survives restart) and persists in `data/lowerthird.json`;
 "Reset to default" restores the starter design. Title-safe guide shown on the canvas.
 
+### Reference image — grab it straight from your switcher
+The builder can show a still of your actual programme behind the canvas, so you design
+against the real shot instead of guessing. **Grab from switcher** offers two tabs:
+
+- **OBS** — needs *Tools > WebSocket Server Settings > Enable WebSocket server*. Enter the
+  address, port (4455) and the password OBS shows under **Show Connect Info**. Pick the live
+  scene or any specific one. OBS sends the picture back down the connection, so this works
+  **from any computer on the network**.
+- **vMix** — needs *Settings > Web Controller > Enabled*. Pick **Program output** (what's on
+  air) or any single input by name. Note vMix only answers on the machine's network address
+  (192.168.x.x), never on `localhost` — it refuses loopback callers as browser scripts.
+
+One difference worth knowing: vMix has no way to send a picture over the wire. It can only
+**save a still to disk on the vMix machine**, so this reads that file back — which means
+StreamGraphics has to be on the vMix computer, or pointed at a folder both can see. OBS has
+no such restriction. Every grab is written under a fresh filename, so nothing is ever
+overwritten and no stale picture can be served from a cache.
+
+Passwords are never written to disk — the OBS password is kept for the session only.
+
 ## Troubleshooting
 **"EADDRINUSE / port 4000 already in use"** — an earlier copy of StreamGraphics is
 still running in another window. Either use that window, or close it (click it and

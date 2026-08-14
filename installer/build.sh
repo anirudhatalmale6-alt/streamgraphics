@@ -16,7 +16,11 @@ ENGINE="$STAGE/sgpro-engine.exe"          # the Node runtime, uniquely renamed
 echo ">> staging app files into $STAGE"
 rm -rf "$HERE/build" && mkdir -p "$STAGE/assets" "$STAGE/data"
 # End-user files ONLY. Never ship the private signing key, make-license.js, or vendor docs.
+# NOTE: this is a hand-written list, so every new server-side module has to be added here too.
+# The smoke test below exists precisely because that is easy to forget — 1.0.17 nearly shipped
+# without obs-grab.js/vmix-grab.js, which would have made the app fail to start at all.
 cp "$ROOT/server.js" "$ROOT/package.json" "$ROOT/LICENSE.txt" "$STAGE/"
+cp "$ROOT/obs-grab.js" "$ROOT/vmix-grab.js" "$STAGE/"
 cp -r "$ROOT/public" "$STAGE/public"
 cp "$ROOT/assets/streamgraphics.ico" "$ROOT/assets/streamgraphics.png" "$STAGE/assets/"
 cp "$HERE/launchers/StreamGraphics Pro.vbs" "$STAGE/"
@@ -38,6 +42,32 @@ BAD_TEXT="$(grep -rIl --exclude='*.exe' -- '-----BEGIN .*PRIVATE KEY-----' "$STA
 if [ -n "$BAD_FILES" ] || [ -n "$BAD_TEXT" ]; then
   echo "!! ABORT: sensitive item in stage:"; [ -n "$BAD_FILES" ] && echo "$BAD_FILES"; [ -n "$BAD_TEXT" ] && echo "$BAD_TEXT"; exit 1
 fi
+
+echo ">> smoke test: does the staged app actually start?"
+# The file list above is hand-written, so a new require() in server.js that nobody remembered to
+# stage produces an installer that looks perfect and dies on launch with MODULE_NOT_FOUND — on the
+# customer's machine, after they've paid. So: boot the staged copy and make it answer a real
+# request before we wrap it up. Tested on a COPY so the stage keeps no data/ files the app writes
+# on first run, and on a free port so it can never collide with anything already running.
+SMOKE="$(mktemp -d)"
+trap 'rm -rf "$SMOKE"' EXIT
+cp -r "$STAGE" "$SMOKE/app"
+rm -f "$SMOKE/app/sgpro-engine.exe"                 # a Windows binary; the test runs on this machine's node
+SMOKE_PORT="$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"
+SG_NO_OPEN=1 PORT="$SMOKE_PORT" node "$SMOKE/app/server.js" >"$SMOKE/out.log" 2>&1 &
+SMOKE_PID=$!
+SMOKE_OK=""
+for _ in $(seq 1 40); do
+  if curl -fsS -o /dev/null "http://127.0.0.1:$SMOKE_PORT/" 2>/dev/null; then SMOKE_OK=1; break; fi
+  kill -0 "$SMOKE_PID" 2>/dev/null || break        # it died — stop waiting, go read the log
+  sleep 0.25
+done
+kill "$SMOKE_PID" 2>/dev/null || true
+wait "$SMOKE_PID" 2>/dev/null || true
+if [ -z "$SMOKE_OK" ]; then
+  echo "!! ABORT: the staged app did not start. Its output:"; sed 's/^/   | /' "$SMOKE/out.log"; exit 1
+fi
+echo "   staged app starts and serves pages"
 
 echo ">> the .exe launcher (so the app can be pinned to the taskbar)"
 # Prefer a signed copy if we have one. The launcher is the file the customer actually clicks
