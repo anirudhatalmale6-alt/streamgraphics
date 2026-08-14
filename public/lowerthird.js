@@ -998,6 +998,73 @@
   $('refOpacity').oninput = function () { refimg.style.opacity = $('refOpacity').value / 100; var r = JSON.parse(localStorage.getItem('lt_ref') || '{}'); r.opacity = +$('refOpacity').value; saveRef(r); };
   $('refClear').onclick = function () { refimg.removeAttribute('src'); refimg.style.display = 'none'; localStorage.removeItem('lt_ref'); };
 
+  /* ---- grab the reference image straight out of OBS ----
+   * Same end result as Browse or Ctrl+V, minus the alt-tabbing. Address and port are remembered;
+   * the password is held in sessionStorage so it dies with the browser session and never reaches
+   * localStorage or the server's state file. */
+  (function obsRef() {
+    var panel = $('obsPanel'), msg = $('obsMsg'), pick = $('obsScene'), grabBtn = $('obsGrab');
+    if (!panel) return;
+    try {
+      $('obsHost').value = localStorage.getItem('obs_host') || '';
+      $('obsPort').value = localStorage.getItem('obs_port') || '';
+      $('obsPass').value = sessionStorage.getItem('obs_pass') || '';
+    } catch (e) {}
+
+    function conn() {
+      var o = { host: $('obsHost').value.trim() || '127.0.0.1', port: $('obsPort').value.trim() || 4455, password: $('obsPass').value };
+      try {
+        localStorage.setItem('obs_host', $('obsHost').value.trim());
+        localStorage.setItem('obs_port', $('obsPort').value.trim());
+        if (o.password) sessionStorage.setItem('obs_pass', o.password); else sessionStorage.removeItem('obs_pass');
+      } catch (e) {}
+      return o;
+    }
+    function say(t, bad) { msg.textContent = t; msg.style.color = bad ? '#e08a72' : 'var(--muted2)'; }
+
+    $('obsBtn').onclick = function () {
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+      if (panel.style.display === 'block' && !pick.options.length) $('obsTest').click();
+    };
+
+    $('obsTest').onclick = function () {
+      say('Connecting…');
+      pick.style.display = grabBtn.style.display = 'none';
+      fetch('/obs/scenes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(conn()) })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.ok) return say(res.error || 'Could not reach OBS.', true);
+          pick.innerHTML = '';
+          // "What's on air" first, because that is what the operator means nine times out of ten.
+          var live = document.createElement('option');
+          live.value = ''; live.textContent = 'What’s on air' + (res.current ? ' (' + res.current + ')' : '');
+          pick.appendChild(live);
+          (res.scenes || []).forEach(function (n) {
+            var o = document.createElement('option'); o.value = n; o.textContent = n; pick.appendChild(o);
+          });
+          pick.style.display = grabBtn.style.display = '';
+          say('OBS ' + (res.obsVersion || '') + ' connected.');
+        })
+        .catch(function () { say('Could not reach OBS.', true); });
+    };
+
+    grabBtn.onclick = function () {
+      say('Grabbing…');
+      var body = conn(); body.source = pick.value || '';
+      fetch('/obs/grab', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.ok) return say(res.error || 'Grab failed.', true);
+          refimg.src = res.url + '?t=' + Date.now();     // same name never repeats, but be certain
+          refimg.style.display = 'block';
+          refimg.style.opacity = $('refOpacity').value / 100;
+          saveRef({ url: res.url, opacity: +$('refOpacity').value });
+          say('Grabbed ' + (res.source || 'the live scene') + '.');
+        })
+        .catch(function () { say('Grab failed.', true); });
+    };
+  })();
+
   // Same job as the Browse button, from a File the user got here some other way.
   function useAsRef(f) {
     if (!f || !/^image\//.test(f.type || '')) return false;

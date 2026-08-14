@@ -22,6 +22,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const obsGrab = require('./obs-grab');
 
 const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -1289,6 +1290,43 @@ const server = http.createServer((req, res) => {
     }
 
     return fail('unknown api group: "' + group + '" (use preset/timer/scoreboard/baseball/list)', 404);
+  }
+
+  /* --- grab a still frame out of OBS, to use as the builder's reference image ---
+   * The operator's OBS password arrives in this request, is used to answer one challenge, and is
+   * never written down: not to disk, not to the state file, not to the log. That is deliberate.
+   * Everything here is local — the app talks to OBS directly, nothing leaves the network. */
+  if ((pathname === '/obs/scenes' || pathname === '/obs/grab') && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', () => {
+      const sendJson = (code, obj) => {
+        res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify(obj));
+      };
+      let j;
+      try { j = JSON.parse(body || '{}'); } catch (e) { return sendJson(400, { ok: false, error: 'bad request' }); }
+      const opts = { host: String(j.host || '127.0.0.1').trim(), port: j.port, password: j.password || '', source: j.source || '', width: j.width };
+
+      if (pathname === '/obs/scenes') {
+        return obsGrab.listScenes(opts, (err, info) => {
+          if (err) return sendJson(200, { ok: false, error: err.message });
+          sendJson(200, Object.assign({ ok: true }, info));
+        });
+      }
+      obsGrab.grabFrame(opts, (err, out) => {
+        if (err) return sendJson(200, { ok: false, error: err.message });
+        const m = /^data:image\/png;base64,(.*)$/.exec(out.dataUri || '');
+        if (!m) return sendJson(200, { ok: false, error: 'OBS answered but sent no picture.' });
+        // Same home as a browsed-for reference image, so Clear/opacity/persistence all keep working.
+        const fname = 'obs_' + Date.now() + '.png';
+        fs.writeFile(path.join(UPLOAD_DIR, fname), Buffer.from(m[1], 'base64'), (e2) => {
+          if (e2) return sendJson(200, { ok: false, error: 'Could not save the grabbed frame.' });
+          sendJson(200, { ok: true, url: '/uploads/' + fname, source: out.source });
+        });
+      });
+    });
+    return;
   }
 
   // --- upload a local image, get back a short URL to use as a logo/backdrop ---
