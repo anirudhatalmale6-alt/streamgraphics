@@ -350,7 +350,13 @@
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();
-  $('outUrl').textContent = location.protocol + '//' + location.host + '/scoreboard-output';
+  /* The output link. Two things move it: picking a different court (adds ?board=)
+     and sg-links.js resolving this computer's LAN address, which is the one that
+     works when it is pasted into OBS/vMix on another machine. Keep the path in one
+     variable so either can repaint it. */
+  var outPath = '/scoreboard-output';
+  function paintOut() { $('outUrl').textContent = SGLinks.url(outPath); }
+  SGLinks.onbase(paintOut);
 
   /* ---- multiple scoreboards ("courts") ---- */
   function escH(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -360,7 +366,8 @@
     selEl.innerHTML = boards.map(function (b) { return '<option value="' + b.id + '"' + (b.id === cur ? ' selected' : '') + '>' + escH(b.name) + '</option>'; }).join('');
     $('boardDelete').disabled = boards.length <= 1;
     $('scorerLink').href = '/scorer?board=' + encodeURIComponent(cur);
-    $('outUrl').textContent = location.protocol + '//' + location.host + '/scoreboard-output?board=' + encodeURIComponent(cur);
+    outPath = '/scoreboard-output?board=' + encodeURIComponent(cur);
+    paintOut();
   }
   function goBoard(id) { location.search = '?board=' + encodeURIComponent(id); }
   $('boardSel').onchange = function () { goBoard($('boardSel').value); };
@@ -379,10 +386,5 @@
 
   // green-screen toggle + copy link
   $('chroma').onchange = function () { send({ type: 'sb_style', style: { chroma: $('chroma').checked ? 'green' : '' } }); };
-  $('copyBtn').onclick = function () {
-    var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent;
-    var ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
-    if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok, ok);
-    else { var t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); ok(); } catch (e) {} t.remove(); }
-  };
+  $('copyBtn').onclick = function () { SGLinks.copy($('outUrl').textContent, this); };
 })();

@@ -27,6 +27,19 @@ screen on launch; set `SG_NO_OPEN=1` to skip that. URLs:
 - Scoreboard control: http://localhost:4000/scoreboard     · output: /scoreboard-output
 - Lower-third control: http://localhost:4000/lowerthird    · output: /lowerthird-output
 
+### Setting up the OBS/vMix machine — don't type the links
+
+Open **http://localhost:4000/links** (or the 🔗 button on the home page). It lists every
+output and control link already built from this computer's network address, with a Copy
+button on each, one that copies them all, and one that copies the whole page as an email
+you can send to whoever is setting up the other computer.
+
+That address matters: a link that says `localhost` points the *other* computer at itself,
+so it can never work there. Every Copy link button in the app now hands out this
+computer's network address instead. If the computer has several (Wi-Fi, Ethernet, a VPN,
+or a virtual adapter left by Hyper-V/VirtualBox/Docker), the links page lets you pick
+which one — if a link doesn't load on the far machine, pick the next address and copy again.
+
 Every output page works the same in **OBS** (Browser Source) or **vMix** (Web Browser
 input) or any browser, at 1920×1080. Each control panel has a **Copy link** button for
 the output URL and a **Green screen** toggle (renders on solid green for a hardware

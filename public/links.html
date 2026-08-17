@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics Pro — Browser source links</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .row{display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px;flex-wrap:wrap}
+  .row .nm{font-weight:700;min-width:150px;flex:0 0 auto}
+  .row .lk{flex:1;min-width:220px;font-family:'Consolas','SF Mono',Menlo,monospace;font-size:12.5px;color:#cfe0f5;background:#0a0e14;border:1px solid var(--line);border-radius:7px;padding:7px 9px;overflow:auto;white-space:nowrap;user-select:all}
+  .row .minibtn{flex:0 0 auto}
+  .minibtn{font-size:12px;line-height:1;padding:8px 12px;min-height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+  .minibtn:hover{border-color:var(--accent)}
+  .bigbtn{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:9px;padding:11px 18px;cursor:pointer;font-size:14px}
+  .bigbtn.alt{background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-weight:600}
+  .mini{color:var(--muted);font-size:12.5px}
+  .warn{background:#2a1f10;border:1px solid #6b4a12;color:#f0c674;border-radius:10px;padding:11px 13px;font-size:13px;margin-bottom:12px}
+  select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:9px 11px;font:inherit;max-width:100%}
+  #mail{width:100%;min-height:230px;background:#0a0e14;border:1px solid var(--line);border-radius:10px;color:#cfe0f5;padding:12px;font-family:'Consolas','SF Mono',Menlo,monospace;font-size:12.5px;line-height:1.5;resize:vertical}
+  @media(max-width:640px){ .row .nm{min-width:100%} }
+</style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233b82f6'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='34' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3E%26%23128279;%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="top">
+    <div style="display:flex;align-items:center">
+      <div class="brand"><span class="dot"></span> StreamGraphics Pro <small>Browser source links</small></div>
+      <nav class="topnav"><a href="/">☰ All graphics</a><a href="/lowerthird">Graphics builder</a><a href="/shows">Show Library</a><a href="/scoreboard">Scoreboard</a></nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h3>This computer's address</h3>
+      <div id="ipWarn"></div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <select id="ipSel" aria-label="Network address to build the links from"></select>
+        <span class="mini" id="ipHint"></span>
+      </div>
+      <p class="mini" style="margin-top:10px">Every link below is built from this address, so it works when it is opened on a different computer. Windows may ask to allow network access the first time — click Allow.</p>
+    </section>
+
+    <section class="panel">
+      <h3 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">Outputs — add these as a Browser Source
+        <span style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="bigbtn" id="copyAll">Copy all output links</button>
+          <button class="bigbtn alt" id="copyMail">Copy the whole page as an email</button>
+        </span>
+      </h3>
+      <p class="mini" style="margin:-4px 0 12px">OBS: <b>Browser</b> source · vMix: <b>Web Browser</b> input · size <b>1920 × 1080</b>. Paste the link in — never type it.</p>
+      <div id="outs"></div>
+    </section>
+
+    <section class="panel">
+      <h3 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">Control panels — open these in a browser
+        <button class="minibtn" id="copyCtl">Copy all control links</button>
+      </h3>
+      <p class="mini" style="margin:-4px 0 12px">These are the operator screens. Open them on a laptop, tablet or phone on the same network to drive the show from anywhere in the room.</p>
+      <div id="ctls"></div>
+    </section>
+
+    <section class="panel">
+      <h3>Ready to email</h3>
+      <p class="mini" style="margin:-4px 0 10px">Edit it if you like, then copy and paste it into an email to whoever is setting up the other computer.</p>
+      <textarea id="mail" spellcheck="false" aria-label="Email text"></textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="bigbtn" id="copyMail2">Copy this text</button>
+        <button class="minibtn" id="mailReset">Start over</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="/sg-live.js"></script>
+  <script src="/sg-links.js"></script>
+  <script src="/sg-autoreload.js"></script>
+  <script>
+  (function () {
+    var $ = function (id) { return document.getElementById(id); };
+
+    /* The fixed pages. Named scoreboards are added on top of these once /state
+       answers, because a second court has its own ?board= link and getting that one
+       wrong is the easiest mistake of the lot. */
+    var OUTPUTS = [
+      { nm: "Presenter's Timer",   p: '/output',            note: 'countdown / count-up for the speaker' },
+      { nm: 'Graphics / Lower Third', p: '/lowerthird-output', note: 'whatever is on the builder canvas' },
+      { nm: 'Program (Show Library)', p: '/program-output',  note: 'every preset you switch on, composited' },
+      { nm: 'Beach Volleyball',    p: '/scoreboard-output',  note: 'scoreboard' },
+      { nm: 'Baseball / Softball', p: '/baseball-output',    note: 'scoreboard' }
+    ];
+    var CONTROLS = [
+      { nm: 'All graphics (home)', p: '/' },
+      { nm: 'Graphics builder',    p: '/lowerthird' },
+      { nm: 'Show Library',        p: '/shows' },
+      { nm: "Presenter's Timer",   p: '/control' },
+      { nm: 'Scoreboards',         p: '/scoreboards' },
+      { nm: 'Scorer (big buttons)', p: '/scorer' },
+      { nm: 'Stream Deck / Companion commands', p: '/control-api' }
+    ];
+
+    var outputs = OUTPUTS.slice();
+    var mailEdited = false;
+
+    function rowHtml(item, id) {
+      return '<div class="row">'
+           + '<div class="nm">' + esc(item.nm) + (item.note ? '<div class="mini" style="font-weight:400">' + esc(item.note) + '</div>' : '') + '</div>'
+           + '<div class="lk" id="' + id + '"></div>'
+           + '<button class="minibtn" data-copy="' + id + '">Copy</button>'
+           + '</div>';
+    }
+    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+    function render() {
+      $('outs').innerHTML = outputs.map(function (o, i) { return rowHtml(o, 'o' + i); }).join('');
+      $('ctls').innerHTML = CONTROLS.map(function (c, i) { return rowHtml(c, 'c' + i); }).join('');
+      paint();
+    }
+
+    /* Re-runs whenever the chosen address changes, so switching adapters updates
+       every link on the page at once. */
+    function paint() {
+      outputs.forEach(function (o, i) { var el = $('o' + i); if (el) el.textContent = SGLinks.url(o.p); });
+      CONTROLS.forEach(function (c, i) { var el = $('c' + i); if (el) el.textContent = SGLinks.url(c.p); });
+      if (!mailEdited) $('mail').value = mailText();
+    }
+
+    function mailText() {
+      var L = [];
+      L.push('StreamGraphics Pro — browser source links');
+      L.push('');
+      L.push('The StreamGraphics computer is at ' + SGLinks.base());
+      L.push('Both computers have to be on the same network, and StreamGraphics has to be running.');
+      L.push('');
+      L.push('OUTPUTS — add as an OBS "Browser" source or a vMix "Web Browser" input, 1920 x 1080:');
+      L.push('');
+      outputs.forEach(function (o) {
+        L.push('  ' + o.nm + (o.note ? '  (' + o.note + ')' : ''));
+        L.push('  ' + SGLinks.url(o.p));
+        L.push('');
+      });
+      L.push('CONTROL PANELS — just open in a web browser:');
+      L.push('');
+      CONTROLS.forEach(function (c) { L.push('  ' + c.nm); L.push('  ' + SGLinks.url(c.p)); L.push(''); });
+      L.push('Copy and paste the links — do not retype them.');
+      return L.join('\n');
+    }
+
+    function listText(items) {
+      return items.map(function (i) { return SGLinks.url(i.p); }).join('\n');
+    }
+
+    /* --- address picker --- */
+    function paintPicker() {
+      var sel = $('ipSel'), warn = $('ipWarn'), hint = $('ipHint');
+      sel.innerHTML = '';
+      if (!SGLinks.localOnly) {
+        // Opened from another device already: that address demonstrably works.
+        var o = document.createElement('option');
+        o.value = ''; o.textContent = SGLinks.base();
+        sel.appendChild(o);
+        sel.disabled = true;
+        hint.textContent = 'the address you opened this page on';
+        return;
+      }
+      if (!SGLinks.ips.length) {
+        sel.style.display = 'none';
+        warn.innerHTML = '<div class="warn"><b>No network address found.</b> This computer does not appear to be on a network, so the only links available are localhost ones — they will only work on this computer. Connect to Wi-Fi or Ethernet and refresh this page.</div>';
+        hint.textContent = '';
+        return;
+      }
+      SGLinks.ips.forEach(function (ip) {
+        var o = document.createElement('option');
+        o.value = ip; o.textContent = 'http://' + ip + ':' + SGLinks.port;
+        if (ip === SGLinks.chosen) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.disabled = false;
+      hint.textContent = SGLinks.ips.length > 1
+        ? 'this computer has more than one — pick the one your studio network uses'
+        : '';
+      if (SGLinks.ips.length > 1) {
+        warn.innerHTML = '<div class="warn">This computer has <b>' + SGLinks.ips.length + '</b> network addresses (Wi-Fi, Ethernet, a VPN, or virtual ones left by Hyper-V / VirtualBox / Docker). Only one is the one your other computers can see. If a link does not load on the other machine, come back and pick the next address in the list.</div>';
+      }
+    }
+
+    $('ipSel').onchange = function () { SGLinks.choose(this.value); };
+
+    /* --- buttons --- */
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-copy]') : null;
+      if (!b) return;
+      var el = $(b.getAttribute('data-copy'));
+      if (el) SGLinks.copy(el.textContent, b);
+    });
+    $('copyAll').onclick  = function () { SGLinks.copy(listText(outputs), this); };
+    $('copyCtl').onclick  = function () { SGLinks.copy(listText(CONTROLS), this); };
+    $('copyMail').onclick = function () { SGLinks.copy($('mail').value, this); };
+    $('copyMail2').onclick = function () { SGLinks.copy($('mail').value, this); };
+    $('mail').oninput = function () { mailEdited = true; };
+    $('mailReset').onclick = function () { mailEdited = false; $('mail').value = mailText(); };
+
+    SGLinks.onbase(function () { if ($('outs').innerHTML) paint(); });
+
+    render();
+    SGLinks.load(function () {
+      paintPicker();
+      paint();
+      // A second court / field is its own browser source with its own ?board= link.
+      fetch('/state').then(function (r) { return r.json(); }).then(function (s) {
+        var boards = (s && s.state && s.state.scoreboards) || [];
+        if (boards.length < 2) return;
+        var extra = boards.map(function (b) {
+          return { nm: 'Beach Volleyball — ' + b.name, p: '/scoreboard-output?board=' + encodeURIComponent(b.id), note: 'scoreboard' };
+        });
+        outputs = OUTPUTS.filter(function (o) { return o.p !== '/scoreboard-output'; }).concat(extra);
+        render();
+      }).catch(function () {});
+    });
+  })();
+  </script>
+</body>
+</html>

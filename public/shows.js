@@ -418,10 +418,7 @@
   ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.style.borderColor = ''; }); });
   dz.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files) uploadMedia(e.dataTransfer.files); });
   refreshMediaList();
-  $('copyBtn').onclick = function () {
-    var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
-    if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok, ok);
-  };
+  $('copyBtn').onclick = function () { SGLinks.copy($('outUrl').textContent, this); };
 
   function connect() {
     var es = SGLive('/events');
@@ -460,5 +457,6 @@
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();
-  $('outUrl').textContent = location.protocol + '//' + location.host + '/program-output';
+  // The address another computer can reach, not localhost — see sg-links.js.
+  SGLinks.onbase(function () { $('outUrl').textContent = SGLinks.url('/program-output'); });
 })();

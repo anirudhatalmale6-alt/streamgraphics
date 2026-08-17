@@ -1424,10 +1424,7 @@
   }
   $('chromaSel').onchange = sendChroma;
   $('chromaColor').oninput = sendChroma;
-  $('copyBtn').onclick = function () {
-    var url = $('outUrl').textContent, b = $('copyBtn'), old = b.textContent, ok = function () { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = old; }, 1200); };
-    if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok, ok);
-  };
+  $('copyBtn').onclick = function () { SGLinks.copy($('outUrl').textContent, this); };
 
   /* ---- server state ---- */
   function connect() {
@@ -1475,5 +1472,6 @@
     }); }
     requestAnimationFrame(builderTick);
   })();
-  $('outUrl').textContent = location.protocol + '//' + location.host + '/lowerthird-output';
+  // The address another computer can reach, not localhost — see sg-links.js.
+  SGLinks.onbase(function () { $('outUrl').textContent = SGLinks.url('/lowerthird-output'); });
 })();

@@ -1680,6 +1680,7 @@ const server = http.createServer((req, res) => {
           : pathname === '/shows' ? '/shows.html'
           : pathname === '/program-output' ? '/program-output.html'
           : pathname === '/control-api' ? '/control-api.html'
+          : pathname === '/links' ? '/links.html'
           : pathname;
   // decode %20 etc. so files/folders with spaces (e.g. /media/Grad 2026/jane.jpg) resolve
   try { rel = decodeURIComponent(rel); } catch (e) {}
@@ -1723,7 +1724,8 @@ server.listen(PORT, () => {
   console.log(`  SHOW LIBRARY:                http://localhost:${PORT}/shows            · output: /program-output`);
   console.log(`  ---------------------------------------------------------------`);
   console.log(`  From ANOTHER computer, swap "localhost" for  ${lan}`);
-  console.log(`  e.g. OBS/vMix Browser Source:  http://${lan}:${PORT}/lowerthird-output\n`);
+  console.log(`  e.g. OBS/vMix Browser Source:  http://${lan}:${PORT}/lowerthird-output`);
+  console.log(`  Every link, ready to copy or email:  http://localhost:${PORT}/links\n`);
   openBrowser('http://localhost:' + PORT + '/');
 });
 

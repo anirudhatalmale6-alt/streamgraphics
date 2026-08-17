@@ -8,12 +8,16 @@
     return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {});
   }
 
-  /* ---- output URL (use this machine's address for OBS/vMix) ---- */
+  /* ---- output URL (use this machine's address for OBS/vMix) ----
+     location.hostname is localhost when the panel is open on the StreamGraphics
+     computer, and a copied localhost link sends the far machine to itself. SGLinks
+     swaps in this computer's LAN address as soon as /netinfo answers. */
   (function () {
-    var host = location.hostname, port = location.port || '80';
-    var url = 'http://' + host + (port ? ':' + port : '') + '/baseball-output';
-    var a = $('outUrl'), b = $('outUrl2'); if (a) a.textContent = url; if (b) b.textContent = url;
-    $('copyBtn').onclick = function () { navigator.clipboard && navigator.clipboard.writeText(url); $('copyBtn').textContent = 'Copied'; setTimeout(function () { $('copyBtn').textContent = 'Copy'; }, 1200); };
+    SGLinks.onbase(function () {
+      var url = SGLinks.url('/baseball-output');
+      var a = $('outUrl'), b = $('outUrl2'); if (a) a.textContent = url; if (b) b.textContent = url;
+    });
+    $('copyBtn').onclick = function () { SGLinks.copy(SGLinks.url('/baseball-output'), this); };
   })();
 
   /* ---- on-air ---- */

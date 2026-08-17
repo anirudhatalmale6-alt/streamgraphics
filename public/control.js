@@ -171,5 +171,8 @@
   connect();
 
   // fill the OBS output URL hint with the real host
-  $('outUrl').textContent = location.protocol + '//' + location.host + '/output';
+  // Show (and copy) the address another computer can actually reach — a localhost
+  // link points the far machine at itself. SGLinks upgrades this once /netinfo answers.
+  SGLinks.onbase(function () { $('outUrl').textContent = SGLinks.url('/output'); });
+  if ($('copyOut')) $('copyOut').onclick = function () { SGLinks.copy($('outUrl').textContent, this); };
 })();
