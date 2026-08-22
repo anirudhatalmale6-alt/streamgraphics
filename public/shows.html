@@ -106,8 +106,13 @@
         <h3 id="rowsTitle" style="margin:0 0 3px;flex:1;min-width:220px">Edit rows</h3>
         <input class="inp" id="rowsFilter" placeholder="Filter rows…" style="width:200px" title="type a name to find one entry among hundreds">
         <button class="minibtn" id="rowsGoCur" title="scroll to the entry that's on air">On-air row</button>
+        <!-- Taking the graphic off air from in here. Stepping rows switches which entry is up;
+             without this the only way to clear the screen was to close the whole editor. -->
+        <div class="airstate" id="rowsAir" style="min-width:78px;text-align:center">OFF AIR</div>
+        <button class="btn go" id="rowsOn" title="put this graphic on air">On air ▸</button>
+        <button class="btn" id="rowsOff" title="take this graphic off air — stays here, so you can keep editing">◂ Off air</button>
       </div>
-      <p class="mini" style="color:var(--muted);margin:0 0 12px">Edits go live as you type — there's no Save button, so nothing gets lost mid-show. The entry that's on air right now is highlighted in red; hit ▶ on any row to put that one up.</p>
+      <p class="mini" style="color:var(--muted);margin:0 0 12px">Edits go live as you type — there's no Save button, so nothing gets lost mid-show. The entry that's on air right now is highlighted in red; hit ▶ on any row to put that one up, and <b>Off air</b> above to clear the screen without leaving this window.</p>
       <div id="rowsTableWrap" style="overflow:auto;flex:1;border:1px solid var(--line);border-radius:10px;min-height:80px"></div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
         <button class="minibtn" id="rowsAdd" title="add an empty entry at the end">＋ Add row</button>

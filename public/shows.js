@@ -189,8 +189,24 @@
       lastDeleted = null; showUndo(false);
       $('rowsTitle').textContent = 'Edit rows — ' + rowsEdit.name;
       renderRows();
+      paintRowsAir();
       $('rowsModal').style.display = 'flex';
     }).catch(function () { alert('Could not reach the app.'); });
+  }
+
+  /* The on-air state of the graphic being edited. Read from `shows` rather than remembered
+     locally: it can be switched from a Stream Deck, a phone or another operator's browser
+     while this window is open, and a button that lies about what is on screen is worse than
+     no button at all. */
+  function paintRowsAir() {
+    if (!rowsEdit) return;
+    var me = shows.filter(function (x) { return x.id === rowsEdit.id; })[0];
+    var on = !!(me && me.on);
+    var badge = $('rowsAir');
+    badge.textContent = on ? 'ON AIR' : 'OFF AIR';
+    badge.className = 'airstate' + (on ? ' live' : '');
+    $('rowsOn').style.display = on ? 'none' : '';
+    $('rowsOff').style.display = on ? '' : 'none';
   }
 
   function closeRows() {
@@ -208,6 +224,8 @@
     var tr = $('rowsTableWrap').querySelector('tr[data-n="' + rowsEdit.cur + '"]');
     if (tr) tr.scrollIntoView({ block: 'center' });
   };
+  $('rowsOn').onclick  = function () { if (rowsEdit) rowsPost({ type: 'show_toggle', id: rowsEdit.id, on: true }); };
+  $('rowsOff').onclick = function () { if (rowsEdit) rowsPost({ type: 'show_toggle', id: rowsEdit.id, on: false }); };
   $('rowsDone').onclick = closeRows;
   $('rowsModal').onclick = function (e) { if (e.target === $('rowsModal')) closeRows(); };
   $('rowsAdd').onclick = function () {
@@ -437,6 +455,7 @@
         if (rowsEdit) {
           var me = shows.filter(function (x) { return x.id === rowsEdit.id; })[0];
           if (me) {
+            paintRowsAir();
             var ci = me.rowIndex || 0;
             if (ci !== rowsEdit.cur) { rowsEdit.cur = ci; paintCurrent(); }
             var cnt = me.rowCount != null ? me.rowCount : ((me.rows || []).length);
