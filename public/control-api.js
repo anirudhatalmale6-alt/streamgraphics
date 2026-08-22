@@ -82,6 +82,20 @@
       row('Take to air', b + '/api/baseball/show'),
       row('Off air', b + '/api/baseball/hide')
     ]);
+    fill($('prompter'), [
+      row('Start / stop', b + '/api/prompter/toggle'),
+      row('Faster', b + '/api/prompter/faster'),
+      row('Slower', b + '/api/prompter/slower'),
+      row('Jump back', b + '/api/prompter/back'),
+      row('Jump ahead', b + '/api/prompter/ahead'),
+      row('Next section', b + '/api/prompter/nextmark'),
+      row('Previous section', b + '/api/prompter/prevmark'),
+      row('Back to the top', b + '/api/prompter/top'),
+      row('Jump to a named section', b + '/api/prompter/mark?name=Intro'),
+      row('Set the speed', b + '/api/prompter/speed?value=40'),
+      row('Take to air', b + '/api/prompter/air'),
+      row('Off air', b + '/api/prompter/off')
+    ]);
   }
 
   function renderLive(data) {

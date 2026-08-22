@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics Pro — Teleprompter Control</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  /* The preview box is sized to the scaled stage exactly (1280x720 at .5), not stretched to
+     the panel width — the prompter has a solid background, so an oversized box would show a
+     strip of empty checkerboard beside the script and read as a rendering fault. */
+  .previewwrap{background:repeating-conic-gradient(#0e131b 0% 25%,#10151f 0% 50%) 50%/26px 26px;border:1px solid var(--line);border-radius:12px;overflow:hidden;width:640px;max-width:100%;height:360px;position:relative;margin:0 auto}
+  .previewwrap iframe{position:absolute;top:0;left:0;width:1280px;height:720px;border:0;transform:scale(.5);transform-origin:top left}
+  @media(max-width:700px){.previewwrap{width:460px;height:259px}.previewwrap iframe{transform:scale(.359)}}
+  .urlgrp{display:inline-flex;align-items:center;gap:8px}
+  .urlgrp code{background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:12px}
+
+  .transport{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .tbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:14px 18px;font-weight:800;font-size:15px;cursor:pointer;min-width:74px;transition:.15s}
+  .tbtn:hover{border-color:var(--accent)}
+  .tbtn.play{background:var(--go);border-color:var(--go);color:#04231a;min-width:150px;font-size:17px}
+  .tbtn.play.on{background:var(--air);border-color:var(--air);color:#fff}
+  .tbtn .k{display:block;font-size:10px;font-weight:700;letter-spacing:.1em;color:#ffffff66;margin-top:3px;text-transform:uppercase}
+  .tbtn.play .k{color:#00000066}
+
+  .gauge{flex:1;min-width:230px}
+  .bar{height:10px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;position:relative;cursor:pointer}
+  .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);width:0}
+  .bar .mk{position:absolute;top:0;bottom:0;width:2px;background:#f4a63c;opacity:.85}
+  .gnums{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+
+  .speedbox{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--panel2)}
+  .speedbox .v{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;min-width:52px;text-align:center}
+  .speedbox button{width:42px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-weight:900;font-size:17px;cursor:pointer}
+  .speedbox button:hover{border-color:var(--accent)}
+
+  #marks{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .mkbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mkbtn:hover{border-color:#f4a63c;color:#f4c37a}
+  .mkbtn.at{background:#f4a63c;border-color:#f4a63c;color:#251703}
+  .nomarks{color:var(--muted);font-size:13px}
+
+  #script{width:100%;min-height:290px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:14px 16px;font:15px/1.6 'Segoe UI',Arial,sans-serif;resize:vertical;outline:none}
+  #script:focus{border-color:var(--accent)}
+
+  .lrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:11px}
+  .lrow label{font-size:13px;color:var(--muted)}
+  .rng{width:150px;accent-color:var(--accent)}
+  .kbd{display:inline-block;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:700;background:var(--panel2);color:var(--txt);font-family:inherit}
+  .keyhelp{font-size:13px;color:var(--muted);line-height:2}
+  @media(max-width:700px){.tbtn{min-width:62px;padding:12px 12px}.tbtn.play{min-width:120px}}
+</style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232b6cb0'/%3E%3Ctext x='32' y='46' font-family='Arial,Helvetica,sans-serif' font-size='34' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3E%E2%96%A4%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="top">
+    <div style="display:flex;align-items:center">
+      <div class="brand"><span class="dot"></span> StreamGraphics Pro <small>Teleprompter</small></div>
+      <nav class="topnav"><a href="/prompter-output" target="_blank">Open output ↗</a><a href="/prompter-output?mirror=1" target="_blank">Mirrored ↗</a><a href="/links">All links</a><a href="/">All graphics</a></nav>
+    </div>
+    <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
+  </header>
+
+  <main>
+    <div class="outbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:14px">
+      <button class="btn big show" id="btnShow">Take to air ▸</button>
+      <button class="btn big hide" id="btnHide">◂ Off air</button>
+      <div class="airstate" id="airState" style="min-width:90px">OFF AIR</div>
+      <span style="flex:1"></span>
+      <!-- Each address travels with its own label and button, so a narrow window wraps them
+           as units instead of stranding "Mirrored:" on the end of the line above. -->
+      <span class="urlgrp"><span class="mini" style="color:var(--muted)">Normal</span>
+        <code id="outUrl">…/prompter-output</code>
+        <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button></span>
+      <span class="urlgrp"><span class="mini" style="color:var(--muted)">Mirrored</span>
+        <code id="outUrlM">…?mirror=1</code>
+        <button id="copyBtnM" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button></span>
+    </div>
+
+    <section class="panel" style="margin-bottom:14px">
+      <div class="previewwrap"><iframe id="pv" src="/prompter-output?preview=1" title="preview"></iframe></div>
+      <p class="mini" style="color:var(--muted);margin-top:9px">Both addresses run this one script at the same time — put the mirrored one on the glass in front of the lens and the normal one on a confidence monitor, or drop either into OBS / vMix as a browser source.</p>
+    </section>
+
+    <!-- transport -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3>Run the script</h3>
+      <div class="transport" style="margin-bottom:14px">
+        <button class="tbtn play" id="btnPlay">Play<span class="k">space</span></button>
+        <button class="tbtn" id="btnBack">▲ Back<span class="k">up</span></button>
+        <button class="tbtn" id="btnAhead">▼ Ahead<span class="k">down</span></button>
+        <button class="tbtn" id="btnTop">⤒ Top<span class="k">home</span></button>
+        <div class="speedbox">
+          <button id="btnSlower" title="Slower">◀</button>
+          <div><div class="v" id="spdV">40</div><div style="font-size:10px;letter-spacing:.1em;color:var(--muted);text-align:center;text-transform:uppercase">speed</div></div>
+          <button id="btnFaster" title="Faster">▶</button>
+        </div>
+      </div>
+      <div class="gauge">
+        <div class="bar" id="bar" title="Click anywhere to jump there"><i id="barFill"></i></div>
+        <div class="gnums"><span id="posTxt">0:00</span><span id="wpmTxt"></span><span id="leftTxt">–:––</span></div>
+      </div>
+    </section>
+
+    <!-- bookmarks -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3>Bookmarks</h3>
+      <div id="marks"><span class="nomarks">Start any line in the script with ## and it becomes a bookmark button here.</span></div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn ghost" id="btnPrevMark">◂ Previous section</button>
+        <button class="btn ghost" id="btnNextMark">Next section ▸</button>
+      </div>
+    </section>
+
+    <!-- script -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3>Script</h3>
+      <textarea id="script" spellcheck="true" placeholder="Type or paste the script here…"></textarea>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px">
+        <span class="mini" style="color:var(--muted)" id="scriptStats">—</span>
+        <span style="flex:1"></span>
+        <span class="mini" style="color:var(--muted)">Saved automatically. Two hashes at the start of a line (## Intro) makes a bookmark.</span>
+      </div>
+    </section>
+
+    <!-- look -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3>How it looks</h3>
+      <div class="lrow">
+        <label>Font</label>
+        <select class="inp" id="stFont" style="width:auto">
+          <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Segoe UI / system</option>
+          <option value="Arial, Helvetica, sans-serif">Arial</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+          <option value="Verdana, Geneva, sans-serif">Verdana</option>
+          <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
+          <option value="'Courier New', monospace">Courier (monospace)</option>
+        </select>
+        <label>Size</label><input type="range" class="rng" id="stSize" min="24" max="160" step="2"><span class="mono" id="szV">64</span>
+        <label>Line spacing</label><input type="range" class="rng" id="stLH" min="1" max="2.6" step="0.05"><span class="mono" id="lhV">1.45</span>
+      </div>
+      <div class="lrow">
+        <label>Column width</label><input type="range" class="rng" id="stW" min="30" max="100" step="1"><span class="mono" id="wV">82</span>
+        <label>Align</label>
+        <select class="inp" id="stAlign" style="width:auto"><option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option></select>
+        <label class="mini" style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stBold"> Bold</label>
+      </div>
+      <div class="lrow">
+        <label>Text</label><input type="color" id="stColor">
+        <label>Background</label><input type="color" id="stBg">
+        <label class="mini" style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stTransparent"> Transparent (key it over a shot)</label>
+        <label>Chroma</label>
+        <select class="inp" id="stChroma" style="width:auto"><option value="">Off</option><option value="#00b140">Green</option><option value="#0047ff">Blue</option><option value="#ff00ff">Magenta</option></select>
+      </div>
+      <div class="lrow">
+        <label>Reading indicator</label>
+        <select class="inp" id="stCue" style="width:auto"><option value="both">Line + arrows</option><option value="line">Line only</option><option value="arrows">Arrows only</option><option value="none">None</option></select>
+        <input type="color" id="stCueColor">
+        <label>Position</label><input type="range" class="rng" id="stCuePos" min="5" max="90" step="1"><span class="mono" id="cpV">38</span>
+      </div>
+      <div class="lrow">
+        <label class="mini" style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stMarks"> Show bookmark headings on screen</label>
+        <input type="color" id="stMarkColor">
+        <label class="mini" style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stFade"> Soften the top and bottom edges</label>
+        <span style="flex:1"></span>
+        <label>Jump step</label><input class="inp s" id="stJump" inputmode="numeric" style="width:74px"><span class="mini" style="color:var(--muted)">px per up/down press</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>Keyboard</h3>
+      <div class="keyhelp">
+        <span class="kbd">space</span> start / stop &nbsp;·&nbsp;
+        <span class="kbd">←</span> slower &nbsp;<span class="kbd">→</span> faster &nbsp;·&nbsp;
+        <span class="kbd">↑</span> jump back &nbsp;<span class="kbd">↓</span> jump ahead &nbsp;·&nbsp;
+        <span class="kbd">Home</span> back to the top &nbsp;·&nbsp;
+        <span class="kbd">PgUp</span> / <span class="kbd">PgDn</span> previous / next bookmark<br>
+        Hold <span class="kbd">Shift</span> with an arrow for a bigger step. The same keys work on the output window, so you can drive it from whichever screen your hand is on — and none of them fire while you're typing in the script box.
+      </div>
+    </section>
+  </main>
+
+  <script src="/sg-live.js"></script>
+  <script src="/sg-links.js"></script>
+  <script src="/sg-autoreload.js"></script>
+  <script src="/sg-prompter.js"></script>
+  <script src="/prompter.js"></script>
+</body>
+</html>

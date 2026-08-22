@@ -62,12 +62,24 @@ for _ in $(seq 1 40); do
   kill -0 "$SMOKE_PID" 2>/dev/null || break        # it died — stop waiting, go read the log
   sleep 0.25
 done
+# Ask for one page from every module, not just the home page. A missing file under public/
+# doesn't stop the server booting — it 404s at the moment the operator needs it, on their
+# machine, mid-setup. This is the cheapest place to find that out.
+if [ -n "$SMOKE_OK" ]; then
+  for P in /control /output /scoreboard /scoreboard-output /baseball /baseball-output \
+           /lowerthird /lowerthird-output /shows /program-output /scorer /links /control-api \
+           /prompter /prompter-output /prompter.css /sg-prompter.js; do
+    if ! curl -fsS -o /dev/null "http://127.0.0.1:$SMOKE_PORT$P" 2>/dev/null; then
+      echo "!! ABORT: the staged app does not serve $P"; SMOKE_OK=""; break
+    fi
+  done
+fi
 kill "$SMOKE_PID" 2>/dev/null || true
 wait "$SMOKE_PID" 2>/dev/null || true
 if [ -z "$SMOKE_OK" ]; then
-  echo "!! ABORT: the staged app did not start. Its output:"; sed 's/^/   | /' "$SMOKE/out.log"; exit 1
+  echo "!! ABORT: the staged app did not start or is missing a page. Its output:"; sed 's/^/   | /' "$SMOKE/out.log"; exit 1
 fi
-echo "   staged app starts and serves pages"
+echo "   staged app starts and serves every module's pages"
 
 echo ">> the .exe launcher (so the app can be pinned to the taskbar)"
 # Prefer a signed copy if we have one. The launcher is the file the customer actually clicks

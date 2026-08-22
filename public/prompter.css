@@ -1,0 +1,71 @@
+/* StreamGraphics Pro — Teleprompter rendering.
+ *
+ * Shared by the OUTPUT page and by the control panel's preview, deliberately: both have to
+ * lay the script out identically or the pixel positions the control panel sends would not
+ * describe what the talent is reading.
+ *
+ * The script is drawn on a fixed 1920x1080 stage and the whole stage is scaled to whatever
+ * window it lands in. That is what keeps the line breaks - and therefore every bookmark
+ * position - the same on a 1080p browser source, a 1366x768 confidence monitor and a phone. */
+
+.pr-fit { position: relative; width: 100%; height: 100%; overflow: hidden; }
+
+.pr-stage {
+  position: absolute; top: 0; left: 0;
+  width: 1920px; height: 1080px;
+  transform-origin: top left;
+  overflow: hidden;
+  background: transparent;
+}
+/* Mirror for beam-splitter glass. These classes are MARKERS ONLY — the flip is folded into
+   the same inline transform as the fit-to-window scale (SGPrompter.fit). Two transforms on
+   one element don't compose; the later one simply replaces the earlier. */
+
+/* The scrolling document. translate3d keeps it on the compositor — the text is large and
+   repainting it every frame on a modest studio PC is exactly how prompters start juddering. */
+.pr-scroll {
+  position: absolute; top: 0; left: 0; width: 1920px;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.pr-doc { margin: 0 auto; }
+
+.pr-l {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  /* A hard word-break is deliberately NOT set: a prompter breaking a word across two lines
+     is a stumble waiting to happen. Long words overhang instead. */
+}
+.pr-l.blank { }
+.pr-mark {
+  opacity: .78;
+  font-size: .52em;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding-top: .35em;
+}
+
+/* Reading indicator — where the talent's eye sits. */
+.pr-cue { position: absolute; left: 0; right: 0; pointer-events: none; }
+/* Kept faint on purpose: it runs THROUGH the words, so at full strength it reads as a
+   strikethrough rather than a guide. The arrows at the edges carry most of the cue. */
+.pr-cue .ln { position: absolute; left: 0; right: 0; top: 0; height: 3px; opacity: .32; }
+.pr-cue .ar {
+  position: absolute; top: 50%; width: 0; height: 0;
+  border-top: 22px solid transparent; border-bottom: 22px solid transparent;
+  margin-top: -22px;
+}
+.pr-cue .ar.l { left: 18px;  border-left: 30px solid currentColor; }
+.pr-cue .ar.r { right: 18px; border-right: 30px solid currentColor; }
+
+/* Soft top/bottom edges, so lines arrive and leave instead of popping. */
+.pr-fade { position: absolute; left: 0; right: 0; height: 13%; pointer-events: none; }
+.pr-fade.top { top: 0; }
+.pr-fade.bot { bottom: 0; }
+
+/* Off-screen twin used purely for measuring. Kept in the layout (not display:none) because
+   an element that is not laid out has no height to read. */
+.pr-measure {
+  position: absolute; left: -10000px; top: 0;
+  width: 1920px; visibility: hidden; pointer-events: none;
+}

@@ -26,6 +26,7 @@ screen on launch; set `SG_NO_OPEN=1` to skip that. URLs:
 - Timer control:      http://localhost:4000/control        · output: /output
 - Scoreboard control: http://localhost:4000/scoreboard     · output: /scoreboard-output
 - Lower-third control: http://localhost:4000/lowerthird    · output: /lowerthird-output
+- Teleprompter:       http://localhost:4000/prompter      · output: /prompter-output
 
 ### Setting up the OBS/vMix machine — don't type the links
 
@@ -45,6 +46,36 @@ input) or any browser, at 1920×1080. Each control panel has a **Copy link** but
 the output URL and a **Green screen** toggle (renders on solid green for a hardware
 switcher that can't key transparency — leave it off for OBS/vMix, which key the
 transparent background directly).
+
+## Teleprompter
+
+Its own module: a control panel at **/prompter** and an output at **/prompter-output**.
+Type or paste the script, press Play, and it scrolls.
+
+- **Transport.** Play/pause, jump back and ahead, back to the top, and speed up or down
+  while it's running. The keys are the ones prompter operators already use:
+  <kbd>space</kbd> start/stop, <kbd>←</kbd>/<kbd>→</kbd> slower/faster,
+  <kbd>↑</kbd>/<kbd>↓</kbd> jump back/ahead, <kbd>Home</kbd> top,
+  <kbd>PgUp</kbd>/<kbd>PgDn</kbd> previous/next section. Hold <kbd>Shift</kbd> for a bigger
+  step. They work on the control panel **and** on the output window, and they're inert while
+  you're typing in the script box.
+- **Bookmarks.** Start any line with `##` and it becomes a bookmark — a button on the panel,
+  a section marker on screen, and a Stream Deck key. They live in the text, so moving a
+  section moves its bookmark with it.
+- **Look.** Font, size, line spacing, column width, alignment, bold, text colour, background
+  colour or fully transparent (key it over a shot), chroma, the reading indicator (line,
+  arrows, both or none) and where it sits, and soft top/bottom edges.
+- **Mirrored and normal at the same time.** `/prompter-output?mirror=1` is a separate
+  address, so beam-splitter glass in front of the lens and a confidence monitor at the back
+  of the room run from one script, in step. `?flip=1` mirrors vertically for a rig that
+  reflects that way; both flags together do both.
+- **Anywhere.** Either address works as an OBS Browser Source, a vMix Web Browser input, or
+  just a browser window dragged full-screen onto a monitor.
+
+**Why it doesn't drift or restart itself:** the scroll position lives on the server, the same
+way the presenter timer's clock does. Every screen computes its own frame from that one
+number, so two screens can't slide out of step however long the read runs — and a browser
+source that reloads mid-take comes back where the script *is*, not at the top.
 
 ## Lower Third Builder (WYSIWYG)
 Not a template — a canvas you build. Add **Text**, **Box**, and **Image** layers,

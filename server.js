@@ -217,6 +217,8 @@ function defaultState() {
     // Baseball / softball scoreboard — a clock-free sport, so it's the first of the
     // new sports. Innings are adjustable (softball/youth vary by age & level).
     baseball: defaultBaseball(),
+    // Teleprompter — its own module: a script, a server-anchored scroll position, and a look.
+    prompter: defaultPrompter(),
     // License (free by default → watermark on, add-ons off).
     license: { active: false, key: '', name: '', tier: 'free', features: [] }
   };
@@ -259,6 +261,91 @@ function ensureBaseballShape(bb) {
   if (bb.inning < 1) bb.inning = 1;
 }
 function baseballRuns(t) { return (t.line || []).reduce(function (s, v) { return s + (v == null ? 0 : (parseInt(v, 10) || 0)); }, 0); }
+
+/* ------------------------------------------------------------------ *
+ *  TELEPROMPTER
+ *
+ *  The scroll POSITION lives here, on the server, exactly like the timer's clock —
+ *  not in each browser. Every screen reads the same number and computes its own
+ *  frame at 60fps, so a confidence monitor, a mirrored beam-splitter feed and an
+ *  OBS browser source cannot drift apart, and a source that reloads mid-take comes
+ *  back where the script IS rather than at the top.
+ *
+ *  Position is carried in the pixels of a REFERENCE layout (`geom.total`), reported
+ *  by whichever prompter page rendered last. Each screen converts
+ *  position/refTotal -> its own pixels, so screens whose fonts measure slightly
+ *  differently (a phone vs the studio PC) still show the same line at the same moment.
+ * ------------------------------------------------------------------ */
+const PROMPT_STARTER = [
+  '## Welcome',
+  '',
+  'This is the teleprompter. Type or paste your script here, then press Play.',
+  '',
+  'Left and right arrows change the speed while it runs. Up and down jump back and ahead. The space bar starts and stops.',
+  '',
+  '## Bookmarks',
+  '',
+  'Any line starting with two hashes is a bookmark. They show up as buttons on the control panel, so you can jump straight to a section instead of holding an arrow down and hunting for it.',
+  '',
+  '## Two screens at once',
+  '',
+  'The mirrored output is a separate address from the normal one, so glass in front of the lens and a confidence monitor at the back of the room can run from this one script at the same time.'
+].join('\n');
+
+function defaultPrompter() {
+  return {
+    visible: false,
+    script: PROMPT_STARTER,
+    running: false,
+    anchorServer: 0,     // server time (ms) when scrolling last started/resumed
+    basePx: 0,           // reference-layout scroll offset at the anchor
+    speed: 40,           // reference px per second
+    jumpPx: 220,         // how far one up/down arrow press moves
+    // Reference layout, measured in a browser and reported back (action 'pr_geom').
+    geom: { sig: '', src: '', total: 0, marks: [] },
+    style: {
+      font: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+      size: 64,             // px on the 1920x1080 stage
+      lineHeight: 1.45,
+      bold: true,
+      align: 'left',
+      width: 82,            // script column, % of stage width
+      color: '#ffffff',
+      bg: '#0a0a0a',        // '' = transparent (key it over a shot instead)
+      chroma: '',
+      showMarks: true,      // draw the ## bookmark lines on screen
+      markColor: '#f4a63c',
+      cue: 'both',          // reading indicator: 'line' | 'arrows' | 'both' | 'none'
+      cuePos: 38,           // % down the screen
+      cueColor: '#e03131',
+      fade: true            // soften the top and bottom edges
+    }
+  };
+}
+
+/* Furthest the script can scroll, in reference pixels.
+ * 🚨 -1 means NOTHING HAS MEASURED THIS LAYOUT YET, which is not the same as a measured
+ * ceiling of 0. Collapsing the two lets an empty script scroll away forever: there is
+ * nothing to show, no ceiling to stop at, and the position runs off while the screen sits
+ * blank. A real measurement of 0 is a genuine ceiling and must clamp. */
+function promptMaxPx(p) { return (p.geom && p.geom.sig) ? Math.max(0, p.geom.total) : -1; }
+
+function livePromptPx(p, now) {
+  const px = p.basePx + ((p.running && p.speed > 0) ? (now - p.anchorServer) * p.speed / 1000 : 0);
+  const max = promptMaxPx(p);
+  if (!(px > 0)) return 0;
+  return (max >= 0 && px > max) ? max : px;
+}
+
+// Move to an absolute position and re-anchor. Re-anchoring matters: without it a running
+// scroll would replay the elapsed time from the NEW base and jump forward again.
+function setPromptPos(p, px, now) {
+  const max = promptMaxPx(p);
+  let v = Number(px); if (!isFinite(v) || v < 0) v = 0;
+  if (max >= 0 && v > max) v = max;
+  p.basePx = v;
+  p.anchorServer = now;
+}
 
 function defaultLowerThirdLayers() {
   // Each layer has an independent ANIMATE-ON (in) and ANIMATE-OFF (out), and each
@@ -323,6 +410,27 @@ const LT_FILE = path.join(DATA_DIR, 'lowerthird.json');
   } catch (e) {}
 })();
 function saveLowerThird() { writeJson(LT_FILE, function () { return { layers: state.lowerthird.layers }; }); }
+
+// The TELEPROMPTER script + look. The live scroll position is deliberately NOT saved — a
+// restart should hand you the script back at the top, not halfway down last night's read.
+const PROMPT_FILE = path.join(DATA_DIR, 'prompter.json');
+(function () {
+  try {
+    if (fs.existsSync(PROMPT_FILE)) {
+      const j = JSON.parse(fs.readFileSync(PROMPT_FILE, 'utf8'));
+      if (j && typeof j.script === 'string') state.prompter.script = j.script;
+      if (j && j.style) Object.assign(state.prompter.style, j.style);
+      if (j && j.speed != null) state.prompter.speed = Math.max(0, Math.min(600, Number(j.speed) || 0));
+      if (j && j.jumpPx != null) state.prompter.jumpPx = Math.max(20, Math.min(2000, Number(j.jumpPx) || 220));
+    }
+  } catch (e) {}
+})();
+function savePrompter() {
+  writeJson(PROMPT_FILE, function () {
+    const p = state.prompter;
+    return { script: p.script, style: p.style, speed: p.speed, jumpPx: p.jumpPx };
+  });
+}
 
 // The SHOW LIBRARY — saved, named graphics ("presets") that can be recalled or toggled on air.
 // Each item: { id, name, kind, payload, on }. Persisted so the library survives restarts.
@@ -1071,10 +1179,154 @@ function applyAction(action) {
       saveShows(); break;
     }
 
+    /* ---------------- Teleprompter ---------------- */
+    case 'pr_show': state.prompter.visible = true;  break;
+    case 'pr_hide': state.prompter.visible = false; break;
+
+    case 'pr_script': {
+      const p = state.prompter;
+      const text = String(action.text == null ? '' : action.text).slice(0, 400000);
+      if (text === p.script) return false;   // a re-save of identical text is not a change
+      p.script = text;
+      // The words moved, so the measured layout no longer describes them. Drop the bookmark
+      // positions rather than keep stale ones — a bookmark that lands on the wrong line
+      // mid-read is worse than one that takes half a second to come back.
+      p.geom = { sig: '', src: '', total: 0, marks: [] };
+      savePrompter();
+      break;
+    }
+
+    case 'pr_play':   { const p = state.prompter; if (!p.running) { p.anchorServer = now; p.running = true; } break; }
+    case 'pr_pause':  { const p = state.prompter; if (p.running) { p.basePx = livePromptPx(p, now); p.running = false; } break; }
+    case 'pr_toggle': { const p = state.prompter; return applyAction({ type: p.running ? 'pr_pause' : 'pr_play' }); }
+
+    case 'pr_speed': {
+      const p = state.prompter;
+      let v = (action.delta != null) ? p.speed + Number(action.delta) : Number(action.value);
+      if (!isFinite(v)) break;
+      // Bank the position at the OLD speed first. Changing p.speed while an anchor is
+      // outstanding would re-run all the elapsed time at the new rate — the text would leap.
+      if (p.running) { p.basePx = livePromptPx(p, now); p.anchorServer = now; }
+      p.speed = Math.max(0, Math.min(600, Math.round(v)));
+      savePrompter();
+      break;
+    }
+
+    case 'pr_jump': { // relative move (the up/down arrows), in reference px
+      const p = state.prompter;
+      let d = Number(action.px);
+      if (!isFinite(d)) d = (Number(action.dir) || 0) * (p.jumpPx || 220);
+      setPromptPos(p, livePromptPx(p, now) + d, now);
+      break;
+    }
+
+    case 'pr_goto': { // absolute: a pixel offset, or a bookmark index
+      const p = state.prompter;
+      if (action.mark != null) {
+        const m = (p.geom.marks || [])[parseInt(action.mark, 10)];
+        if (!m) break;
+        setPromptPos(p, m.y, now);
+      } else {
+        setPromptPos(p, Number(action.px) || 0, now);
+      }
+      break;
+    }
+
+    case 'pr_mark': { // step to the next / previous bookmark from wherever we are
+      const p = state.prompter;
+      const marks = p.geom.marks || [];
+      if (!marks.length) break;
+      const at = livePromptPx(p, now);
+      let target = null;
+      if (action.cmd === 'prev') {
+        // A shade of tolerance, or "previous" lands on the bookmark you are already sitting on.
+        for (let i = marks.length - 1; i >= 0; i--) if (marks[i].y < at - 4) { target = marks[i].y; break; }
+        if (target == null) target = 0;
+      } else {
+        for (let i = 0; i < marks.length; i++) if (marks[i].y > at + 4) { target = marks[i].y; break; }
+        if (target == null) { const mx = promptMaxPx(p); target = mx >= 0 ? mx : at; }
+      }
+      setPromptPos(p, target, now);
+      break;
+    }
+
+    case 'pr_top': setPromptPos(state.prompter, 0, now); break;
+
+    case 'pr_style': {
+      const p = state.prompter;
+      const s = action.style || {};
+      const was = promptSig(p);
+      Object.keys(s).forEach(function (k) { if (k in p.style) p.style[k] = s[k]; });
+      p.style.size = Math.max(12, Math.min(300, Number(p.style.size) || 64));
+      p.style.lineHeight = Math.max(1, Math.min(3, Number(p.style.lineHeight) || 1.45));
+      p.style.width = Math.max(20, Math.min(100, Number(p.style.width) || 82));
+      p.style.cuePos = Math.max(0, Math.min(100, Number(p.style.cuePos) || 0));
+      // Only a change that moves the WRAP invalidates the measurement. Dropping it on every
+      // style change would blank the bookmarks and the time-remaining readout every time
+      // somebody dragged a colour picker — the signature is what tells the two apart.
+      if (promptSig(p) !== was) p.geom = { sig: '', src: '', total: 0, marks: [] };
+      savePrompter();
+      break;
+    }
+
+    case 'pr_jumpsize': {
+      const p = state.prompter;
+      p.jumpPx = Math.max(20, Math.min(2000, Math.round(Number(action.px) || 220)));
+      savePrompter();
+      break;
+    }
+
+    /* A browser reporting what the script actually measures.
+     * Accepted only when it describes the CURRENT script + look (the signature), so a late
+     * report from a layout we've moved on from can never shove the talent mid-read.
+     *
+     * `src` breaks the tie when several pages are open. An OUTPUT page is measuring on the
+     * machine and at the size the talent is reading, so its numbers win; a control panel is
+     * a stand-in that keeps bookmarks working before any output is open, and it must never
+     * overwrite the real thing. Reports that change nothing are dropped, or two open pages
+     * would trade near-identical numbers and broadcast forever. */
+    case 'pr_geom': {
+      const p = state.prompter;
+      const sig = String(action.sig || '');
+      if (!sig || sig !== promptSig(p)) return false;
+      const src = action.src === 'out' ? 'out' : 'ctl';
+      if (p.geom.sig === sig && p.geom.src === 'out' && src !== 'out') return false;
+      const total = Math.max(0, Math.round(Number(action.total) || 0));
+      const marks = (Array.isArray(action.marks) ? action.marks : []).slice(0, 500).map(function (m) {
+        return { name: String(m && m.name || '').slice(0, 120), y: Math.max(0, Math.round(Number(m && m.y) || 0)) };
+      });
+      if (p.geom.sig === sig && p.geom.src === src && p.geom.total === total && p.geom.marks.length === marks.length) return false;
+      p.geom = { sig: sig, src: src, total: total, marks: marks };
+      break;
+    }
+
     default:
       return false;
   }
   return true;
+}
+
+// Identifies a layout: same signature = same wrap, so the same measured pixels apply.
+// Everything that can move a line break belongs in here.
+/* Identifies a layout: same signature = same wrap, so the same measured pixels apply.
+ * Everything that can move a line break belongs in here; anything that cannot (colours, the
+ * cue position, the background) must stay OUT, or every colour tweak would throw the
+ * measurement away and the bookmark buttons would blink out.
+ *
+ * The browser computes this too - public/sg-prompter.js, SGPrompter.sig() - and the two MUST
+ * agree character for character, or every geometry report is rejected and bookmarks never
+ * appear. It is a plain FNV-1a on purpose: SubtleCrypto (sha1/sha256) does not exist over
+ * plain http on a LAN address, which is exactly how this app gets used. */
+function promptSig(p) {
+  const s = p.style || {};
+  const str = [p.script || '', s.font, s.size, s.lineHeight, s.bold ? 1 : 0, s.align, s.width, s.showMarks ? 1 : 0].join('\u0000');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h ^= (c & 0xff);        h = Math.imul(h, 16777619) >>> 0;
+    h ^= ((c >> 8) & 0xff); h = Math.imul(h, 16777619) >>> 0;
+  }
+  return str.length.toString(36) + '-' + h.toString(36);
 }
 
 // Live value (ms) of a timer layer at server time `now`. Shared shape with the standalone timer.
@@ -1207,7 +1459,8 @@ const server = http.createServer((req, res) => {
           reveals: stepLayers(s).map(l => ({ name: l.name || l.type, type: l.type, at: (l.index == null ? -1 : l.index) + 1, of: stepCount(s, l) })) })),
         scoreboards: (state.scoreboards || []).map(b => ({ name: b.name, visible: !!b.visible })),
         timer: { visible: !!state.timer.visible, mode: state.timer.mode },
-        baseball: { visible: !!state.baseball.visible } });
+        baseball: { visible: !!state.baseball.visible },
+        prompter: { visible: !!state.prompter.visible, running: !!state.prompter.running, speed: state.prompter.speed, marks: (state.prompter.geom.marks || []).map(m => m.name) } });
     }
 
     // Library presets — on / off / toggle, plus CSV row stepping
@@ -1290,7 +1543,41 @@ const server = http.createServer((req, res) => {
       return fail('unknown baseball command: "' + cmd + '" (use run/ball/strike/out/clearcount/advance/show/hide)');
     }
 
-    return fail('unknown api group: "' + group + '" (use preset/timer/scoreboard/baseball/list)', 404);
+    // Teleprompter — the buttons an operator actually wants under their fingers.
+    if (group === 'prompter') {
+      const p = state.prompter;
+      const at = () => ({ running: !!p.running, speed: p.speed, position: Math.round(livePromptPx(p, Date.now())), of: Math.max(0, promptMaxPx(p)), marks: (p.geom.marks || []).map(m => m.name) });
+      if (cmd === 'status') return okJson(Object.assign({ ok: true }, at()));
+      if (cmd === 'play')   { applyAction({ type: 'pr_play' });   return did(at()); }
+      if (cmd === 'pause' || cmd === 'stop') { applyAction({ type: 'pr_pause' }); return did(at()); }
+      if (cmd === 'toggle') { applyAction({ type: 'pr_toggle' }); return did(at()); }
+      if (cmd === 'faster') { applyAction({ type: 'pr_speed', delta: (parseFloat(q.get('by')) || 5) });   return did(at()); }
+      if (cmd === 'slower') { applyAction({ type: 'pr_speed', delta: -(parseFloat(q.get('by')) || 5) }); return did(at()); }
+      if (cmd === 'speed')  { const v = parseFloat(q.get('value')); if (isNaN(v)) return fail('provide ?value=N (pixels per second)'); applyAction({ type: 'pr_speed', value: v }); return did(at()); }
+      if (cmd === 'back')    { applyAction({ type: 'pr_jump', dir: -1 }); return did(at()); }
+      if (cmd === 'ahead' || cmd === 'forward') { applyAction({ type: 'pr_jump', dir: 1 }); return did(at()); }
+      if (cmd === 'top')    { applyAction({ type: 'pr_top' }); return did(at()); }
+      if (cmd === 'nextmark') { applyAction({ type: 'pr_mark', cmd: 'next' }); return did(at()); }
+      if (cmd === 'prevmark') { applyAction({ type: 'pr_mark', cmd: 'prev' }); return did(at()); }
+      if (cmd === 'mark') {
+        // ?name=Intro (what it's called in the script) or ?n=2 (the second bookmark)
+        const nm = q.get('name');
+        if (nm) {
+          const k = String(nm).trim().toLowerCase();
+          const i = (p.geom.marks || []).findIndex(m => String(m.name).trim().toLowerCase() === k);
+          if (i < 0) return fail('bookmark not found: "' + nm + '"', 404);
+          applyAction({ type: 'pr_goto', mark: i }); return did(at());
+        }
+        const n = parseInt(q.get('n'), 10);
+        if (isNaN(n)) return fail('provide ?name=NAME or ?n=N');
+        applyAction({ type: 'pr_goto', mark: n - 1 }); return did(at());
+      }
+      if (cmd === 'air' || cmd === 'show') { applyAction({ type: 'pr_show' }); return did(at()); }
+      if (cmd === 'off' || cmd === 'hide') { applyAction({ type: 'pr_hide' }); return did(at()); }
+      return fail('unknown prompter command: "' + cmd + '" (use play/pause/toggle/faster/slower/speed/back/ahead/top/nextmark/prevmark/mark/air/off/status)');
+    }
+
+    return fail('unknown api group: "' + group + '" (use preset/timer/scoreboard/baseball/prompter/list)', 404);
   }
 
   /* --- grab a still frame out of OBS, to use as the builder's reference image ---
@@ -1679,6 +1966,8 @@ const server = http.createServer((req, res) => {
           : pathname === '/lowerthird-output' ? '/lowerthird-output.html'
           : pathname === '/shows' ? '/shows.html'
           : pathname === '/program-output' ? '/program-output.html'
+          : pathname === '/prompter' ? '/prompter.html'
+          : pathname === '/prompter-output' ? '/prompter-output.html'
           : pathname === '/control-api' ? '/control-api.html'
           : pathname === '/links' ? '/links.html'
           : pathname;
@@ -1722,6 +2011,7 @@ server.listen(PORT, () => {
   console.log(`     big-button Scorer:        http://localhost:${PORT}/scorer`);
   console.log(`  LOWER THIRD / GRAPHICS:      http://localhost:${PORT}/lowerthird       · output: /lowerthird-output`);
   console.log(`  SHOW LIBRARY:                http://localhost:${PORT}/shows            · output: /program-output`);
+  console.log(`  TELEPROMPTER:                http://localhost:${PORT}/prompter         · output: /prompter-output (add ?mirror=1 for glass)`);
   console.log(`  ---------------------------------------------------------------`);
   console.log(`  From ANOTHER computer, swap "localhost" for  ${lan}`);
   console.log(`  e.g. OBS/vMix Browser Source:  http://${lan}:${PORT}/lowerthird-output`);
