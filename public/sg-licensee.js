@@ -26,9 +26,11 @@
     // if it wasn't — the wording never accuses anyone.
     if (s.revoked) {
       var bar = document.createElement('div');
+      // Extra padding at the foot so the version badge (fixed at bottom:6px, right:8px) lands
+      // inside this bar rather than half on top of it.
       bar.setAttribute('style', 'position:fixed;left:0;right:0;bottom:0;z-index:2147483000;' +
         'background:#8a1220;color:#fff;font:600 13.5px/1.45 system-ui,Segoe UI,Arial,sans-serif;' +
-        'padding:10px 16px;text-align:center;box-shadow:0 -4px 14px rgba(0,0,0,.3)');
+        'padding:10px 16px 24px;text-align:center;box-shadow:0 -4px 14px rgba(0,0,0,.3)');
       bar.textContent = 'This license key is no longer valid, so the watermark is back. '
         + 'If you believe that is a mistake, get in touch and it will be sorted out.';
       document.body.appendChild(bar);
@@ -44,9 +46,13 @@
     var el = document.createElement('div');
     el.id = 'sgLicensee';
     el.innerHTML = 'Licensed to ' + who;
-    el.setAttribute('style', 'position:fixed;right:10px;bottom:8px;z-index:2147482000;' +
-      'font:500 11px/1.3 system-ui,Segoe UI,Arial,sans-serif;color:#8a97a8;opacity:.72;' +
-      'background:rgba(10,14,20,.55);border:1px solid rgba(255,255,255,.07);border-radius:6px;' +
+    /* 🚨 Stacked ABOVE the version badge, which ver.js pins at right:8px bottom:6px. The first
+       version of this sat on exactly the same spot and the two printed straight through each
+       other - both unreadable, on every control panel. Same right edge and the same colours as
+       that badge, so the pair reads as one stack rather than two things that happen to collide. */
+    el.setAttribute('style', 'position:fixed;right:8px;bottom:30px;z-index:99998;' +
+      'font:600 11px/1.3 system-ui,Segoe UI,Arial,sans-serif;color:#8a97a8;' +
+      'background:rgba(20,26,34,.7);border-radius:8px;' +
       'padding:3px 8px;pointer-events:none;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap');
     document.body.appendChild(el);
   }).catch(function () { /* the app is the only thing that can answer this; silence is fine */ });
