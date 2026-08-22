@@ -5,7 +5,18 @@
     if (s && s.active) {
       $('licStatus').textContent = '✓ Licensed';
       $('licStatus').style.color = '#12b886';
-      $('licInfo').textContent = 'Licensed to ' + (s.name || '—') + ' · tier: ' + (s.tier || 'pro') + (s.features && s.features.length ? ' · add-ons: ' + s.features.join(', ') : '') + '. Watermark removed.';
+      $('licInfo').textContent = 'Licensed to ' + (s.name || '—') + (s.email ? ' (' + s.email + ')' : '')
+        + ' · tier: ' + (s.tier || 'pro')
+        + (s.features && s.features.length ? ' · add-ons: ' + s.features.join(', ') : '') + '. Watermark removed.';
+    } else if (s && s.revoked) {
+      /* Said plainly, and without accusing anyone. A key can end up on the revoked list
+         because it was shared - or because somebody typed the wrong one into the list. The
+         person reading this may be the customer who paid, so the wording has to work for
+         them too, and it has to tell them what to do next. */
+      $('licStatus').textContent = 'Key no longer valid';
+      $('licStatus').style.color = '#ff9aa8';
+      $('licInfo').textContent = 'This license key has been withdrawn, so the watermark is back. '
+        + 'If you think that is a mistake, get in touch and we will sort it out.';
     } else {
       $('licStatus').textContent = 'Free version';
       $('licStatus').style.color = '#8a97a8';

@@ -41,15 +41,29 @@ const UPDATE_MANIFESTS = process.env.SG_UPDATE_URL
 let _updCache = { at: 0, data: null };
 function cmpVer(a, b) { const A = String(a).split('.').map(n => parseInt(n, 10) || 0), B = String(b).split('.').map(n => parseInt(n, 10) || 0); for (let i = 0; i < 3; i++) { if ((A[i] || 0) > (B[i] || 0)) return 1; if ((A[i] || 0) < (B[i] || 0)) return -1; } return 0; }
 // Fetch one manifest URL. Calls back with the parsed object, or null on any failure.
-function fetchManifest(url, cb) {
+/* Fetch and parse one small JSON file. Returns the parsed object, or null on any failure.
+ *
+ * 🚨 Deliberately says nothing about what a VALID document looks like. It used to require a
+ * `version` field, which was right for the update manifest and silently wrong for everything
+ * else - the revoked-key list has no `version`, so reusing this would have thrown away every
+ * revocation and the kill switch would have been dead on arrival with nothing to show for it.
+ * Whether a document makes sense is the caller's business.
+ *
+ * 🚨 http as well as https. The published URLs are https, but the override env vars exist so
+ * this can be pointed at a local file server - for a test, or for someone self-hosting on a
+ * closed network - and https.get on an http:// address fails in a way that looks identical to
+ * "there is nothing to report". */
+function fetchManifest(url, cb, maxBytes) {
   let done = false;
+  const cap = maxBytes || 5000;
   const finish = j => { if (!done) { done = true; cb(j); } };
   try {
-    const req = https.get(url, { timeout: 4000 }, res => {
+    const mod = /^http:/i.test(url) ? http : https;
+    const req = mod.get(url, { timeout: 4000 }, res => {
       if (res.statusCode !== 200) { res.resume(); finish(null); return; }
       let d = '';
-      res.on('data', c => { d += c; if (d.length > 5000) req.destroy(); });
-      res.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (e) {} finish(j && j.version ? j : null); });
+      res.on('data', c => { d += c; if (d.length > cap) req.destroy(); });
+      res.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (e) {} finish(j); });
     });
     req.on('error', () => finish(null));
     req.on('timeout', () => { req.destroy(); finish(null); });
@@ -60,7 +74,9 @@ function checkUpdate(cb) {
   const tryAt = i => {
     if (i >= UPDATE_MANIFESTS.length) { _updCache = { at: Date.now(), data: null }; cb(null); return; }
     fetchManifest(UPDATE_MANIFESTS[i], j => {
-      if (j) { _updCache = { at: Date.now(), data: j }; cb(j); return; }
+      // The `version` requirement moved here when fetchManifest stopped guessing what callers
+      // want. Without it a host that answers 200 with an error page would look like a manifest.
+      if (j && j.version) { _updCache = { at: Date.now(), data: j }; cb(j); return; }
       tryAt(i + 1);
     });
   };
@@ -84,7 +100,7 @@ function verifyLicense(key) {
     if (!crypto.verify(null, payload, LICENSE_PUBKEY, sig)) return null;
     const data = JSON.parse(payload.toString('utf8'));
     if (data.exp && Date.now() > data.exp) return null;   // expired
-    return data;   // { name, tier, features:[], exp, upto? }
+    return data;   // { name, email, tier, features:[], exp, upto? }
   } catch (e) { return null; }
 }
 // A license may cap the MAJOR version it unlocks (data.upto). No upto = covers every version (lifetime).
@@ -544,15 +560,80 @@ function packMeta(p) {
   };
 }
 
+/* ============================================================================
+ * Revoked keys.
+ *
+ * A signed key is otherwise valid forever, so if one is ever posted publicly there is no way
+ * to take it back. This is that way: a short list of key fingerprints published beside the
+ * update manifest, fetched the same silent way.
+ *
+ * Deliberate choices, each of which is the difference between a safety net and a liability:
+ *
+ *  - FINGERPRINTS, NOT KEYS. The list is a public file. Publishing the keys themselves would
+ *    turn it into a catalogue of working licences for anyone who fetched it a day too early.
+ *
+ *  - ITS OWN FILE, not a field inside sgpro-version.json. That manifest gets REPLACED on every
+ *    release; folding revocations into it means one routine upload silently un-revokes every
+ *    key on the list, and nothing would say so.
+ *
+ *  - FAIL OPEN. No internet, a typo in the JSON, the web host down - the licence stays valid.
+ *    A customer in a gym with no wifi must never be punished for a file this app could not
+ *    reach. The list can only ever take a licence away when it is definitely reachable.
+ *
+ *  - APPLIED AT STARTUP ONLY, never mid-run. Same rule the expiry date already follows. A key
+ *    revoked while the app is open keeps working until it is next launched. That costs nothing
+ *    against someone sharing a key - they restart before their next event - and it means a
+ *    revocation added by mistake can never put a watermark on a real customer's live show.
+ * ==========================================================================*/
+const REVOKED_MANIFESTS = process.env.SG_REVOKED_URL
+  ? [process.env.SG_REVOKED_URL]
+  : ['https://streamgraphicspro.com/sgpro-revoked.json'];
+let REVOKED = null;            // null = we have never successfully read the list
+function keyFingerprint(key) {
+  return crypto.createHash('sha256').update(String(key || '').trim(), 'utf8').digest('hex');
+}
+function isRevoked(key) {
+  if (!REVOKED || !REVOKED.size) return false;
+  return REVOKED.has(keyFingerprint(key));
+}
+function fetchRevoked(cb) {
+  /* 256 KB, not the 5 KB the update manifest gets: that would cap the list at about forty
+     keys, and a limit you only discover by silently dropping the forty-first revocation is
+     not a limit, it is a trap. */
+  fetchManifest(REVOKED_MANIFESTS[0], function (j) {
+    const list = j && Array.isArray(j.revoked) ? j.revoked : null;
+    if (!list) return cb(false);
+    REVOKED = new Set(list.map(x => String(x && x.key != null ? x.key : x).trim().toLowerCase()).filter(Boolean));
+    cb(true);
+  }, 256 * 1024);
+}
+/* Look once at startup, then twice more in case the machine's network was not up yet. All
+   three land inside the first few minutes, so the answer is settled long before a show. */
+function startRevocationChecks() {
+  const attempt = () => fetchRevoked(function (got) {
+    if (!got) return;
+    if (state.license.key && isRevoked(state.license.key)) {
+      applyLicense(state.license.key);   // re-runs the check and drops the licence
+      broadcast();
+    }
+  });
+  // unref'd so a pending check can never hold the process open on shutdown.
+  [2000, 30000, 180000].forEach(function (ms) { const t = setTimeout(attempt, ms); if (t.unref) t.unref(); });
+}
+
 // Apply a license key to state (verifying it). Returns the (public) status.
 const LIC_FILE = path.join(DATA_DIR, 'license.json');
 function applyLicense(key) {
   const data = verifyLicense(key);
-  if (data) state.license = { active: true, key: key, name: data.name || '', tier: data.tier || 'pro', features: Array.isArray(data.features) ? data.features : [], upto: (data.upto != null ? data.upto : null) };
-  else state.license = { active: false, key: '', name: '', tier: 'free', features: [], upto: null };
+  /* 🚨 Revocation is checked BEFORE the signature is honoured. A revoked key is still
+     perfectly signed - that is the whole point of it needing a list. */
+  if (data && isRevoked(key)) { state.license = { active: false, key: key, name: '', email: '', tier: 'free', features: [], upto: null, revoked: true }; return false; }
+  if (data) state.license = { active: true, key: key, name: data.name || '', email: data.email || '', tier: data.tier || 'pro', features: Array.isArray(data.features) ? data.features : [], upto: (data.upto != null ? data.upto : null), revoked: false };
+  else state.license = { active: false, key: '', name: '', email: '', tier: 'free', features: [], upto: null, revoked: false };
   return state.license.active;
 }
 (function () { try { if (fs.existsSync(LIC_FILE)) { const j = JSON.parse(fs.readFileSync(LIC_FILE, 'utf8')); if (j && j.key) applyLicense(j.key); } } catch (e) {} })();
+startRevocationChecks();   // after the key is loaded, so there is something to check
 function saveLicense() { writeJson(LIC_FILE, function () { return { key: state.license.key || '' }; }); }
 function hasFeature(f) { return isLicensed() && (state.license.features || []).indexOf(f) >= 0; }
 
@@ -582,7 +663,7 @@ function wireState() {
   const templates = allTemplates().map(function (t) { return { id: t.id, name: t.name, kind: t.kind, builtin: !!t.builtin, pack: t.pack || '' }; });
   // License: expose whether we're licensed + public info (never the key itself) — drives the watermark + gating.
   const covers = licCoversVersion(state.license);
-  const lic = { active: !!state.license.active, name: state.license.name || '', tier: state.license.tier || 'free', features: state.license.features || [], upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers };
+  const lic = { active: !!state.license.active, name: state.license.name || '', email: state.license.email || '', tier: state.license.tier || 'free', features: state.license.features || [], upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, revoked: !!state.license.revoked };
   return Object.assign({}, state, { license: lic, licensed: !!state.license.active && covers, shows: shows, media: mediaIndex, templates: templates });
 }
 
@@ -1961,7 +2042,7 @@ const server = http.createServer((req, res) => {
   if (pathname === '/state') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     const covers = licCoversVersion(state.license);
-    const lic = { active: !!state.license.active, name: state.license.name, tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers };
+    const lic = { active: !!state.license.active, name: state.license.name, email: state.license.email || '', tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, revoked: !!state.license.revoked };
     res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex, license: lic, licensed: !!state.license.active && covers }) }));
     return;
   }
@@ -2147,13 +2228,13 @@ const server = http.createServer((req, res) => {
         if (!state.license.active) err = 'invalid or expired key';
         else if (!covers) err = 'This key covers StreamGraphics Pro up to v' + state.license.upto + '.x — you are on v' + VERSION + '. An upgrade is needed to keep the full version license-free.';
         res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-        res.end(JSON.stringify({ ok: !!state.license.active && covers, active: !!state.license.active, licensed: !!state.license.active && covers, name: state.license.name, tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, error: err }));
+        res.end(JSON.stringify({ ok: !!state.license.active && covers, active: !!state.license.active, licensed: !!state.license.active && covers, name: state.license.name, email: state.license.email || '', tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, revoked: !!state.license.revoked, error: err }));
       });
       return;
     }
     const covers = licCoversVersion(state.license);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-    res.end(JSON.stringify({ active: !!state.license.active, licensed: !!state.license.active && covers, name: state.license.name, tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers }));
+    res.end(JSON.stringify({ active: !!state.license.active, licensed: !!state.license.active && covers, name: state.license.name, email: state.license.email || '', tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, revoked: !!state.license.revoked }));
     return;
   }
 

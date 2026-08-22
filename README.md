@@ -230,6 +230,30 @@ output instantly. Open the control panel on two devices and they stay in sync.
 
 ---
 
+## Licensing
+
+A key is a small signed document the app checks on its own machine — no internet, no
+activation server, nothing to be down at kick-off. It carries the buyer's name and email, an
+optional expiry date, and optionally a cap on the major version it unlocks.
+
+- **Who it belongs to is visible.** Every control panel shows *Licensed to NAME · EMAIL* in
+  the corner. It is deliberately quiet, and deliberately not on the output pages: those go to
+  air, and a customer's email on a browser source would end up on their own livestream.
+- **Keys can be withdrawn.** `sgpro-revoked.json` on the website lists the **fingerprints** of
+  keys that no longer work — never the keys themselves, since that file is public and would
+  otherwise be a catalogue of working licences. The app reads it the same silent way it reads
+  the update manifest.
+- **It fails open.** No internet, a bad file, the host down — the licence stays valid. Nobody
+  loses their software because of a file the app couldn't reach.
+- **It only applies at startup**, exactly like the expiry date. A key withdrawn while the app
+  is open keeps working until it is next launched, so this can never put a watermark on a live
+  show — including if a key ends up on the list by mistake.
+
+Vendor side, in the License Maker folder: **Make a License Key** issues one, **Revoke a License
+Key** turns a key into the line for `sgpro-revoked.json` and tells you to upload it.
+
+---
+
 ## How it's built (and where it's going)
 - **Zero dependencies, pure Node.** The server serves the pages and relays state over
   Server-Sent Events; the control panel posts actions. That's why there's no install
