@@ -647,12 +647,22 @@ function machineId(salt) {
   return crypto.createHash('sha256').update(salt + '#' + bits, 'utf8').digest('hex').slice(0, 16);
 }
 
+/* 🚨 Which licence this process has already reported. Without it the report only ever went out
+   once, eight seconds after launch - so the ordinary sequence of "open the app, paste the key
+   you were just sent" reported NOTHING, because at the eight-second mark there was no licence
+   yet. Mark hit exactly that: registered, then found his machine missing from the page.
+   Keyed on the fingerprint rather than a boolean, so activating a DIFFERENT key reports again
+   while re-pasting the same one stays quiet. */
+let _pingedFp = '';
+
 function pingSeen() {
   try {
     if (process.env.SG_NO_SEEN === '1') return;          // an operator can switch it off
     const key = state.license.key;
     if (!key || !state.license.active) return;           // nothing to report for a free copy
     const k = keyFingerprint(key);
+    if (k === _pingedFp) return;                         // already reported this licence
+    _pingedFp = k;
     const u = SEEN_URL + (SEEN_URL.indexOf('?') >= 0 ? '&' : '?')
             /* The WHOLE fingerprint, not a slice of it. The revoked list and the License
                Maker both identify a key by the full sha256; sending a truncated one here
@@ -2283,7 +2293,12 @@ const server = http.createServer((req, res) => {
         try {
           const j = JSON.parse(body || '{}');
           if (j.clear) { state.license = { active: false, key: '', name: '', tier: 'free', features: [], upto: null }; ok = true; }
-          else { ok = applyLicense(String(j.key || '')); }
+          else {
+            ok = applyLicense(String(j.key || ''));
+            // Report the newly activated licence. Off the response path, and pingSeen() itself
+            // refuses to repeat a fingerprint, so a double-click cannot turn into two reports.
+            if (ok) { const t = setTimeout(pingSeen, 1200); if (t.unref) t.unref(); }
+          }
           saveLicense(); broadcast();
         } catch (e) {}
         const covers = licCoversVersion(state.license);
