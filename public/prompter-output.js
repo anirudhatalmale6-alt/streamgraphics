@@ -32,7 +32,7 @@
   var clockOffset = 0;     // serverTime - clientTime
   var pad = 0;             // lead-in height of the current layout
   var ownTotal = 0;        // how far THIS page can scroll (its own metrics)
-  var lastSig = null;
+  var lastLayout = null;   // what this page last DREW (see layoutKey)
 
   function serverNow() { return Date.now() + clockOffset; }
 
@@ -106,15 +106,29 @@
     ownTotal = SGPrompter.measure(doc, pad).total;
   }
 
+  /* What has to be REDRAWN, which is not the same list as what has to be RE-MEASURED.
+     sig() covers everything that moves a line break, and the server keys its stored geometry
+     on it. Cue position belongs here and not there: it changes the lead-in pad, so the page
+     must draw again — but the pads always add up to one screen height and bookmark offsets are
+     stored relative to the content, so nothing it changes is measurable. Left out of this key
+     it produced a quiet fault: dragging the reading indicator moved the line and the arrows
+     while the text stayed put, so the first line no longer began at the cue. */
+  function layoutKey(p) {
+    return SGPrompter.sig(p) + '|' + (Number((p.style || {}).cuePos) || 0);
+  }
+
   function onState(msg) {
     var measured = msg.serverTime - Date.now();
     clockOffset = clockOffset === 0 ? measured : Math.round(clockOffset * 0.7 + measured * 0.3);
     var p = msg.state && msg.state.prompter;
     if (!p) return;
     P = p;
-    var sg = SGPrompter.sig(p);
+    var lk = layoutKey(p);
     applyChrome(p);
-    if (sg !== lastSig) { lastSig = sg; relayout(p); }
+    if (lk !== lastLayout) { lastLayout = lk; relayout(p); }
+    // Unconditionally, and after any re-layout: the colours are the part that must follow a
+    // picker in real time without ever costing a measurement.
+    SGPrompter.colors(doc, p);
     reportGeom(p);
     /* Off air hides the stage AND drops the solid background — a browser source left in a
        scene must key to nothing, not to a black rectangle. The watermark lives outside #fit

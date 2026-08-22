@@ -71,7 +71,6 @@
     docEl.style.lineHeight = String(lh);
     docEl.style.fontWeight = s.bold ? '700' : '400';
     docEl.style.textAlign = (['left', 'center', 'right'].indexOf(s.align) >= 0 ? s.align : 'left');
-    docEl.style.color = s.color || '#ffffff';
 
     var blocks = parse(p && p.script);
     var html = '<div class="pr-pad" style="height:' + pad + 'px"></div>';
@@ -79,7 +78,7 @@
       var b = blocks[i];
       if (b.type === 'mark') {
         if (!s.showMarks) continue;   // operator-only bookmark: keep it off the talent's screen
-        html += '<div class="pr-l pr-mark" data-mark="' + esc(b.text) + '" style="color:' + esc(s.markColor || '#f4a63c') + '">' + esc(b.text) + '</div>';
+        html += '<div class="pr-l pr-mark" data-mark="' + esc(b.text) + '">' + esc(b.text) + '</div>';
       } else if (b.type === 'blank') {
         html += '<div class="pr-l blank">&nbsp;</div>';
       } else {
@@ -88,7 +87,22 @@
     }
     html += '<div class="pr-pad" style="height:' + (STAGE_H - pad) + 'px"></div>';
     docEl.innerHTML = html;
+    colors(docEl, p);
     return pad;
+  }
+
+  /* Colours, applied to an ALREADY-RENDERED document.
+     🚨 Split out of render() on purpose. Text colour and bookmark colour are deliberately not
+     part of sig() — they cannot move a line break, so making them invalidate the measurement
+     would blank the bookmarks every time somebody dragged a colour picker. But the output page
+     only re-renders when sig() changes, so while these two were set inside render() they were
+     the one pair of controls that did nothing until something ELSE forced a re-layout. Every
+     page that draws a script must call this on every state, not only when the layout changes. */
+  function colors(docEl, p) {
+    var s = (p && p.style) || {};
+    docEl.style.color = s.color || '#ffffff';
+    var mk = docEl.querySelectorAll ? docEl.querySelectorAll('.pr-mark') : [];
+    for (var i = 0; i < mk.length; i++) mk[i].style.color = s.markColor || '#f4a63c';
   }
 
   /* Measure a rendered document.
@@ -128,6 +142,7 @@
 
   global.SGPrompter = {
     STAGE_W: STAGE_W, STAGE_H: STAGE_H,
-    parse: parse, marksOf: marksOf, sig: sig, render: render, measure: measure, fit: fit, esc: esc
+    parse: parse, marksOf: marksOf, sig: sig, render: render, colors: colors,
+    measure: measure, fit: fit, esc: esc
   };
 })(window);

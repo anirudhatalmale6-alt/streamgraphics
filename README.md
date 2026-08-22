@@ -65,6 +65,12 @@ Type or paste the script, press Play, and it scrolls.
 - **Look.** Font, size, line spacing, column width, alignment, bold, text colour, background
   colour or fully transparent (key it over a shot), chroma, the reading indicator (line,
   arrows, both or none) and where it sits, and soft top/bottom edges.
+- **Edit on screen.** Press **✎ Edit on screen** above the preview and the preview becomes
+  the editor, at prompter size, in the prompter's own font and colours. It opens on the part
+  of the script that is being read right now, not at the top, and a line wraps there exactly
+  where it wraps on the glass — so a change made mid-show can be judged for length before it
+  reaches the talent. Every keystroke is on air within half a second. **▸ Prompter to my
+  cursor** sends the read to whatever line you're editing. <kbd>Esc</kbd> closes it.
 - **Mirrored and normal at the same time.** `/prompter-output?mirror=1` is a separate
   address, so beam-splitter glass in front of the lens and a confidence monitor at the back
   of the room run from one script, in step. `?flip=1` mirrors vertically for a rig that

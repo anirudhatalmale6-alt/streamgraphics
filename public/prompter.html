@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>StreamGraphics Pro — Teleprompter Control</title>
 <link rel="stylesheet" href="/control.css">
+<!-- The output's own rendering rules. Needed here because "Prompter to my cursor" measures the
+     script with the same code the output page uses, and a measurement taken without .pr-l's
+     wrapping rules would land the read on the wrong line. Everything in it is .pr- prefixed. -->
+<link rel="stylesheet" href="/prompter.css">
 <style>
   /* The preview box is sized to the scaled stage exactly (1280x720 at .5), not stretched to
      the panel width — the prompter has a solid background, so an oversized box would show a
@@ -12,6 +16,19 @@
   .previewwrap{background:repeating-conic-gradient(#0e131b 0% 25%,#10151f 0% 50%) 50%/26px 26px;border:1px solid var(--line);border-radius:12px;overflow:hidden;width:640px;max-width:100%;height:360px;position:relative;margin:0 auto}
   .previewwrap iframe{position:absolute;top:0;left:0;width:1280px;height:720px;border:0;transform:scale(.5);transform-origin:top left}
   @media(max-width:700px){.previewwrap{width:460px;height:259px}.previewwrap iframe{transform:scale(.359)}}
+  /* Edit-on-screen. The editing surface is the SAME 1920-wide stage as the output, scaled by
+     the same factor as the preview, so a line wraps here exactly where it wraps on the glass.
+     The scrollbar is forced to zero width for that reason and not for looks: a gutter would
+     narrow the text column and every line would wrap one word early. */
+  .pvedit{position:absolute;inset:0;display:none;overflow:hidden}
+  .pvedit.on{display:block}
+  .pvstage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:top left}
+  #pvText{display:block;margin:0 auto;height:1080px;padding:0;border:0;outline:0;resize:none;
+          background:transparent;white-space:pre-wrap;overflow-wrap:break-word;overflow-y:scroll;
+          scrollbar-width:none;caret-color:#7cc4ff}
+  #pvText::-webkit-scrollbar{width:0;height:0}
+  .pvcue{position:absolute;left:0;right:0;height:2px;background:#7cc4ff;opacity:.5;pointer-events:none}
+  .pvbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
   .urlgrp{display:inline-flex;align-items:center;gap:8px}
   .urlgrp code{background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:12px}
 
@@ -78,7 +95,20 @@
     </div>
 
     <section class="panel" style="margin-bottom:14px">
-      <div class="previewwrap"><iframe id="pv" src="/prompter-output?preview=1" title="preview"></iframe></div>
+      <div class="pvbar">
+        <button class="btn ghost" id="btnEditPv">✎ Edit on screen</button>
+        <button class="btn ghost" id="btnGoCursor" style="display:none">▸ Prompter to my cursor</button>
+        <span class="mini" style="color:var(--muted)" id="pvHint">Live preview of what the talent sees.</span>
+      </div>
+      <div class="previewwrap" id="pvWrap">
+        <iframe id="pv" src="/prompter-output?preview=1" title="preview"></iframe>
+        <div class="pvedit" id="pvEdit">
+          <div class="pvstage" id="pvStage">
+            <textarea id="pvText" spellcheck="true" placeholder="Type the script here…"></textarea>
+            <div class="pvcue" id="pvCue"></div>
+          </div>
+        </div>
+      </div>
       <p class="mini" style="color:var(--muted);margin-top:9px">Both addresses run this one script at the same time — put the mirrored one on the glass in front of the lens and the normal one on a confidence monitor, or drop either into OBS / vMix as a browser source.</p>
     </section>
 
@@ -179,6 +209,9 @@
       </div>
     </section>
   </main>
+
+  <!-- Off-screen twin, used only to work out which pixel a cursor position sits at. -->
+  <div class="pr-measure" id="meas" aria-hidden="true"><div class="pr-doc" id="measDoc"></div></div>
 
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>

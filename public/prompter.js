@@ -104,6 +104,94 @@
     $('scriptStats').textContent = words.toLocaleString() + ' words · ' + marks + ' bookmark' + (marks === 1 ? '' : 's');
   }
 
+  /* ---- edit on screen ----
+     The same script, edited in the preview at prompter size instead of in the box below.
+     The editing surface is the OUTPUT'S stage — 1920 wide, the configured column width, the
+     configured type — scaled by the same factor as the preview iframe. That is what makes it
+     worth having: a line that wraps here wraps there, so an edit made mid-show can be judged
+     for length on the spot rather than after it reaches the talent. */
+  var pvEdit = $('pvEdit'), pvStage = $('pvStage'), pvText = $('pvText'), pvWrap = $('pvWrap'),
+      pvCue = $('pvCue'), pvHint = $('pvHint'), btnEditPv = $('btnEditPv'), btnGoCursor = $('btnGoCursor');
+  var editing = false, pvTimer = null;
+
+  function pvScale() {
+    var k = (pvWrap.clientWidth || 640) / SGPrompter.STAGE_W;
+    pvStage.style.transform = 'scale(' + k + ')';
+  }
+  window.addEventListener('resize', pvScale);
+
+  // Dress the textarea exactly as the output dresses .pr-doc, so the two wrap alike.
+  function pvDress(p) {
+    var s = (p && p.style) || {};
+    pvText.style.width = Math.max(20, Math.min(100, Number(s.width) || 82)) + '%';
+    pvText.style.fontFamily = s.font || "'Segoe UI', Arial, sans-serif";
+    pvText.style.fontSize = (Number(s.size) || 64) + 'px';
+    pvText.style.lineHeight = String(Number(s.lineHeight) || 1.45);
+    pvText.style.fontWeight = s.bold ? '700' : '400';
+    pvText.style.textAlign = (['left', 'center', 'right'].indexOf(s.align) >= 0 ? s.align : 'left');
+    pvText.style.color = s.color || '#ffffff';
+    var bg = s.chroma || s.bg || '';
+    pvEdit.style.background = bg || '#0a0a0a';   // a transparent key has nothing to type on
+    var cp = Math.max(0, Math.min(100, Number(s.cuePos) || 0));
+    pvCue.style.top = (cp / 100 * SGPrompter.STAGE_H) + 'px';
+    pvCue.style.background = s.cueColor || '#7cc4ff';
+  }
+
+  function setEditing(on) {
+    editing = on;
+    pvEdit.classList.toggle('on', on);
+    btnGoCursor.style.display = on ? '' : 'none';
+    btnEditPv.textContent = on ? '✔ Done' : '✎ Edit on screen';
+    pvHint.textContent = on
+      ? 'Click a line to edit it. Changes reach the talent as you type; ## makes a bookmark; Esc closes.'
+      : 'Live preview of what the talent sees.';
+    if (on && P) {
+      pvDress(P);
+      pvScale();
+      pvText.value = P.script || '';
+      /* Open where the read IS, with the current line on the same guide it sits on over on the
+         glass — otherwise "edit on screen" would drop the operator at the top of a twenty-minute
+         script mid-take.
+         🚨 And deliberately WITHOUT focusing. Giving a textarea focus makes the browser scroll
+         its caret into view, which threw this straight back to the end of the script; worse, it
+         would leave a cursor sitting somewhere the operator can't see while the read is live,
+         so the first key pressed edits the wrong line. He clicks the line he means. */
+      var cp = Math.max(0, Math.min(100, Number((P.style || {}).cuePos) || 0));
+      pvText.scrollTop = Math.max(0, livePx(P, serverNow()) - SGPrompter.STAGE_H * (cp / 100));
+    } else {
+      pvText.blur();
+    }
+  }
+  btnEditPv.onclick = function () { setEditing(!editing); };
+
+  pvText.addEventListener('keydown', function (e) {
+    // Escape leaves the editor. The global key map is deliberately inert while a field has
+    // focus, so without this there is no way back to the transport keys but the mouse.
+    if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
+  });
+  pvText.addEventListener('focus', function () { typing = true; });
+  pvText.addEventListener('blur',  function () { typing = false; });
+  pvText.addEventListener('input', function () {
+    localScript = pvText.value;
+    scriptEl.value = pvText.value;      // the box below is the same script, keep it honest
+    stats(pvText.value);
+    clearTimeout(pvTimer);
+    pvTimer = setTimeout(function () { send({ type: 'pr_script', text: pvText.value }); }, 400);
+  });
+
+  /* Send the read to wherever the cursor is. Measured, not counted: the text before the
+     cursor is laid out through the very same renderer the output uses, and its height IS the
+     pixel offset — which is the only way to be right about a line that wraps three times. */
+  btnGoCursor.onclick = function () {
+    if (!P) return;
+    var before = pvText.value.slice(0, pvText.selectionStart);
+    var padM = SGPrompter.render($('measDoc'), { script: before, style: P.style });
+    var h = SGPrompter.measure($('measDoc'), padM).total;
+    // That height reaches the END of the cursor's line; back off one line to land on its start.
+    var line = (Number((P.style || {}).size) || 64) * (Number((P.style || {}).lineHeight) || 1.45);
+    send({ type: 'pr_goto', px: Math.max(0, Math.round(h - line)) });
+  };
+
   /* ---- look ---- */
   function style(o) { send({ type: 'pr_style', style: o }); }
   $('stFont').onchange   = function () { style({ font: this.value }); };
@@ -170,6 +258,13 @@
     if (localScript === p.script) localScript = null;
     if (!typing && scriptEl.value === p.script) stats(p.script);
 
+    // The on-screen editor follows the look live, and takes new text only when it isn't the
+    // one being typed into — same rule as the box below, for the same reason.
+    if (editing) {
+      pvDress(p);
+      if (document.activeElement !== pvText && pvText.value !== p.script) pvText.value = p.script || '';
+    }
+
     setVal($('stFont'), s.font);
     setVal($('stSize'), s.size); $('szV').textContent = s.size;
     setVal($('stLH'), s.lineHeight); $('lhV').textContent = Number(s.lineHeight).toFixed(2);
@@ -231,5 +326,10 @@
   };
 
   // expose for tests
-  window.__sgpc = { get state() { return P; }, livePx: livePx };
+  window.__sgpc = {
+    get state() { return P; },
+    get editing() { return editing; },
+    setEditing: setEditing,
+    livePx: livePx
+  };
 })();
