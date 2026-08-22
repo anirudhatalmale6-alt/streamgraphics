@@ -29,6 +29,14 @@ const vmixGrab = require('./vmix-grab');
 const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 let VERSION = '?'; try { VERSION = require('./package.json').version; } catch (e) {}
+/* 🚨 Every outbound request has to say who it is.
+   Node's https.get sends NO User-Agent at all, and a request without one is exactly what a
+   host's firewall treats as a bot. On the vendor's own host it answered 403 to the licence
+   report - the app ignores the reply by design, so it failed in complete silence and the
+   activity page stayed empty for a whole evening while everything else looked correct.
+   The two .json files were unaffected because they are static and never reach the firewall;
+   the counter is the only PHP endpoint the app calls, which is why it alone was blocked. */
+const SG_UA = 'StreamGraphicsPro/' + VERSION + ' (+https://streamgraphicspro.com)';
 
 // Update check: the app fetches a small JSON manifest you host
 // (→ {"version":"1.0.1","url":"https://...","notes":"..."}) and shows an in-app banner if newer.
@@ -59,7 +67,10 @@ function fetchManifest(url, cb, maxBytes) {
   const finish = j => { if (!done) { done = true; cb(j); } };
   try {
     const mod = /^http:/i.test(url) ? http : https;
-    const req = mod.get(url, { timeout: 4000 }, res => {
+    // Identify ourselves here too: these happen to be static files today, but a host that
+    // ever routes them through the same firewall would silently stop both the update check
+    // and the revoked-key list - and the kill switch failing quietly is not acceptable.
+    const req = mod.get(url, { timeout: 4000, headers: { 'User-Agent': SG_UA } }, res => {
       if (res.statusCode !== 200) { res.resume(); finish(null); return; }
       let d = '';
       res.on('data', c => { d += c; if (d.length > cap) req.destroy(); });
@@ -630,6 +641,7 @@ function fetchRevoked(cb) {
  * ==========================================================================*/
 const SEEN_URL = process.env.SG_SEEN_URL || 'https://streamgraphicspro.com/sgpro-seen.php';
 
+
 function machineId(salt) {
   const nets = require('os').networkInterfaces();
   const macs = [];
@@ -672,7 +684,7 @@ function pingSeen() {
             + '&m=' + encodeURIComponent(machineId(k))
             + '&v=' + encodeURIComponent(VERSION);
     const mod = /^http:/i.test(u) ? http : https;
-    const req = mod.get(u, { timeout: 4000 }, res => { res.resume(); });
+    const req = mod.get(u, { timeout: 4000, headers: { 'User-Agent': SG_UA } }, res => { res.resume(); });
     req.on('error', () => {});
     req.on('timeout', () => req.destroy());
   } catch (e) { /* never let this matter */ }
