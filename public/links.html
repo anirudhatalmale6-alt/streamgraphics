@@ -148,8 +148,20 @@
       return L.join('\n');
     }
 
+    /* 🚨 Names, not just addresses. A bare list of seven URLs that differ by one word at the
+       end is unusable the moment it leaves this page — pasted into a message or a notepad
+       there is nothing to say which one is the scoreboard and which one is the prompter, and
+       two of them differ only by "?mirror=1". The e-mail below always did this; these two
+       buttons were the ones that didn't. Blank line between entries so each address stays on
+       a line of its own and remains clickable wherever it lands. */
     function listText(items) {
-      return items.map(function (i) { return SGLinks.url(i.p); }).join('\n');
+      var L = [];
+      items.forEach(function (i) {
+        L.push(i.nm + (i.note ? '  (' + i.note + ')' : ''));
+        L.push(SGLinks.url(i.p));
+        L.push('');
+      });
+      return L.join('\n').replace(/\n+$/, '');
     }
 
     /* --- address picker --- */
