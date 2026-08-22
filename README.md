@@ -249,6 +249,14 @@ optional expiry date, and optionally a cap on the major version it unlocks.
   is open keeps working until it is next launched, so this can never put a watermark on a live
   show — including if a key ends up on the list by mistake.
 
+- **Counting where a key is opened.** A licensed copy sends one small request on launch: the
+  licence fingerprint, a machine id, and the version. Nothing else — no name, no email, no
+  hostname, and no IP is stored against it. The machine id is salted **with the licence**, so
+  the same computer under two licences produces two unrelated ids and this can never become a
+  way to follow a machine around. `SG_NO_SEEN=1` switches it off; the free version never sends
+  it. It is a detection aid only: nothing about it can take a licence away, and failure is
+  silent.
+
 Vendor side, in the License Maker folder: **Make a License Key** issues one, **Revoke a License
 Key** turns a key into the line for `sgpro-revoked.json` and tells you to upload it.
 

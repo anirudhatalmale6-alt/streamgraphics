@@ -607,6 +607,67 @@ function fetchRevoked(cb) {
     cb(true);
   }, 256 * 1024);
 }
+/* ============================================================================
+ * "This licence was opened here."
+ *
+ * One tiny GET on launch so the vendor can see that a key which was sold once is being opened
+ * on forty different machines. It is a DETECTION aid, not enforcement: nothing about it can
+ * ever take a licence away, and the app does not read the reply.
+ *
+ * What is sent, and nothing else:
+ *   k  the licence fingerprint  - the same sha256 the revoked list uses
+ *   m  a machine id            - see below
+ *   v  the app version         - so an old build can be told apart from a new one
+ *
+ * 🚨 NOT the customer's name, NOT their email, NOT their hostname, NOT anything typed into the
+ * app. The machine id is a hash of this computer's stable bits SALTED WITH THE LICENCE
+ * FINGERPRINT, which matters: it means the same computer running two different licences
+ * produces two unrelated ids, so this can count installs per key without ever becoming a way
+ * to follow one machine around.
+ *
+ * 🚨 And it is silent about failure by design. No internet, host down, endpoint missing - the
+ * app carries on exactly as before. Nothing here is allowed to matter to the person on stage.
+ * ==========================================================================*/
+const SEEN_URL = process.env.SG_SEEN_URL || 'https://streamgraphicspro.com/sgpro-seen.php';
+
+function machineId(salt) {
+  const nets = require('os').networkInterfaces();
+  const macs = [];
+  for (const name of Object.keys(nets)) {
+    for (const ni of nets[name] || []) {
+      // Skip loopback and the all-zero MACs virtual adapters hand out.
+      if (!ni.internal && ni.mac && ni.mac !== '00:00:00:00:00:00') macs.push(ni.mac);
+    }
+  }
+  /* Sorted, because the order interfaces come back in is not stable across reboots and an id
+     that changes on its own would report one machine as many - the exact false alarm this is
+     supposed to raise honestly. */
+  macs.sort();
+  const bits = macs.join('|') + '#' + require('os').hostname() + '#' + require('os').platform();
+  return crypto.createHash('sha256').update(salt + '#' + bits, 'utf8').digest('hex').slice(0, 16);
+}
+
+function pingSeen() {
+  try {
+    if (process.env.SG_NO_SEEN === '1') return;          // an operator can switch it off
+    const key = state.license.key;
+    if (!key || !state.license.active) return;           // nothing to report for a free copy
+    const k = keyFingerprint(key);
+    const u = SEEN_URL + (SEEN_URL.indexOf('?') >= 0 ? '&' : '?')
+            /* The WHOLE fingerprint, not a slice of it. The revoked list and the License
+               Maker both identify a key by the full sha256; sending a truncated one here
+               would mean the number on the activity page could never be matched back to a
+               customer without prefix-matching logic in two more places. One identity. */
+            + 'k=' + encodeURIComponent(k)
+            + '&m=' + encodeURIComponent(machineId(k))
+            + '&v=' + encodeURIComponent(VERSION);
+    const mod = /^http:/i.test(u) ? http : https;
+    const req = mod.get(u, { timeout: 4000 }, res => { res.resume(); });
+    req.on('error', () => {});
+    req.on('timeout', () => req.destroy());
+  } catch (e) { /* never let this matter */ }
+}
+
 /* Look once at startup, then twice more in case the machine's network was not up yet. All
    three land inside the first few minutes, so the answer is settled long before a show. */
 function startRevocationChecks() {
@@ -634,6 +695,8 @@ function applyLicense(key) {
 }
 (function () { try { if (fs.existsSync(LIC_FILE)) { const j = JSON.parse(fs.readFileSync(LIC_FILE, 'utf8')); if (j && j.key) applyLicense(j.key); } } catch (e) {} })();
 startRevocationChecks();   // after the key is loaded, so there is something to check
+// Same idea, same delay: let the machine's network come up first, and never hold the process.
+(function () { const t = setTimeout(pingSeen, 8000); if (t.unref) t.unref(); })();
 function saveLicense() { writeJson(LIC_FILE, function () { return { key: state.license.key || '' }; }); }
 function hasFeature(f) { return isLicensed() && (state.license.features || []).indexOf(f) >= 0; }
 
