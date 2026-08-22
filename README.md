@@ -75,6 +75,16 @@ Type or paste the script, press Play, and it scrolls.
   where it wraps on the glass — so a change made mid-show can be judged for length before it
   reaches the talent. Every keystroke is on air within half a second. **▸ Prompter to my
   cursor** sends the read to whatever line you're editing. <kbd>Esc</kbd> closes it.
+- **Open a document.** *Open a document…* under the script box takes Word (`.docx`), rich
+  text (`.rtf`) and plain text (`.txt`, `.md`) — or drag the file straight onto the box.
+  Headings in the document become bookmarks on their own: a script written in Word with
+  Heading 1 / Heading 2 per section arrives already marked up and already on your Stream Deck.
+  Nothing is stored — the file is read and handed back to the page.
+- **Put it on a monitor.** On the computer running the app (Chrome or Edge), *Find my
+  monitors* lists your displays and sends the normal or mirrored output straight to the one
+  you pick, full screen. From another device this is not possible in any browser — open the
+  output over there and drag it across, or use it as a browser source. The panel says which
+  case you're in rather than failing quietly.
 - **Mirrored and normal at the same time.** `/prompter-output?mirror=1` is a separate
   address, so beam-splitter glass in front of the lens and a confidence monitor at the back
   of the room run from one script, in step. `?flip=1` mirrors vertically for a rig that

@@ -62,6 +62,11 @@
   .mkbtn.at b{background:#00000033;color:#251703}
   .nomarks{color:var(--muted);font-size:13px}
 
+  #dropzone{position:relative}
+  .dropveil{position:absolute;inset:0;display:none;align-items:center;justify-content:center;border:2px dashed var(--accent);border-radius:10px;background:#0b1b2ccc;font-weight:800;color:#cfe0f5;pointer-events:none}
+  #dropzone.over .dropveil{display:flex}
+  #docMsg.ok{color:#5ee0a8}
+  #docMsg.bad{color:#ff9aa8}
   #script{width:100%;min-height:290px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:14px 16px;font:15px/1.6 'Segoe UI',Arial,sans-serif;resize:vertical;outline:none}
   #script:focus{border-color:var(--accent)}
 
@@ -98,6 +103,18 @@
         <code id="outUrlM">…?mirror=1</code>
         <button id="copyBtnM" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button></span>
     </div>
+
+    <!-- Put the output on a monitor without dragging a window across the desk. -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3>Put it on a monitor</h3>
+      <div class="lrow" id="screenRow">
+        <button class="btn ghost" id="btnFindScreens">Find my monitors</button>
+        <select class="inp" id="screenPick" style="width:auto;display:none"></select>
+        <button class="btn" id="btnSendNormal" style="display:none">Open normal there ▸</button>
+        <button class="btn ghost" id="btnSendMirror" style="display:none">Open mirrored there ▸</button>
+      </div>
+      <p class="mini" id="screenHint" style="color:var(--muted);margin:0"></p>
+    </section>
 
     <section class="panel" style="margin-bottom:14px">
       <div class="pvbar">
@@ -153,12 +170,19 @@
     <!-- script -->
     <section class="panel" style="margin-bottom:14px">
       <h3>Script</h3>
-      <textarea id="script" spellcheck="true" placeholder="Type or paste the script here…"></textarea>
+      <div id="dropzone">
+        <textarea id="script" spellcheck="true" placeholder="Type or paste the script here — or drop a Word document on it."></textarea>
+        <div class="dropveil" id="dropVeil">Drop it to load the script</div>
+      </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px">
+        <button class="btn ghost" id="btnOpenDoc">Open a document…</button>
+        <input type="file" id="docFile" accept=".txt,.text,.md,.markdown,.rtf,.docx" style="display:none">
         <span class="mini" style="color:var(--muted)" id="scriptStats">—</span>
         <span style="flex:1"></span>
         <span class="mini" style="color:var(--muted)">Saved automatically. Two hashes at the start of a line (## Intro) makes a bookmark.</span>
       </div>
+      <div class="mini" id="docMsg" style="margin-top:8px;display:none"></div>
+      <p class="mini" style="color:var(--muted);margin-top:8px">Word (.docx), rich text (.rtf) and plain text (.txt, .md). Headings in a Word document come across as bookmarks on their own — you don't have to add the ## by hand.</p>
     </section>
 
     <!-- look -->

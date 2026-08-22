@@ -199,6 +199,142 @@
     send({ type: 'pr_goto', px: Math.max(0, Math.round(h - line)) });
   };
 
+  /* ---- open a document as the script ----
+     The file is posted to the app, which does the reading. A .docx is a zip and a .rtf is a
+     control-word stream; Node has had the tools for both since forever, whereas doing it here
+     would rest on DecompressionStream — a much younger API than the browser that happens to
+     be on a studio PC. */
+  var docFile = $('docFile'), docMsg = $('docMsg'), dropzone = $('dropzone'), dropVeil = $('dropVeil');
+
+  function docSay(text, good) {
+    docMsg.textContent = text;
+    docMsg.className = 'mini ' + (good ? 'ok' : 'bad');
+    docMsg.style.display = '';
+  }
+
+  function importFile(f) {
+    if (!f) return;
+    // Say no here rather than after pushing twelve megabytes across the room's Wi-Fi.
+    if (f.size > 12 * 1024 * 1024) { docSay(f.name + ' is too big — the limit is 12 MB.', false); return; }
+    // Replacing a script that is on air is not something to do on a stray drag.
+    var cur = (P && P.script) || '';
+    if (cur.trim() && !window.confirm('Replace the script that is loaded with "' + f.name + '"?')) return;
+    docSay('Reading ' + f.name + '…', true);
+    fetch('/prompter/import?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) { docSay(f.name + ': ' + ((j && j.error) || 'could not be read'), false); return; }
+        scriptEl.value = j.text;
+        localScript = j.text;
+        if (editing) pvText.value = j.text;
+        stats(j.text);
+        send({ type: 'pr_script', text: j.text });
+        var marks = SGPrompter.marksOf(j.text).length;
+        docSay('Loaded ' + f.name + ' — ' + j.words.toLocaleString() + ' words, ' +
+               marks + ' bookmark' + (marks === 1 ? '' : 's') +
+               (marks ? '.' : '. Start a line with ## to add one.'), true);
+      })
+      .catch(function () { docSay('Could not reach the app to read that file.', false); });
+  }
+
+  $('btnOpenDoc').onclick = function () { docFile.value = ''; docFile.click(); };
+  docFile.onchange = function () { importFile(this.files && this.files[0]); };
+
+  // Drag a document straight onto the script box.
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.add('over'); });
+  });
+  ['dragleave', 'dragend'].forEach(function (ev) {
+    // 🚨 relatedTarget, not a plain remove: dragging ACROSS the textarea inside the zone fires
+    // dragleave on the child, and the veil would flicker off under the operator's cursor.
+    dropzone.addEventListener(ev, function (e) {
+      if (!e.relatedTarget || !dropzone.contains(e.relatedTarget)) dropzone.classList.remove('over');
+    });
+  });
+  dropzone.addEventListener('drop', function (e) {
+    e.preventDefault();
+    dropzone.classList.remove('over');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) importFile(f);
+  });
+
+  /* ---- put the output on a monitor ----
+     Uses the Window Management API, which needs a secure context — on the StreamGraphics PC
+     itself http://localhost counts as one, which is exactly where this is used. From a tablet
+     across the network it does not, and could not anyway: no browser can place a window on a
+     different computer's monitor. The fallback says so instead of failing quietly. */
+  var screenPick = $('screenPick'), screenHint = $('screenHint');
+  var screens = [], SKEY = 'sg.prompter.screen';
+
+  function canPlace() { return typeof window.getScreenDetails === 'function' && window.isSecureContext; }
+
+  function openOn(mirrored) {
+    var i = Math.max(0, Math.min(screens.length - 1, +screenPick.value || 0));
+    var s = screens[i];
+    try { localStorage.setItem(SKEY, String(i)); } catch (e) {}
+    var url = SGLinks.url('/prompter-output?fs=1' + (mirrored ? '&mirror=1' : ''));
+    var feat = s
+      ? 'popup=yes,left=' + s.left + ',top=' + s.top + ',width=' + s.width + ',height=' + s.height
+      : 'popup=yes';
+    // A distinct name per output, so re-sending replaces that window rather than piling up.
+    var w = window.open(url, 'sgprompter-' + (mirrored ? 'mirror' : 'normal'), feat);
+    if (!w) { screenHint.textContent = 'Your browser blocked that pop-up. Allow pop-ups for this address and try again.'; return; }
+    // Chrome sizes a re-used window to its old bounds, so say it again once it is there.
+    if (s) { try { w.moveTo(s.left, s.top); w.resizeTo(s.width, s.height); } catch (e) {} }
+    try { w.focus(); } catch (e) {}
+    screenHint.textContent = 'Sent to ' + (s ? s.label : 'a new window') +
+      '. If it is not full screen, click the window once and press F11.';
+  }
+
+  function fillScreens(list) {
+    screens = list;
+    screenPick.innerHTML = '';
+    list.forEach(function (s, i) {
+      var o = document.createElement('option');
+      o.value = String(i); o.textContent = s.label;
+      screenPick.appendChild(o);
+    });
+    var saved = 0;
+    try { saved = parseInt(localStorage.getItem(SKEY), 10) || 0; } catch (e) {}
+    screenPick.value = String(Math.max(0, Math.min(list.length - 1, saved)));
+    screenPick.style.display = '';
+    $('btnSendNormal').style.display = '';
+    $('btnSendMirror').style.display = '';
+    $('btnFindScreens').style.display = 'none';
+    screenHint.textContent = list.length > 1
+      ? 'Pick the monitor and send it. The choice is remembered.'
+      : 'Only one monitor is connected, so this will open on it.';
+  }
+
+  $('btnFindScreens').onclick = function () {
+    if (!canPlace()) {
+      // Deliberately explicit about WHY, because the reason changes what the operator does.
+      screenHint.textContent = window.isSecureContext
+        ? 'This browser cannot place windows on a chosen monitor (Chrome and Edge can). Open the output link and drag that window to the monitor, then press F11.'
+        : 'Placing a window on a chosen monitor only works on the StreamGraphics computer itself. From another device, open the output link over there and drag it across, or use it as a browser source.';
+      fillScreens([]);
+      $('btnSendNormal').style.display = '';
+      $('btnSendMirror').style.display = '';
+      screenPick.style.display = 'none';
+      return;
+    }
+    window.getScreenDetails().then(function (d) {
+      fillScreens((d.screens || []).map(function (s, i) {
+        return {
+          left: s.availLeft, top: s.availTop, width: s.availWidth, height: s.availHeight,
+          label: (s.label || ('Monitor ' + (i + 1))) + ' — ' + s.width + '×' + s.height + (s.isPrimary ? ' (main)' : '')
+        };
+      }));
+    }).catch(function () {
+      screenHint.textContent = 'Permission to see your monitors was declined. Allow it in the address bar, or open the output link and drag the window across.';
+    });
+  };
+  $('btnSendNormal').onclick = function () { openOn(false); };
+  $('btnSendMirror').onclick = function () { openOn(true); };
+  if (!canPlace()) {
+    $('btnFindScreens').textContent = 'Open the output in its own window';
+  }
+
   /* ---- look ---- */
   function style(o) { send({ type: 'pr_style', style: o }); }
   $('stFont').onchange   = function () { style({ font: this.value }); };

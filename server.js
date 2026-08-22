@@ -22,6 +22,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');   // .docx is a zip; see documentToScript()
 const obsGrab = require('./obs-grab');
 const vmixGrab = require('./vmix-grab');
 
@@ -1329,6 +1330,225 @@ function promptSig(p) {
   return str.length.toString(36) + '-' + h.toString(36);
 }
 
+/* ============================================================================
+ * Turning a document into a script.
+ *
+ * Done here rather than in the browser on purpose: a .docx is a zip, and Node has always had
+ * zlib. Doing it in the page would rest on DecompressionStream, which is a much younger API —
+ * and this app runs on whatever browser is already on the studio PC, sometimes an old one.
+ * No libraries: everything below is the file formats, read directly.
+ * ==========================================================================*/
+
+function decodeXmlEntities(s) {
+  return String(s)
+    .replace(/&#x([0-9a-fA-F]+);/g, (m, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');   // last, or "&amp;lt;" would decode twice
+}
+
+/* Pull one file out of a zip. Reads the central directory rather than scanning for local
+ * headers, because a local header is allowed to lie. */
+function zipRead(buf, wanted) {
+  const EOCD = 0x06054b50, CEN = 0x02014b50, LOC = 0x04034b50;
+  let eocd = -1;
+  // The comment at the end is variable length, so the record has to be found backwards.
+  for (let i = buf.length - 22; i >= 0 && i >= buf.length - 22 - 65535; i--) {
+    if (buf.readUInt32LE(i) === EOCD) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('this file is not a Word document (no zip directory)');
+  const count = buf.readUInt16LE(eocd + 10);
+  let off = buf.readUInt32LE(eocd + 16);
+  for (let i = 0; i < count && off + 46 <= buf.length; i++) {
+    if (buf.readUInt32LE(off) !== CEN) throw new Error('this file is not a Word document (bad directory)');
+    const nameLen = buf.readUInt16LE(off + 28), extraLen = buf.readUInt16LE(off + 30), cmtLen = buf.readUInt16LE(off + 32);
+    const name = buf.toString('latin1', off + 46, off + 46 + nameLen);
+    if (name === wanted) {
+      const lho = buf.readUInt32LE(off + 42);
+      if (buf.readUInt32LE(lho) !== LOC) throw new Error('this Word document is damaged');
+      const method = buf.readUInt16LE(lho + 8);
+      /* 🚨 Take the compressed size from the CENTRAL directory, not the local header. A zip
+         written as a stream sets the local sizes to zero and puts the real ones in a data
+         descriptor after the payload; trusting the local header there yields an empty slice
+         and a document that imports as one blank line. */
+      const csize = buf.readUInt32LE(off + 20);
+      const start = lho + 30 + buf.readUInt16LE(lho + 26) + buf.readUInt16LE(lho + 28);
+      const data = buf.slice(start, start + csize);
+      if (method === 0) return data;
+      if (method === 8) return zlib.inflateRawSync(data);
+      throw new Error('this Word document uses a compression this app cannot read');
+    }
+    off += 46 + nameLen + extraLen + cmtLen;
+  }
+  return null;
+}
+
+/* word/document.xml -> lines. One <w:p> is one line, which is exactly how a prompter wants
+ * it: what the writer pressed Enter on becomes what the talent reads as a line. */
+function docxToText(buf) {
+  const xml = zipRead(buf, 'word/document.xml');
+  if (!xml) throw new Error('this file has no document text in it');
+  const s = xml.toString('utf8');
+  const body = s.indexOf('<w:body');
+  const paras = (body >= 0 ? s.slice(body) : s).split(/<w:p(?=[\s/>])/).slice(1);
+  return paras.map(p => {
+    const end = p.indexOf('</w:p>');
+    let t = (end >= 0 ? p.slice(0, end) : p);
+    /* 🚨 The split ate the "<w:p" but left the REST of that opening tag, and what is left
+       has no "<" for the tag-stripper below to grab - so every single line came back with a
+       stray ">" welded to the front of it. Only visible against a document a real word
+       processor wrote; a hand-made fixture would have used a bare <w:p> and hidden it. */
+    t = t.replace(/^[^>]*>/, '');
+    /* 🚨 A script written in Word has its sections as HEADINGS, not as "##" — nobody types
+       our marker into a Word document. Reading the style turns a document that already looks
+       structured into one that already has its bookmarks, instead of a flat wall of text the
+       operator then has to go and mark up by hand. */
+    const heading = /<w:pStyle[^>]*w:val="(?:Title|Subtitle|Heading[1-4])"/i.test(t)
+                 || /<w:outlineLvl[^>]*w:val="[0-3]"/i.test(t);
+    t = t.replace(/<w:tab\b[^>]*>/g, '\t')
+         .replace(/<w:br\b[^>]*>/g, ' ')      // a soft break inside a paragraph is not a new line
+         .replace(/<w:noBreakHyphen\b[^>]*>/g, '-')
+         .replace(/<[^>]*>/g, '');
+    t = decodeXmlEntities(t).replace(/ /g, ' ').replace(/[ \t]+$/, '');
+    // Don't double the marker up if the writer happened to type it as well.
+    if (heading && t.trim() && !/^\s*##/.test(t)) t = '## ' + t.trim();
+    return t;
+  }).join('\n');
+}
+
+/* RTF, walked as a stream of groups and control words. Only the parts that carry body text
+ * are kept; the font and colour tables, embedded pictures and Word's private destinations are
+ * skipped whole, or their contents would arrive as pages of hex. */
+/* Which \sN style numbers are headings, read out of the document's own stylesheet.
+ * \outlinelevel alone is not enough: pandoc writes it, LibreOffice and Word write
+ * {\stylesheet{\s1 ... Heading 1;}} and then just \s1 on the paragraph. Without this a script
+ * saved as .rtf out of Word arrives as one flat block with every section heading demoted to
+ * an ordinary line - the bookmarks silently gone. */
+function rtfHeadingStyles(s) {
+  const set = new Set();
+  const st = s.indexOf('{\\stylesheet');
+  if (st < 0) return set;
+  let d = 0, end = s.length;
+  for (let i = st; i < s.length; i++) {
+    if (s[i] === '{') d++;
+    else if (s[i] === '}') { d--; if (!d) { end = i; break; } }
+  }
+  // Walk the stylesheet's own top-level children; each is one style, named just before its ";".
+  let i = st + 1;
+  while (i < end) {
+    if (s[i] !== '{') { i++; continue; }
+    let dd = 0, j = i;
+    for (; j <= end; j++) {
+      if (s[j] === '{') dd++;
+      else if (s[j] === '}') { dd--; if (!dd) break; }
+    }
+    const entry = s.slice(i, j);
+    const num = /\\s(\d+)[\\ ]/.exec(entry);
+    /* Anchored on the space that ENDS the last control word. A bare /([^;{}\\]+);/ looks
+       equivalent and isn't: the capture starts wherever the previous backslash left off, so
+       "...\\af8 Heading 1;" yielded "af8 Heading 1" and nothing was ever recognised as a
+       heading. Stripping a leading token instead would eat the first word of any style whose
+       name really does start at the capture. */
+    const name = /\\[a-zA-Z]+-?\d* ([^;{}\\]+);\s*$/.exec(entry) || /([^;{}\\]+);\s*$/.exec(entry);
+    if (num && name && /^\s*(heading|title|subtitle|\u00fcberschrift|titre|t\u00edtulo)/i.test(name[1].trim())) {
+      set.add(+num[1]);
+    }
+    i = j + 1;
+  }
+  return set;
+}
+
+function rtfToText(buf) {
+  const s = buf.toString('latin1');
+  const headingStyles = rtfHeadingStyles(s);
+  const SKIP = /^(fonttbl|colortbl|stylesheet|info|pict|object|themedata|colorschememapping|latentstyles|datastore|xmlnstbl|listtable|listoverridetable|generator|filetbl|revtbl|rsidtbl|mmathPr|header|footer|footnote|annotation)$/;
+  let out = [], line = '', heading = false, i = 0, depth = 0, skipAt = -1;
+  const skipping = () => skipAt >= 0;
+  /* Built a line at a time rather than as one string, so a paragraph marked as a heading can
+     be turned into a "## " bookmark the way a Word heading is. RTF carries that as
+     \\outlinelevel on the paragraph - style numbers (\\s1, \\s2) look like the same thing and are
+     not: they point into a stylesheet where 1 can mean anything the author wanted. */
+  const flush = () => {
+    let t = line.replace(/[ \t]+$/, '');
+    if (heading && t.trim() && !/^\s*##/.test(t)) t = '## ' + t.trim();
+    out.push(t); line = ''; heading = false;
+  };
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '{') { depth++; i++; continue; }
+    if (c === '}') { depth--; if (skipping() && depth < skipAt) skipAt = -1; i++; continue; }
+    if (c === '\\') {
+      // Escaped literals first — \\ \{ \} are text, not control words.
+      const n = s[i + 1];
+      if (n === '\\' || n === '{' || n === '}') { if (!skipping()) line += n; i += 2; continue; }
+      if (n === "'") {                                   // \'hh — one byte, hex
+        const hex = s.substr(i + 2, 2);
+        if (!skipping()) line += String.fromCharCode(parseInt(hex, 16) || 0);
+        i += 4; continue;
+      }
+      /* 🚨 Only start a skip if we are not already in one. Word writes
+         {\\fonttbl{\\f3 Liberation Serif{\\*\\falt Times New Roman};}...} - the nested \\* used to
+         overwrite the font table's own skip depth with a deeper one, and the very next "}"
+         then ended the skip early. Every font name after the third arrived in the script. */
+      if (n === '*') { if (!skipping()) skipAt = depth; i += 2; continue; }
+      const m = /^\\([a-zA-Z]+)(-?\d+)? ?/.exec(s.slice(i));
+      if (!m) { i++; continue; }
+      const word = m[1], num = m[2];
+      if (SKIP.test(word) && !skipping()) skipAt = depth;
+      else if (!skipping()) {
+        if (word === 'par' || word === 'line' || word === 'sect') flush();
+        else if (word === 'tab') line += '\t';
+        else if (word === 'outlinelevel' && num != null && +num >= 0 && +num <= 3) heading = true;
+        else if (word === 's' && num != null && headingStyles.has(+num)) heading = true;
+        else if (word === 'pard') heading = false;   // \pard resets the paragraph's formatting
+        else if (word === 'u' && num != null) {
+          line += String.fromCharCode(((+num) + 65536) % 65536);
+          /* \uN is followed by a fallback character for readers that don't do Unicode. It has
+             to be swallowed or every accented letter arrives with a "?" glued to it. */
+          let j = i + m[0].length;
+          if (s[j] === '\\' && s[j + 1] === "'") j += 4; else if (s[j] && s[j] !== '\\' && s[j] !== '{' && s[j] !== '}') j += 1;
+          i = j; continue;
+        }
+      }
+      i += m[0].length; continue;
+    }
+    if (c === '\r' || c === '\n') { i++; continue; }   // RTF line breaks are formatting, not text
+    if (!skipping()) line += c;
+    i++;
+  }
+  flush();
+  return out.join('\n');
+}
+
+/* One entry point, chosen by what the file actually is rather than only what it's called —
+ * a .doc that is really a .docx, or a .txt saved as .rtf, both turn up in the wild. */
+function documentToScript(buf, filename) {
+  const name = String(filename || '').toLowerCase();
+  const isZip = buf.length > 4 && buf.readUInt32LE(0) === 0x04034b50;
+  const isRtf = buf.slice(0, 5).toString('latin1') === '{\\rtf';
+  let text;
+  if (isZip) text = docxToText(buf);
+  else if (isRtf) text = rtfToText(buf);
+  else if (/\.docx?$/.test(name) && !isZip) {
+    // The old binary .doc is a completely different format (OLE compound file) and is not
+    // worth guessing at — say so plainly instead of importing a page of mojibake.
+    throw new Error('this looks like an old .doc — open it in Word and "Save As" .docx or plain text, then try again');
+  } else {
+    text = buf.toString('utf8').replace(/^﻿/, '');
+    if (text.indexOf('�') >= 0 && /[\x00-\x08\x0e-\x1f]/.test(buf.slice(0, 400).toString('latin1'))) {
+      throw new Error('this file is not text this app can read — save it as .txt, .rtf or .docx');
+    }
+  }
+  return String(text)
+    .replace(/\r\n|\r/g, '\n')
+    .replace(/ /g, ' ')
+    .replace(/[\t ]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')     // a document full of empty paragraphs is a wall of blank screen
+    .replace(/^\n+/, '')
+    .replace(/\s+$/, '');
+}
+
 // Live value (ms) of a timer layer at server time `now`. Shared shape with the standalone timer.
 function liveTimerMs(t, now) {
   if (t.mode === 'up')  return (t.baseMs || 0) + (t.running ? now - t.anchorServer : 0);
@@ -1584,6 +1804,52 @@ const server = http.createServer((req, res) => {
    * The operator's OBS password arrives in this request, is used to answer one challenge, and is
    * never written down: not to disk, not to the state file, not to the log. That is deliberate.
    * Everything here is local — the app talks to OBS directly, nothing leaves the network. */
+  /* --- turn an uploaded document into a script ---
+   * The file arrives as a raw body rather than a multipart form: there is exactly one file,
+   * and hand-rolling a multipart parser to carry it would be more code than reading the
+   * document formats themselves. Nothing is written to disk — the bytes are decoded and the
+   * text is handed straight back to the page that sent them. */
+  if (pathname === '/prompter/import' && req.method === 'POST') {
+    const MAX = 12 * 1024 * 1024;
+    const chunks = [];
+    let size = 0, aborted = false;
+    const sendJson = (code, obj) => {
+      res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify(obj));
+    };
+    /* 🚨 Over the limit, STOP BUFFERING but keep reading, and answer at the end.
+       Two earlier shapes of this both failed the same way. Destroying the request mid-upload
+       resets the connection, and answering early then destroying breaks the pipe — either way
+       the client is still writing the file when the socket goes, so it never reads the reply
+       and the page reports "could not reach the app". That sends the operator off debugging
+       their network when the real answer is "pick a smaller file". Dropping the chunks keeps
+       memory flat; the hard ceiling below is the runaway guard. */
+    let over = false;
+    req.on('data', c => {
+      size += c.length;
+      if (size > MAX) { over = true; chunks.length = 0; }
+      else chunks.push(c);
+      if (size > 64 * 1024 * 1024) { aborted = true; req.destroy(); }
+    });
+    req.on('error', () => {});
+    req.on('end', () => {
+      if (aborted) return;
+      if (over) return sendJson(413, { ok: false, error: 'that file is too big — the limit is 12 MB' });
+      const name = url.searchParams.get('name') || '';
+      try {
+        const text = documentToScript(Buffer.concat(chunks), name);
+        if (!text.trim()) return sendJson(200, { ok: false, error: 'there is no text in that file' });
+        const lines = text.split('\n').length;
+        const words = (text.match(/\S+/g) || []).length;
+        sendJson(200, { ok: true, text: text, name: name, lines: lines, words: words });
+      } catch (e) {
+        // The messages thrown above are written for the operator, not for a log.
+        sendJson(200, { ok: false, error: e && e.message ? e.message : 'that file could not be read' });
+      }
+    });
+    return;
+  }
+
   if ((pathname === '/obs/scenes' || pathname === '/obs/grab') && req.method === 'POST') {
     let body = '';
     req.on('data', c => { body += c; if (body.length > 1e5) req.destroy(); });

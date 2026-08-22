@@ -183,6 +183,35 @@
   window.addEventListener('resize', refit);
   refit();
 
+  /* ?fs=1 — this window was placed on a monitor by the control panel, so try to lose the
+     browser chrome. Only ever set by that flow, never on a browser-source URL: a badge or a
+     fullscreen call inside OBS would be a bug, not a feature.
+     🚨 requestFullscreen may be refused when the opener's click is no longer "recent" enough
+     to count as activation. That is not an error worth hiding — the operator is standing in
+     front of the screen, so offer them the one click that will work. */
+  if (Q.get('fs') === '1') {
+    var tryFs = function () {
+      var p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+      if (p && p.catch) p.catch(showFsHint); else if (!p) showFsHint();
+    };
+    var hint = null;
+    function showFsHint() {
+      if (hint || document.fullscreenElement) return;
+      hint = document.createElement('div');
+      hint.textContent = 'Click for full screen';
+      hint.setAttribute('style', 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);' +
+        'background:#1b2434;color:#cfe0f5;border:1px solid #2e3b52;border-radius:10px;' +
+        'padding:10px 18px;font:600 15px/1 Segoe UI,Arial,sans-serif;cursor:pointer;z-index:9');
+      hint.onclick = function () { document.documentElement.requestFullscreen(); };
+      document.body.appendChild(hint);
+    }
+    document.addEventListener('fullscreenchange', function () {
+      if (document.fullscreenElement && hint) { hint.remove(); hint = null; }
+      refit();
+    });
+    setTimeout(tryFs, 60);
+  }
+
   var es = SGLive('/events');
   es.onmessage = function (e) { try { onState(JSON.parse(e.data)); } catch (err) {} };
 
