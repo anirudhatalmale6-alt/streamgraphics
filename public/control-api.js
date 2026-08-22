@@ -92,6 +92,7 @@
       row('Previous section', b + '/api/prompter/prevmark'),
       row('Back to the top', b + '/api/prompter/top'),
       row('Jump to a named section', b + '/api/prompter/mark?name=Intro'),
+      row('Jump to the Nth section', b + '/api/prompter/mark?n=2'),
       row('Set the speed', b + '/api/prompter/speed?value=40'),
       row('Take to air', b + '/api/prompter/air'),
       row('Off air', b + '/api/prompter/off')
@@ -148,6 +149,23 @@
       sel.appendChild(row('Take to air', b + '/api/scoreboard/show?name=' + e));
       sel.appendChild(row('Off air', b + '/api/scoreboard/hide?name=' + e));
     });
+
+    /* Teleprompter bookmarks — one ready-made URL per section actually in the script, so a
+       Stream Deck can have a key per section instead of one "next section" key pressed five
+       times. Addressed BY NAME rather than by number: rewrite the script, move a section, and
+       the key still lands on the right words. */
+    var mel = $('prompterMarks');
+    if (mel) {
+      var marks = (data.prompter && data.prompter.marks) || [];
+      mel.innerHTML = '';
+      if (!marks.length) {
+        mel.innerHTML = '<div class="empty">No bookmarks in the script yet. Start a line with ## in the teleprompter, then Refresh.</div>';
+      } else {
+        marks.forEach(function (nm, i) {
+          mel.appendChild(row('Go to "' + nm + '"', b + '/api/prompter/mark?name=' + enc(nm)));
+        });
+      }
+    }
   }
 
   function load() {

@@ -52,9 +52,14 @@
   .speedbox button:hover{border-color:var(--accent)}
 
   #marks{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .mkbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mkbtn{display:inline-flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;max-width:280px}
+  .mkbtn span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* The shortcut number, on the button it fires. A key you have to look up in a help panel is
+     a key nobody uses mid-show. */
+  .mkbtn b{flex:none;min-width:17px;height:17px;line-height:17px;text-align:center;border-radius:4px;background:var(--line);color:var(--muted);font-size:11px;font-weight:800}
   .mkbtn:hover{border-color:#f4a63c;color:#f4c37a}
   .mkbtn.at{background:#f4a63c;border-color:#f4a63c;color:#251703}
+  .mkbtn.at b{background:#00000033;color:#251703}
   .nomarks{color:var(--muted);font-size:13px}
 
   #script{width:100%;min-height:290px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:14px 16px;font:15px/1.6 'Segoe UI',Arial,sans-serif;resize:vertical;outline:none}
@@ -112,10 +117,27 @@
       <p class="mini" style="color:var(--muted);margin-top:9px">Both addresses run this one script at the same time — put the mirrored one on the glass in front of the lens and the normal one on a confidence monitor, or drop either into OBS / vMix as a browser source.</p>
     </section>
 
+    <!-- Where you are. Deliberately ABOVE the transport: during a read the operator needs to
+         see the position and reach a section far more often than they need to look at buttons
+         they are driving from the keyboard anyway. -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3>Where you are</h3>
+      <div class="gauge" style="margin-bottom:14px">
+        <div class="bar" id="bar" title="Click anywhere to jump there"><i id="barFill"></i></div>
+        <div class="gnums"><span id="posTxt">0:00</span><span id="wpmTxt"></span><span id="leftTxt">–:––</span></div>
+      </div>
+      <div id="marks"><span class="nomarks">Start any line in the script with ## and it becomes a bookmark button here.</span></div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn ghost" id="btnPrevMark">◂ Previous section</button>
+        <button class="btn ghost" id="btnNextMark">Next section ▸</button>
+        <span class="mini" style="color:var(--muted)">Press <span class="kbd">1</span>–<span class="kbd">9</span> to jump straight to a section, from here or from the output window.</span>
+      </div>
+    </section>
+
     <!-- transport -->
     <section class="panel" style="margin-bottom:14px">
       <h3>Run the script</h3>
-      <div class="transport" style="margin-bottom:14px">
+      <div class="transport">
         <button class="tbtn play" id="btnPlay">Play<span class="k">space</span></button>
         <button class="tbtn" id="btnBack">▲ Back<span class="k">up</span></button>
         <button class="tbtn" id="btnAhead">▼ Ahead<span class="k">down</span></button>
@@ -125,20 +147,6 @@
           <div><div class="v" id="spdV">40</div><div style="font-size:10px;letter-spacing:.1em;color:var(--muted);text-align:center;text-transform:uppercase">speed</div></div>
           <button id="btnFaster" title="Faster">▶</button>
         </div>
-      </div>
-      <div class="gauge">
-        <div class="bar" id="bar" title="Click anywhere to jump there"><i id="barFill"></i></div>
-        <div class="gnums"><span id="posTxt">0:00</span><span id="wpmTxt"></span><span id="leftTxt">–:––</span></div>
-      </div>
-    </section>
-
-    <!-- bookmarks -->
-    <section class="panel" style="margin-bottom:14px">
-      <h3>Bookmarks</h3>
-      <div id="marks"><span class="nomarks">Start any line in the script with ## and it becomes a bookmark button here.</span></div>
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn ghost" id="btnPrevMark">◂ Previous section</button>
-        <button class="btn ghost" id="btnNextMark">Next section ▸</button>
       </div>
     </section>
 
@@ -204,7 +212,8 @@
         <span class="kbd">←</span> slower &nbsp;<span class="kbd">→</span> faster &nbsp;·&nbsp;
         <span class="kbd">↑</span> jump back &nbsp;<span class="kbd">↓</span> jump ahead &nbsp;·&nbsp;
         <span class="kbd">Home</span> back to the top &nbsp;·&nbsp;
-        <span class="kbd">PgUp</span> / <span class="kbd">PgDn</span> previous / next bookmark<br>
+        <span class="kbd">PgUp</span> / <span class="kbd">PgDn</span> previous / next bookmark &nbsp;·&nbsp;
+        <span class="kbd">1</span>…<span class="kbd">9</span> jump straight to that bookmark<br>
         Hold <span class="kbd">Shift</span> with an arrow for a bigger step. The same keys work on the output window, so you can drive it from whichever screen your hand is on — and none of them fire while you're typing in the script box.
       </div>
     </section>

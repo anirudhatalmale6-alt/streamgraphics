@@ -82,6 +82,13 @@
     else if (k === 'Home')       { send({ type: 'pr_top' }); }
     else if (k === 'PageUp')     { send({ type: 'pr_mark', cmd: 'prev' }); }
     else if (k === 'PageDown')   { send({ type: 'pr_mark', cmd: 'next' }); }
+    // 1-9 go straight to a section. Guarded on the bookmark actually existing, so pressing 7
+    // on a three-section script does nothing instead of throwing the read to the end.
+    else if (k >= '1' && k <= '9') {
+      var n = +k - 1, ms = (P && P.geom && P.geom.marks) || [];
+      if (n >= ms.length) return;
+      send({ type: 'pr_goto', mark: n });
+    }
     else return;
     e.preventDefault();
   });
@@ -229,7 +236,15 @@
     box.innerHTML = '';
     marks.forEach(function (m, i) {
       var b = document.createElement('button');
-      b.className = 'mkbtn'; b.textContent = m.name; b.title = 'Jump to "' + m.name + '"';
+      b.className = 'mkbtn';
+      // The first nine carry their shortcut number; past that there is no key to show, and a
+      // badge with nothing behind it would be a lie.
+      if (i < 9) {
+        var n = document.createElement('b'); n.textContent = String(i + 1); b.appendChild(n);
+      }
+      var t = document.createElement('span'); t.className = 't'; t.textContent = m.name;
+      b.appendChild(t);
+      b.title = i < 9 ? 'Jump to "' + m.name + '"  (press ' + (i + 1) + ')' : 'Jump to "' + m.name + '"';
       b.dataset.y = m.y;
       b.onclick = function () { send({ type: 'pr_goto', mark: i }); };
       box.appendChild(b);

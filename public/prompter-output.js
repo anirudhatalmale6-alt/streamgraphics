@@ -170,6 +170,11 @@
     else if (k === 'Home')       send({ type: 'pr_top' });
     else if (k === 'PageUp')     send({ type: 'pr_mark', cmd: 'prev' });
     else if (k === 'PageDown')   send({ type: 'pr_mark', cmd: 'next' });
+    else if (k >= '1' && k <= '9') {
+      var n = +k - 1, ms = (P && P.geom && P.geom.marks) || [];
+      if (n >= ms.length) return;
+      send({ type: 'pr_goto', mark: n });
+    }
     else return;
     e.preventDefault();
   });

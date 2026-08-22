@@ -61,7 +61,11 @@ Type or paste the script, press Play, and it scrolls.
   you're typing in the script box.
 - **Bookmarks.** Start any line with `##` and it becomes a bookmark — a button on the panel,
   a section marker on screen, and a Stream Deck key. They live in the text, so moving a
-  section moves its bookmark with it.
+  section moves its bookmark with it. The first nine have a keyboard shortcut: press
+  <kbd>1</kbd>…<kbd>9</kbd> to go straight to that section, from the panel or from the output
+  window, and the number is printed on the button so you don't have to remember it. The
+  Control API page lists a ready-made URL per section, addressed by name — rename a section
+  and the Stream Deck key still lands on the right words.
 - **Look.** Font, size, line spacing, column width, alignment, bold, text colour, background
   colour or fully transparent (key it over a shot), chroma, the reading indicator (line,
   arrows, both or none) and where it sits, and soft top/bottom edges.
