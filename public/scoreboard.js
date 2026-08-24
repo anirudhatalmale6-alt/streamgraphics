@@ -358,6 +358,19 @@
   function paintOut() { $('outUrl').textContent = SGLinks.url(outPath); }
   SGLinks.onbase(paintOut);
 
+  /* The big-button Scorer is normally run from a tablet at the desk, so its link has the same
+     trap the prompter remote had: a relative href reads as localhost here, and localhost typed
+     into a tablet points the tablet at itself. Address + QR, not just a clickable link. */
+  var scorerPath = '/scorer';
+  var scorerLink = SGLinks.phoneLink({
+    path: function () { return scorerPath; },
+    link: $('scorerLink'),
+    out:  $('scorerUrl'),
+    copy: $('scorerCopy'),
+    qr:   $('scorerQr'),
+    box:  $('scorerQrBox')
+  });
+
   /* ---- multiple scoreboards ("courts") ---- */
   function escH(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function reflectBoards(boards) {
@@ -365,7 +378,8 @@
     var cur = (sb && sb.id) || BOARD || (boards[0] && boards[0].id) || '';
     selEl.innerHTML = boards.map(function (b) { return '<option value="' + b.id + '"' + (b.id === cur ? ' selected' : '') + '>' + escH(b.name) + '</option>'; }).join('');
     $('boardDelete').disabled = boards.length <= 1;
-    $('scorerLink').href = '/scorer?board=' + encodeURIComponent(cur);
+    scorerPath = '/scorer?board=' + encodeURIComponent(cur);
+    scorerLink.refresh();          // href, the visible address AND an open QR all follow the board
     outPath = '/scoreboard-output?board=' + encodeURIComponent(cur);
     paintOut();
   }

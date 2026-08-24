@@ -35,6 +35,19 @@
   $('copyBtn').onclick  = function () { SGLinks.copy(SGLinks.url('/prompter-output'), this); };
   $('copyBtnM').onclick = function () { SGLinks.copy(SGLinks.url('/prompter-output?mirror=1'), this); };
 
+  /* 🚨 The phone remote's address is the one that CANNOT be localhost — the whole point is a
+     second device — yet the nav link was a plain relative href, so clicking it here opened
+     localhost and reading it off the screen gave the operator an address that sends the phone
+     to itself. phoneLink() points the link, the text and the QR at the reachable address. */
+  SGLinks.phoneLink({
+    path: '/prompter-remote',
+    link: $('navRemote'),
+    out:  $('outUrlR'),
+    copy: $('copyBtnR'),
+    qr:   $('qrBtnR'),
+    box:  $('qrBoxR')
+  });
+
   /* ---- on air ---- */
   $('btnShow').onclick = function () { send({ type: 'pr_show' }); };
   $('btnHide').onclick = function () { send({ type: 'pr_hide' }); };
@@ -268,6 +281,57 @@
 
   function canPlace() { return typeof window.getScreenDetails === 'function' && window.isSecureContext; }
 
+  /* 🚨 Sending the output to a monitor used to be a one-way trip: the window handle lived in a
+     local var that vanished when the function returned, so nothing could ever close it again.
+     The operator's only way out was to find the window and close it by hand — and a prompter
+     output is a black full-screen window with no title bar showing, which is exactly the thing
+     you cannot find in a hurry. So: keep the handles, and offer to close them.
+
+     OPEN_KEY survives a reload of THIS page. That matters — reloading the control page during a
+     show is normal, and before this the handles were lost and the window was orphaned again. */
+  var sentWins = {}, OPEN_KEY = 'sg.prompter.sent';
+
+  function openNames() {
+    try { return JSON.parse(localStorage.getItem(OPEN_KEY) || '[]') || []; } catch (e) { return []; }
+  }
+  function rememberOpen(name, yes) {
+    var list = openNames().filter(function (n) { return n !== name; });
+    if (yes) list.push(name);
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  function liveCount() {
+    var n = 0;
+    Object.keys(sentWins).forEach(function (k) {
+      var w = sentWins[k];
+      // A window the operator closed by hand must not keep the button lit.
+      if (!w || w.closed) { delete sentWins[k]; rememberOpen(k, false); } else n++;
+    });
+    return n;
+  }
+  function refreshCloseBtn() {
+    // Either we hold a live handle, or a previous page-load left one behind that we can reclaim.
+    var show = liveCount() > 0 || openNames().length > 0;
+    $('btnCloseSent').style.display = show ? '' : 'none';
+  }
+
+  function closeSent() {
+    var names = {}, k;
+    for (k in sentWins) names[k] = 1;
+    openNames().forEach(function (n) { names[n] = 1; });
+    Object.keys(names).forEach(function (name) {
+      var w = sentWins[name];
+      /* No live handle — this page was reloaded since sending. Re-opening by NAME with an empty
+         url hands back the existing window without navigating it, so we can close it. If no such
+         window exists we get a blank one instead, which we close on the same line. */
+      if (!w || w.closed) { try { w = window.open('', name); } catch (e) { w = null; } }
+      if (w) { try { w.close(); } catch (e) {} }
+      delete sentWins[name];
+      rememberOpen(name, false);
+    });
+    screenHint.textContent = 'Prompter window closed. The monitor is yours again.';
+    refreshCloseBtn();
+  }
+
   function openOn(mirrored) {
     var i = Math.max(0, Math.min(screens.length - 1, +screenPick.value || 0));
     var s = screens[i];
@@ -277,14 +341,275 @@
       ? 'popup=yes,left=' + s.left + ',top=' + s.top + ',width=' + s.width + ',height=' + s.height
       : 'popup=yes';
     // A distinct name per output, so re-sending replaces that window rather than piling up.
-    var w = window.open(url, 'sgprompter-' + (mirrored ? 'mirror' : 'normal'), feat);
+    var name = 'sgprompter-' + (mirrored ? 'mirror' : 'normal');
+    var w = window.open(url, name, feat);
     if (!w) { screenHint.textContent = 'Your browser blocked that pop-up. Allow pop-ups for this address and try again.'; return; }
+    sentWins[name] = w;
+    rememberOpen(name, true);
     // Chrome sizes a re-used window to its old bounds, so say it again once it is there.
     if (s) { try { w.moveTo(s.left, s.top); w.resizeTo(s.width, s.height); } catch (e) {} }
     try { w.focus(); } catch (e) {}
     screenHint.textContent = 'Sent to ' + (s ? s.label : 'a new window') +
       '. If it is not full screen, click the window once and press F11.';
+    refreshCloseBtn();
   }
+
+  /* ---- collapsible panels ----
+     🚨 Mark's actual complaint: "How it looks" sits underneath the two tallest panels on the
+     page, so reaching the formatting controls means scrolling past a full script editor and the
+     saved-script list every time. Folding a panel away is the fix; remembering the choice is
+     what makes it worth doing, because otherwise he refolds them every session.
+
+     Done in script rather than markup so every panel with a heading gets it, including any
+     added later — there is no list here to forget to update. */
+  var FOLD_KEY = 'sg.prompter.folded';
+
+  function foldedSet() {
+    try { return JSON.parse(localStorage.getItem(FOLD_KEY) || '[]') || []; } catch (e) { return []; }
+  }
+  function rememberFold(key, folded) {
+    var list = foldedSet().filter(function (k) { return k !== key; });
+    if (folded) list.push(key);
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  (function setUpFolding() {
+    var open = foldedSet();
+    var panels = document.querySelectorAll('section.panel');
+    Array.prototype.forEach.call(panels, function (panel) {
+      // Direct child only, and without :scope — this has to work in whatever browser the
+      // operator happens to have open, not just the one I test in.
+      var h = null;
+      for (var i = 0; i < panel.children.length; i++) {
+        if (panel.children[i].tagName === 'H3') { h = panel.children[i]; break; }
+      }
+      if (!h) return;                       // the preview panel has no heading — leave it alone
+      var key = (h.textContent || '').trim();
+      if (!key) return;
+
+      // Everything after the heading becomes the body, so one class can hide it.
+      var body = document.createElement('div');
+      body.className = 'panelbody';
+      while (h.nextSibling) body.appendChild(h.nextSibling);
+      panel.appendChild(body);
+
+      h.classList.add('fold');
+      // 🚨 Store the key rather than re-deriving it later: the caret and "(hidden)" spans below
+      // become part of h3.textContent, so reading the name back out would give a DIFFERENT
+      // string and quietly write a second entry that never matches on reload.
+      h.setAttribute('data-fold', key);
+      var car = document.createElement('span');
+      car.className = 'car';
+      car.textContent = '▼';
+      h.insertBefore(car, h.firstChild);
+      var tag = document.createElement('span');
+      tag.className = 'folded';
+      tag.textContent = '(hidden)';
+      h.appendChild(tag);
+
+      if (open.indexOf(key) >= 0) panel.classList.add('collapsed');
+
+      h.addEventListener('click', function () {
+        var nowFolded = panel.classList.toggle('collapsed');
+        rememberFold(key, nowFolded);
+        syncFoldAll();
+      });
+    });
+    syncFoldAll();
+  })();
+
+  function syncFoldAll() {
+    var b = $('btnFoldAll');
+    if (!b) return;
+    var panels = document.querySelectorAll('section.panel > h3.fold');
+    var folded = document.querySelectorAll('section.panel.collapsed > h3.fold');
+    b.textContent = (panels.length && folded.length >= panels.length) ? 'Expand all' : 'Collapse all';
+  }
+
+  if ($('btnFoldAll')) {
+    $('btnFoldAll').onclick = function () {
+      var expandAll = $('btnFoldAll').textContent === 'Expand all';
+      Array.prototype.forEach.call(document.querySelectorAll('section.panel > h3.fold'), function (h) {
+        var panel = h.parentNode, key = h.getAttribute('data-fold') || '';
+        panel.classList.toggle('collapsed', !expandAll);
+        rememberFold(key, !expandAll);
+      });
+      syncFoldAll();
+    };
+  }
+
+  /* ---- the SCRIPT LIBRARY ----
+     The prompter holds one live script. This is the drawer everything else lives in.
+
+     🚨 The whole point is that nothing here can lose work by accident, so loading over an
+     unsaved script always asks first. Built with DOM nodes rather than innerHTML because
+     script names are free text the operator types. */
+  var libItems = [];
+
+  function libDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    var today = new Date();
+    var sameDay = d.toDateString() === today.toDateString();
+    return sameDay
+      ? 'today ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // Is there work on air that isn't in the library? Drives the "are you sure" on load.
+  function liveIsUnsaved() {
+    if (!P) return false;
+    if (P.libId) return !!P.libDirty;
+    return !!(P.script || '').trim();
+  }
+
+  function renderLib(list, p) {
+    libItems = list || [];
+    var wrap = $('libList');
+    wrap.innerHTML = '';
+    $('libEmpty').style.display = libItems.length ? 'none' : '';
+
+    libItems.forEach(function (it) {
+      var live = p && p.libId === it.id;
+      var row = document.createElement('div');
+      row.className = 'librow' + (live ? ' on' : '');
+      row.setAttribute('data-id', it.id);
+
+      var box = document.createElement('div');
+      var nm = document.createElement('div');
+      nm.className = 'nm';
+      nm.textContent = it.name;
+      box.appendChild(nm);
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var bits = [it.words + (it.words === 1 ? ' word' : ' words')];
+      if (libDate(it.updated)) bits.push('saved ' + libDate(it.updated));
+      meta.textContent = bits.join(' · ');
+      box.appendChild(meta);
+      row.appendChild(box);
+
+      if (live) {
+        var tag = document.createElement('span');
+        tag.className = p.libDirty ? 'dirty' : 'live';
+        tag.textContent = p.libDirty ? 'on air · edited' : 'on air';
+        row.appendChild(tag);
+      }
+
+      var sp = document.createElement('span');
+      sp.className = 'sp';
+      row.appendChild(sp);
+
+      function btn(label, cls, fn) {
+        var b = document.createElement('button');
+        b.textContent = label;
+        if (cls) b.className = cls;
+        b.onclick = fn;
+        row.appendChild(b);
+        return b;
+      }
+
+      btn('Load', 'load', function () {
+        if (liveIsUnsaved()) {
+          var what = P.libId
+            ? 'The script on air has been edited since it was saved.'
+            : 'The script on air has never been saved.';
+          if (!confirm(what + '\n\nLoading "' + it.name + '" will replace it.\n\nLoad anyway?')) return;
+        }
+        send({ type: 'pr_lib_load', id: it.id });
+      });
+
+      btn('Rename', '', function () {
+        var n = prompt('Rename this script:', it.name);
+        if (n == null) return;
+        n = n.trim();
+        if (n) send({ type: 'pr_lib_rename', id: it.id, name: n });
+      });
+
+      btn('Duplicate', '', function () { send({ type: 'pr_lib_dup', id: it.id }); });
+
+      /* 🚨 Export matters more than it looks. Without it a prepared script only exists inside
+         one installation of the app — no copy to email a presenter, nothing to keep when the
+         machine is replaced. Plain .txt with the ## headings intact, so what comes out is
+         exactly what goes back in. */
+      btn('Export', '', function () {
+        var a = document.createElement('a');
+        a.href = '/prompter/script?id=' + encodeURIComponent(it.id);
+        a.download = '';                    // the server names it; this just forces a download
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+
+      btn('Delete', '', function () {
+        // Naming it in the prompt: "are you sure?" on the wrong row is how scripts vanish.
+        if (!confirm('Delete "' + it.name + '" from the library?\n\nThis cannot be undone. '
+          + 'Anything currently on air stays on air.')) return;
+        send({ type: 'pr_lib_delete', id: it.id });
+      });
+
+      wrap.appendChild(row);
+    });
+
+    // What is loaded right now, said in words above the list.
+    var now = $('libNow');
+    if (p && p.libId && p.libName) {
+      now.textContent = p.libDirty
+        ? 'On air: "' + p.libName + '" — edited since saving. Save to keep the changes.'
+        : 'On air: "' + p.libName + '" — saved.';
+    } else if (p && (p.script || '').trim()) {
+      now.textContent = 'The script on air is not saved anywhere yet.';
+    } else {
+      now.textContent = '';
+    }
+    $('btnLibSave').textContent = (p && p.libId) ? '💾 Save changes' : '💾 Save this script';
+  }
+
+  function suggestedName() {
+    var first = (scriptEl.value || '').split('\n').find(function (l) { return l.trim(); });
+    return (first || '').replace(/^#+\s*/, '').trim().slice(0, 60) || 'Untitled script';
+  }
+
+  $('btnLibSave').onclick = function () {
+    // Loaded from the library → this is an overwrite of that entry, no question asked.
+    if (P && P.libId) { send({ type: 'pr_lib_save', id: P.libId, text: scriptEl.value }); return; }
+    var n = prompt('Save this script as:', suggestedName());
+    if (n == null) return;
+    send({ type: 'pr_lib_save', name: n.trim(), text: scriptEl.value });
+  };
+
+  $('btnLibSaveAs').onclick = function () {
+    var n = prompt('Save as a new script called:', suggestedName());
+    if (n == null) return;
+    // No id, so the server makes a new entry rather than overwriting the loaded one.
+    send({ type: 'pr_lib_save', name: n.trim(), text: scriptEl.value });
+  };
+
+  /* Put a document straight into the library WITHOUT touching what is on air. The existing
+     "Open a document" button loads into the prompter, which is right when you are about to read
+     it and wrong when you are preparing next week's. Both now exist, and they are separate. */
+  $('btnLibAddDoc').onclick = function () { $('libFile').value = ''; $('libFile').click(); };
+  $('libFile').onchange = function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    $('libNow').textContent = 'Reading ' + f.name + '…';
+    fetch('/prompter/import?name=' + encodeURIComponent(f.name), { method: 'POST', body: f })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) { $('libNow').textContent = f.name + ': ' + ((j && j.error) || 'could not be read'); return; }
+        // Name it after the file, minus the extension — that is what the operator called it.
+        var nm = f.name.replace(/\.[^.]+$/, '');
+        send({ type: 'pr_lib_save', name: nm, text: j.text });
+        $('libNow').textContent = 'Added "' + nm + '" — ' + j.words.toLocaleString() + ' words.';
+      })
+      .catch(function () { $('libNow').textContent = 'Could not reach the app to read that file.'; });
+  };
+
+  $('btnCloseSent').onclick = closeSent;
+  // Catches the operator closing the output by hand, so the button does not lie.
+  setInterval(refreshCloseBtn, 1000);
+  refreshCloseBtn();
 
   function fillScreens(list) {
     screens = list;
@@ -340,6 +665,10 @@
   $('stFont').onchange   = function () { style({ font: this.value }); };
   $('stSize').oninput    = function () { $('szV').textContent = this.value; style({ size: +this.value }); };
   $('stLH').oninput      = function () { $('lhV').textContent = (+this.value).toFixed(2); style({ lineHeight: +this.value }); };
+  /* Paragraph gap: how tall a blank line in the script is, as a % of one line. The talent
+     complains about this before anything else — text with no air between thoughts is hard to
+     read aloud — and until now the only answer was "add more blank lines". */
+  $('stGap').oninput     = function () { $('gapV').textContent = this.value + '%'; style({ paraGap: +this.value }); };
   $('stW').oninput       = function () { $('wV').textContent = this.value; style({ width: +this.value }); };
   $('stAlign').onchange  = function () { style({ align: this.value }); };
   $('stBold').onchange   = function () { style({ bold: this.checked }); };
@@ -419,6 +748,8 @@
     setVal($('stFont'), s.font);
     setVal($('stSize'), s.size); $('szV').textContent = s.size;
     setVal($('stLH'), s.lineHeight); $('lhV').textContent = Number(s.lineHeight).toFixed(2);
+    var gp = (s.paraGap == null ? 100 : Number(s.paraGap));
+    setVal($('stGap'), gp); $('gapV').textContent = Math.round(gp) + '%';
     setVal($('stW'), s.width); $('wV').textContent = s.width;
     setVal($('stAlign'), s.align);
     $('stBold').checked = !!s.bold;
@@ -473,6 +804,7 @@
       var measured = msg.serverTime - Date.now();
       clockOffset = clockOffset === 0 ? measured : Math.round(clockOffset * 0.7 + measured * 0.3);
       if (msg.state && msg.state.prompter) { P = msg.state.prompter; render(P); }
+      if (msg.state && msg.state.scripts) renderLib(msg.state.scripts, msg.state.prompter);
     } catch (err) {}
   };
 

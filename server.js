@@ -238,6 +238,8 @@ function defaultState() {
 
     // The Show Library — saved named graphics, recallable and toggleable on the Program output.
     shows: [],
+    // Saved teleprompter scripts. The prompter itself holds ONE live script; this is the drawer.
+    scripts: [],
     // User-made / imported Templates (built-ins are added on top in wireState/allTemplates).
     userTemplates: [],
     // Installed template packs (metadata only — the designs live in userTemplates, tagged by pack id).
@@ -329,6 +331,9 @@ function defaultPrompter() {
     basePx: 0,           // reference-layout scroll offset at the anchor
     speed: 40,           // reference px per second
     jumpPx: 220,         // how far one up/down arrow press moves
+    // Which library script is on air, so the operator can see it and "Save" knows where to go.
+    // Cleared the moment the live text stops matching it — see pr_script.
+    libId: '', libName: '', libDirty: false,
     // Reference layout, measured in a browser and reported back (action 'pr_geom').
     geom: { sig: '', src: '', total: 0, marks: [] },
     style: {
@@ -338,6 +343,9 @@ function defaultPrompter() {
       bold: true,
       align: 'left',
       width: 82,            // script column, % of stage width
+      // Gap left by a blank line, as a % of one line's height. 100 = exactly one blank line,
+      // which is what it always was; this just makes it adjustable.
+      paraGap: 100,
       color: '#ffffff',
       bg: '#0a0a0a',        // '' = transparent (key it over a shot instead)
       chroma: '',
@@ -418,12 +426,33 @@ function loadLibrary() {
 // Debounced async disk writes — never block the request/broadcast hot path (saving a big
 // preset or toggling on/off used to stall while a synchronous write finished).
 const _writeTimers = {};
+const _writePending = {};
 function writeJson(file, getObj) {
   clearTimeout(_writeTimers[file]);
+  _writePending[file] = getObj;                 // so a quit can still flush it — see below
   _writeTimers[file] = setTimeout(function () {
+    delete _writePending[file];
     try { fs.writeFile(file, JSON.stringify(getObj(), null, 2), function () {}); } catch (e) {}
   }, 300);
 }
+
+/* 🚨 Writes are debounced by 300ms, so anything saved in the last third of a second before the
+ * app quits was still sitting in a timer and never reached the disk. For a scoreboard that is
+ * nothing. For the script library it means "I saved my script, closed the app, and it's gone" —
+ * which is the exact failure the library exists to prevent. So flush on the way out.
+ * Synchronous on purpose: 'exit' cannot wait for a callback. */
+function flushWrites() {
+  Object.keys(_writePending).forEach(function (file) {
+    const getObj = _writePending[file];
+    delete _writePending[file];
+    clearTimeout(_writeTimers[file]);
+    try { fs.writeFileSync(file, JSON.stringify(getObj(), null, 2)); } catch (e) {}
+  });
+}
+process.on('exit', flushWrites);
+['SIGINT', 'SIGTERM'].forEach(function (sig) {
+  process.on(sig, function () { flushWrites(); process.exit(0); });
+});
 function saveLibrary() { writeJson(LIB_FILE, function () { return { teams: state.library.teams }; }); }
 state.library = { teams: loadLibrary() };
 
@@ -457,6 +486,70 @@ function savePrompter() {
   writeJson(PROMPT_FILE, function () {
     const p = state.prompter;
     return { script: p.script, style: p.style, speed: p.speed, jumpPx: p.jumpPx };
+  });
+}
+
+/* The SCRIPT LIBRARY — named teleprompter scripts kept on disk.
+ *
+ * 🚨 Why this exists: the prompter holds exactly ONE script (PROMPT_FILE above). Loading a new
+ * one overwrote the previous one with no way back, so anything prepared in advance could be
+ * destroyed by opening the next item. A teleprompter without a drawer of scripts is half a
+ * teleprompter — this is the drawer.
+ *
+ * Each item: { id, name, text, updated }. Deliberately SEPARATE from prompter.json: the live
+ * script is what is on air right now, the library is what is available. Editing on air must
+ * never silently rewrite a saved script, so saving is always an explicit act. */
+const SCRIPTS_FILE = path.join(DATA_DIR, 'prompter-scripts.json');
+const SCRIPT_MAX = 400;                    // a sane ceiling; each is only text
+const SCRIPT_CHARS = 400 * 1024;           // one script's text
+
+(function () {
+  try {
+    if (fs.existsSync(SCRIPTS_FILE)) {
+      const j = JSON.parse(fs.readFileSync(SCRIPTS_FILE, 'utf8'));
+      if (j && Array.isArray(j.items)) state.scripts = j.items;
+    }
+  } catch (e) {}
+})();
+function saveScripts() { writeJson(SCRIPTS_FILE, function () { return { items: state.scripts }; }); }
+
+function scriptName(n, fallback) {
+  n = String(n == null ? '' : n).replace(/\s+/g, ' ').trim().slice(0, 120);
+  return n || fallback || 'Untitled script';
+}
+/* Two scripts called "Sunday Service" in one list is an operator error waiting to happen at
+ * exactly the wrong moment, so a clash gets a numbered suffix rather than being allowed. */
+function uniqueScriptName(name, exceptId) {
+  const taken = state.scripts
+    .filter(s => s.id !== exceptId)
+    .map(s => String(s.name).trim().toLowerCase());
+  if (taken.indexOf(name.toLowerCase()) < 0) return name;
+  for (let n = 2; n < 999; n++) {
+    const t = name + ' (' + n + ')';
+    if (taken.indexOf(t.toLowerCase()) < 0) return t;
+  }
+  return name + ' (' + Date.now().toString(36) + ')';
+}
+function newScriptId() { return 'PS' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
+function findScript(id) { return state.scripts.find(s => s.id === id) || null; }
+
+/* 🚨 The script LIST, never the scripts themselves.
+ *
+ * Every state push goes to every connected page, and the live script is already in
+ * state.prompter.script — sending the whole library on top of that would put the same text on
+ * the wire many times over on every tick. Nothing in the browser needs a saved script's text:
+ * loading one is a server-side action.
+ *
+ * ONE function because the SSE broadcast and the /state endpoint build their payloads
+ * separately, and the first version of this stripped the text from only one of them. */
+function scriptList() {
+  return (state.scripts || []).map(function (s) {
+    const t = String(s.text || '');
+    return {
+      id: s.id, name: s.name, updated: s.updated || '',
+      words: (t.match(/\S+/g) || []).length,
+      chars: t.length
+    };
   });
 }
 
@@ -749,7 +842,7 @@ function wireState() {
   // License: expose whether we're licensed + public info (never the key itself) — drives the watermark + gating.
   const covers = licCoversVersion(state.license);
   const lic = { active: !!state.license.active, name: state.license.name || '', email: state.license.email || '', tier: state.license.tier || 'free', features: state.license.features || [], upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, revoked: !!state.license.revoked };
-  return Object.assign({}, state, { license: lic, licensed: !!state.license.active && covers, shows: shows, media: mediaIndex, templates: templates });
+  return Object.assign({}, state, { license: lic, licensed: !!state.license.active && covers, shows: shows, scripts: scriptList(), media: mediaIndex, templates: templates });
 }
 
 /* ------------------------------------------------------------------ *
@@ -1355,11 +1448,108 @@ function applyAction(action) {
       const text = String(action.text == null ? '' : action.text).slice(0, 400000);
       if (text === p.script) return false;   // a re-save of identical text is not a change
       p.script = text;
+      /* The live text no longer matches what was loaded. Keep libId — "Save" should still know
+       * which script this came from — but flag it, so the operator can SEE that the copy on air
+       * has drifted from the saved one. Silently letting those diverge is how a rehearsed
+       * script gets lost. */
+      if (p.libId) p.libDirty = true;
       // The words moved, so the measured layout no longer describes them. Drop the bookmark
       // positions rather than keep stale ones — a bookmark that lands on the wrong line
       // mid-read is worse than one that takes half a second to come back.
       p.geom = { sig: '', src: '', total: 0, marks: [] };
       savePrompter();
+      break;
+    }
+
+    /* ---- the SCRIPT LIBRARY ----
+       Save is always explicit. Load replaces what is on air. Nothing here ever writes to a
+       saved script as a side effect of editing on air. */
+
+    case 'pr_lib_save': {
+      const p = state.prompter;
+      /* 🚨 Only claim a saved entry is the one ON AIR when its text really is what is on air.
+       * Adding a prepared document to the library for next week must not relabel the script
+       * the operator is reading right now — that would show the wrong name on the panel, on
+       * the Stream Deck, and in the "edited" flag, all while looking perfectly fine. */
+      const adopt = (item, saved) => {
+        if (saved !== p.script) return;
+        p.libId = item.id; p.libName = item.name; p.libDirty = false;
+      };
+      const text = String(action.text != null ? action.text : p.script).slice(0, SCRIPT_CHARS);
+      // Overwrite an existing entry only when explicitly told which one.
+      const target = action.id ? findScript(action.id) : null;
+      if (target) {
+        target.text = text;
+        target.updated = new Date().toISOString();
+        if (action.name) target.name = uniqueScriptName(scriptName(action.name), target.id);
+        adopt(target, text);
+        saveScripts(); savePrompter();
+        break;
+      }
+      if (state.scripts.length >= SCRIPT_MAX) break;
+      // First line of the script is a far better default name than "Untitled".
+      const firstLine = (text.split('\n').find(l => l.trim()) || '').trim().slice(0, 60);
+      const item = {
+        id: newScriptId(),
+        name: uniqueScriptName(scriptName(action.name, firstLine)),
+        text: text,
+        updated: new Date().toISOString()
+      };
+      state.scripts.push(item);
+      adopt(item, text);
+      saveScripts(); savePrompter();
+      break;
+    }
+
+    case 'pr_lib_load': {
+      const it = findScript(action.id);
+      if (!it) break;
+      const p = state.prompter;
+      /* 🚨 Stop first. Loading a new script while the old one is rolling would leave the scroll
+         running against text that no longer exists, at whatever position it had reached. */
+      if (p.running) { p.basePx = livePromptPx(p, now); p.running = false; }
+      p.script = it.text;
+      p.basePx = 0; p.anchorServer = now;
+      p.geom = { sig: '', src: '', total: 0, marks: [] };   // new words, old measurements are lies
+      p.libId = it.id; p.libName = it.name; p.libDirty = false;
+      savePrompter();
+      break;
+    }
+
+    case 'pr_lib_rename': {
+      const it = findScript(action.id);
+      if (!it) break;
+      it.name = uniqueScriptName(scriptName(action.name, it.name), it.id);
+      if (state.prompter.libId === it.id) state.prompter.libName = it.name;
+      saveScripts(); savePrompter();
+      break;
+    }
+
+    case 'pr_lib_delete': {
+      const it = findScript(action.id);
+      if (!it) break;
+      state.scripts = state.scripts.filter(s => s.id !== action.id);
+      /* Deleting the saved copy must NOT wipe what is on air — the operator may still be
+         reading it. Just stop claiming it is backed by a library entry. */
+      if (state.prompter.libId === it.id) {
+        state.prompter.libId = ''; state.prompter.libName = ''; state.prompter.libDirty = false;
+        savePrompter();
+      }
+      saveScripts();
+      break;
+    }
+
+    case 'pr_lib_dup': {
+      const it = findScript(action.id);
+      if (!it || state.scripts.length >= SCRIPT_MAX) break;
+      const copy = {
+        id: newScriptId(),
+        name: uniqueScriptName(it.name + ' copy'),
+        text: it.text,
+        updated: new Date().toISOString()
+      };
+      state.scripts.splice(state.scripts.indexOf(it) + 1, 0, copy);
+      saveScripts();
       break;
     }
 
@@ -1428,6 +1618,9 @@ function applyAction(action) {
       p.style.lineHeight = Math.max(1, Math.min(3, Number(p.style.lineHeight) || 1.45));
       p.style.width = Math.max(20, Math.min(100, Number(p.style.width) || 82));
       p.style.cuePos = Math.max(0, Math.min(100, Number(p.style.cuePos) || 0));
+      // 0 is a legitimate choice here (paragraphs butted together), so `|| 100` would be wrong.
+      p.style.paraGap = Math.max(0, Math.min(300,
+        isFinite(Number(p.style.paraGap)) ? Math.round(Number(p.style.paraGap)) : 100));
       // Only a change that moves the WRAP invalidates the measurement. Dropping it on every
       // style change would blank the bookmarks and the time-remaining readout every time
       // somebody dragged a colour picker — the signature is what tells the two apart.
@@ -1486,7 +1679,11 @@ function applyAction(action) {
  * plain http on a LAN address, which is exactly how this app gets used. */
 function promptSig(p) {
   const s = p.style || {};
-  const str = [p.script || '', s.font, s.size, s.lineHeight, s.bold ? 1 : 0, s.align, s.width, s.showMarks ? 1 : 0].join('\u0000');
+  /* 🚨 paraGap CHANGES LINE POSITIONS, so it belongs in the signature. Leaving it out would
+   * mean every screen reported geometry measured with one gap while the server believed
+   * another, and bookmarks would land in the wrong place. sg-prompter.js sig() computes this
+   * same string and the two must stay identical. */
+  const str = [p.script || '', s.font, s.size, s.lineHeight, s.bold ? 1 : 0, s.align, s.width, s.showMarks ? 1 : 0, s.paraGap].join('\u0000');
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
     const c = str.charCodeAt(i);
@@ -1932,8 +2129,23 @@ const server = http.createServer((req, res) => {
     // Teleprompter — the buttons an operator actually wants under their fingers.
     if (group === 'prompter') {
       const p = state.prompter;
-      const at = () => ({ running: !!p.running, speed: p.speed, position: Math.round(livePromptPx(p, Date.now())), of: Math.max(0, promptMaxPx(p)), marks: (p.geom.marks || []).map(m => m.name) });
+      const at = () => ({ running: !!p.running, speed: p.speed, position: Math.round(livePromptPx(p, Date.now())), of: Math.max(0, promptMaxPx(p)), marks: (p.geom.marks || []).map(m => m.name), script: p.libName || '', scriptEdited: !!p.libDirty });
       if (cmd === 'status') return okJson(Object.assign({ ok: true }, at()));
+      if (cmd === 'scripts') return okJson({ ok: true, scripts: (state.scripts || []).map(s => s.name) });
+      if (cmd === 'script' || cmd === 'load') {
+        /* Addressed by NAME, like bookmarks and presets — the operator built the button around
+         * a name they chose, and ids mean nothing on a Stream Deck. A name that no longer
+         * exists must say so loudly and list what IS there: a button that silently does
+         * nothing mid-show is the worst possible answer. */
+        const nm = q.get('name');
+        if (!nm) return fail('provide ?name=NAME (the name you saved the script under)');
+        const k = String(nm).trim().toLowerCase();
+        const it = (state.scripts || []).find(s => String(s.name).trim().toLowerCase() === k);
+        if (!it) return fail('no saved script called "' + nm + '" (have: '
+          + ((state.scripts || []).map(s => s.name).join(', ') || 'none') + ')', 404);
+        applyAction({ type: 'pr_lib_load', id: it.id });
+        return did(at());
+      }
       if (cmd === 'play')   { applyAction({ type: 'pr_play' });   return did(at()); }
       if (cmd === 'pause' || cmd === 'stop') { applyAction({ type: 'pr_pause' }); return did(at()); }
       if (cmd === 'toggle') { applyAction({ type: 'pr_toggle' }); return did(at()); }
@@ -1960,7 +2172,7 @@ const server = http.createServer((req, res) => {
       }
       if (cmd === 'air' || cmd === 'show') { applyAction({ type: 'pr_show' }); return did(at()); }
       if (cmd === 'off' || cmd === 'hide') { applyAction({ type: 'pr_hide' }); return did(at()); }
-      return fail('unknown prompter command: "' + cmd + '" (use play/pause/toggle/faster/slower/speed/back/ahead/top/nextmark/prevmark/mark/air/off/status)');
+      return fail('unknown prompter command: "' + cmd + '" (use play/pause/toggle/faster/slower/speed/back/ahead/top/nextmark/prevmark/mark/script/scripts/air/off/status)');
     }
 
     return fail('unknown api group: "' + group + '" (use preset/timer/scoreboard/baseball/prompter/list)', 404);
@@ -1975,6 +2187,26 @@ const server = http.createServer((req, res) => {
    * and hand-rolling a multipart parser to carry it would be more code than reading the
    * document formats themselves. Nothing is written to disk — the bytes are decoded and the
    * text is handed straight back to the page that sent them. */
+  /* --- download a saved script as a text file ---
+   * "Prepare scripts and export them for later" is the point of the library, and a library you
+   * cannot get anything OUT of is a trap: the scripts would only exist inside one installation.
+   * Plain .txt with the ## bookmark headings intact, so the file that comes out is the same
+   * thing that goes back in. */
+  if (pathname === '/prompter/script' && req.method === 'GET') {
+    const it = findScript(url.searchParams.get('id'));
+    if (!it) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('no such script'); return; }
+    // Windows rejects \ / : * ? " < > | in filenames, and a script called "Q&A: part 2" is
+    // entirely reasonable to type. Strip rather than refuse.
+    const safe = String(it.name).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 80) || 'script';
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="' + safe + '.txt"',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(it.text || '');
+    return;
+  }
+
   if (pathname === '/prompter/import' && req.method === 'POST') {
     const MAX = 12 * 1024 * 1024;
     const chunks = [];
@@ -2128,7 +2360,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     const covers = licCoversVersion(state.license);
     const lic = { active: !!state.license.active, name: state.license.name, email: state.license.email || '', tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, revoked: !!state.license.revoked };
-    res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex, license: lic, licensed: !!state.license.active && covers }) }));
+    res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex, license: lic, licensed: !!state.license.active && covers, scripts: scriptList() }) }));
     return;
   }
 
@@ -2404,6 +2636,7 @@ const server = http.createServer((req, res) => {
           : pathname === '/shows' ? '/shows.html'
           : pathname === '/program-output' ? '/program-output.html'
           : pathname === '/prompter' ? '/prompter.html'
+          : pathname === '/prompter-remote' || pathname === '/remote' ? '/prompter-remote.html'
           : pathname === '/prompter-output' ? '/prompter-output.html'
           : pathname === '/control-api' ? '/control-api.html'
           : pathname === '/links' ? '/links.html'
@@ -2449,6 +2682,9 @@ server.listen(PORT, () => {
   console.log(`  LOWER THIRD / GRAPHICS:      http://localhost:${PORT}/lowerthird       · output: /lowerthird-output`);
   console.log(`  SHOW LIBRARY:                http://localhost:${PORT}/shows            · output: /program-output`);
   console.log(`  TELEPROMPTER:                http://localhost:${PORT}/prompter         · output: /prompter-output (add ?mirror=1 for glass)`);
+  /* The remote is the one address that is USELESS as localhost — it is opened on a phone, and
+     localhost on a phone means the phone. So print it ready to type, not as a swap instruction. */
+  console.log(`     PHONE / TABLET remote:    http://${lan}:${PORT}/prompter-remote`);
   console.log(`  ---------------------------------------------------------------`);
   console.log(`  From ANOTHER computer, swap "localhost" for  ${lan}`);
   console.log(`  e.g. OBS/vMix Browser Source:  http://${lan}:${PORT}/lowerthird-output`);

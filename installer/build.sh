@@ -33,6 +33,33 @@ if [ ! -f "$HERE/node-$NODE_VER.exe" ]; then
 fi
 cp "$HERE/node-$NODE_VER.exe" "$ENGINE"
 
+echo ">> naming the engine so Windows' firewall prompt says StreamGraphics Pro"
+# 🚨 Renaming node.exe to sgpro-engine.exe changes the FILENAME and nothing else. Windows'
+# "Do you want to allow this app through the firewall?" dialog reads the PE version resource,
+# not the filename, so it kept announcing "Node.js JavaScript Runtime" wanting network access.
+# The customer sees an unknown runtime asking for the network on first launch of a paid product.
+# rcedit rewrites those fields in place. Wine because we build on Linux.
+RCEDIT="$HERE/tools/rcedit-x64.exe"
+if [ ! -f "$RCEDIT" ] || ! command -v wine >/dev/null 2>&1; then
+  echo "!! ABORT: need $RCEDIT and wine to name the engine."
+  echo "!! Without this the firewall prompt says 'Node.js' again. Fix the toolchain, do not skip."
+  exit 1
+fi
+WINEDEBUG=-all wine "$RCEDIT" "$ENGINE" \
+  --set-version-string "FileDescription" "StreamGraphics Pro" \
+  --set-version-string "ProductName"     "StreamGraphics Pro" \
+  --set-version-string "CompanyName"     "Manhattan Beach Studios LLC" \
+  --set-version-string "OriginalFilename" "sgpro-engine.exe" >/dev/null 2>&1
+
+# Prove it took. A silent no-op here reintroduces the exact bug this step exists to fix.
+if strings -el "$ENGINE" | grep -q "Node.js JavaScript Runtime"; then
+  echo "!! ABORT: the engine still identifies itself as Node.js — rcedit did not apply."; exit 1
+fi
+if ! strings -el "$ENGINE" | grep -q "StreamGraphics Pro"; then
+  echo "!! ABORT: the engine does not carry the StreamGraphics Pro name."; exit 1
+fi
+echo "   engine now identifies as StreamGraphics Pro"
+
 echo ">> guard: verify no secrets staged"
 # Check for the actual sensitive FILES (not the string "PRIVATE KEY", which legitimately
 # appears inside the bundled Node/OpenSSL runtime). Also scan TEXT files (never the .exe) for a
@@ -42,6 +69,30 @@ BAD_TEXT="$(grep -rIl --exclude='*.exe' -- '-----BEGIN .*PRIVATE KEY-----' "$STA
 if [ -n "$BAD_FILES" ] || [ -n "$BAD_TEXT" ]; then
   echo "!! ABORT: sensitive item in stage:"; [ -n "$BAD_FILES" ] && echo "$BAD_FILES"; [ -n "$BAD_TEXT" ] && echo "$BAD_TEXT"; exit 1
 fi
+
+echo ">> guard: no stray control bytes in staged text files"
+# 🚨 A NUL byte got into public/prompter-remote.js and SHIPPED in 1.0.28. It ran fine, which is
+# what made it invisible: the only symptom was `file` calling the source "data" and grep quietly
+# refusing to match it. Corruption that survives because it happens to be harmless today is
+# exactly the kind that bites later, so fail the build on it.
+BADBYTES="$(node -e '
+const fs=require("fs"), path=require("path");
+const exts=new Set([".js",".html",".css",".json",".txt",".md"]);
+const bad=[];
+(function walk(d){ for (const e of fs.readdirSync(d,{withFileTypes:true})) {
+  const f=path.join(d,e.name);
+  if (e.isDirectory()) walk(f);
+  else if (exts.has(path.extname(e.name).toLowerCase())) {
+    const b=fs.readFileSync(f);
+    for (const c of b) if (c<9 || (c>13 && c<32)) { bad.push(f); break; }
+  }
+} })(process.argv[1]);
+process.stdout.write(bad.join("\n"));
+' "$STAGE")"
+if [ -n "$BADBYTES" ]; then
+  echo "!! ABORT: control bytes in staged text files:"; echo "$BADBYTES"; exit 1
+fi
+echo "   staged text files are clean"
 
 echo ">> smoke test: does the staged app actually start?"
 # The file list above is hand-written, so a new require() in server.js that nobody remembered to
@@ -68,7 +119,8 @@ done
 if [ -n "$SMOKE_OK" ]; then
   for P in /control /output /scoreboard /scoreboard-output /baseball /baseball-output \
            /lowerthird /lowerthird-output /shows /program-output /scorer /links /control-api \
-           /prompter /prompter-output /prompter.css /sg-prompter.js; do
+           /prompter /prompter-output /prompter-remote /prompter-remote.js \
+           /prompter.css /sg-prompter.js; do
     if ! curl -fsS -o /dev/null "http://127.0.0.1:$SMOKE_PORT$P" 2>/dev/null; then
       echo "!! ABORT: the staged app does not serve $P"; SMOKE_OK=""; break
     fi

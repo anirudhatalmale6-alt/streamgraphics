@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover so the buttons clear the iPhone's home indicator and notch -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0f16">
+<title>StreamGraphics Pro — Prompter Remote</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  /* A remote held in one hand, driven with a thumb, often in the dark at the back of a room.
+     Everything here is sized for that: nothing important smaller than a thumb, no double-tap
+     zoom, no text selection to accidentally trigger, and no scrolling needed for the transport. */
+  html, body { overscroll-behavior: none; }
+  body { -webkit-user-select: none; user-select: none; touch-action: manipulation;
+         -webkit-touch-callout: none; }
+  .rm { max-width: 720px; margin: 0 auto; padding: 8px 12px calc(18px + env(safe-area-inset-bottom)); }
+
+  .top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .top .ttl { font-weight: 900; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .top .sp { flex: 1; }
+  .airstate { font-weight: 900; font-size: 12px; color: var(--muted); letter-spacing: .06em; }
+  .airstate.live { color: #ff5470; }
+
+  .scriptname { font-weight: 800; font-size: 17px; margin-bottom: 10px; min-height: 1.3em;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scriptname .ed { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: #e7b53c; margin-left: 8px; }
+
+  /* where you are */
+  .gauge { margin-bottom: 14px; }
+  .bar { height: 14px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; position: relative; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; }
+  .gnums { display: flex; justify-content: space-between; margin-top: 6px; font-size: 13px; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* the transport — the reason this page exists */
+  .play { width: 100%; border: none; border-radius: 20px; padding: 34px 0; font-size: 30px;
+          font-weight: 900; letter-spacing: .04em; color: #06121f; background: var(--accent);
+          cursor: pointer; margin-bottom: 14px; }
+  .play.on { background: #ff5470; color: #fff; }
+  .play:active { filter: brightness(.9); }
+
+  .speed { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 12px; align-items: stretch; margin-bottom: 14px; }
+  .speed button { border: 1px solid var(--line); background: var(--panel2); color: var(--txt);
+                  border-radius: 16px; font-size: 34px; font-weight: 900; padding: 22px 0; cursor: pointer; }
+  .speed button:active { border-color: var(--accent); }
+  .speed .v { border: 1px solid var(--line); border-radius: 16px; background: var(--panel);
+              display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .speed .v b { font-size: 40px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .speed .v small { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+
+  /* Speed. 🚨 The ± buttons alone meant tapping twenty times to go from 40 to 140, which is
+     what Mark hit in a live show. The slider is the coarse control, ± is the fine one, and
+     holding ± repeats. */
+  .speed { margin-bottom: 8px; }
+  .sl { -webkit-appearance: none; appearance: none; width: 100%; height: 46px; background: transparent; margin: 0 0 14px; }
+  .sl::-webkit-slider-runnable-track { height: 14px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); }
+  .sl::-moz-range-track { height: 14px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); }
+  /* A 44px thumb: this is dragged with a thumb in the dark, not a mouse. */
+  .sl::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 44px; height: 44px;
+      border-radius: 50%; background: var(--accent); border: 3px solid #06121f; margin-top: -16px; }
+  .sl::-moz-range-thumb { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); border: 3px solid #06121f; }
+
+  /* preview */
+  .pvbox { display: none; margin-bottom: 14px; }
+  .pvbox.on { display: block; }
+  .pvframe { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line);
+             border-radius: 12px; overflow: hidden; background: #000; }
+  .pvframe iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .pvtoggle { width: 100%; border: 1px solid var(--line); background: var(--panel2); color: var(--txt);
+              border-radius: 12px; padding: 14px 4px; font-size: 14px; font-weight: 800; cursor: pointer; margin-bottom: 14px; }
+  .pvtoggle.on { border-color: var(--accent); color: var(--accent); }
+
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .row3 button { border: 1px solid var(--line); background: var(--panel2); color: var(--txt);
+                 border-radius: 14px; font-size: 15px; font-weight: 800; padding: 20px 4px; cursor: pointer; }
+  .row3 button:active { border-color: var(--accent); }
+
+  .air2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .air2 button { border-radius: 14px; font-size: 15px; font-weight: 800; padding: 18px 4px; cursor: pointer;
+                 border: 1px solid var(--line); background: var(--panel2); color: var(--txt); }
+  .air2 button.live { background: #ff5470; border-color: #ff5470; color: #fff; }
+
+  h4 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+       margin: 0 0 8px; font-weight: 800; }
+  .secs { display: flex; flex-direction: column; gap: 8px; }
+  .secs button { text-align: left; border: 1px solid var(--line); background: var(--panel2);
+                 color: var(--txt); border-radius: 12px; padding: 16px 14px; font-size: 16px;
+                 font-weight: 700; cursor: pointer; }
+  .secs button.on { border-color: var(--accent); background: #12202e; color: var(--accent); font-weight: 900; }
+  .none { color: var(--muted); font-size: 13px; margin: 0; }
+
+  .conn { width: 9px; height: 9px; border-radius: 50%; background: #666; display: inline-block; }
+  .conn.ok { background: #2ecc71; } .conn.off { background: #ff5470; }
+</style>
+</head>
+<body>
+  <div class="rm">
+    <div class="top">
+      <span class="conn" id="conn"></span>
+      <span class="ttl">Prompter</span>
+      <span class="sp"></span>
+      <a href="/prompter" style="color:var(--muted);font-size:12px;font-weight:700;text-decoration:none;margin-right:10px">Full panel ↗</a>
+      <span class="airstate" id="airState">OFF AIR</span>
+    </div>
+
+    <div class="scriptname" id="scriptName">—</div>
+
+    <div class="gauge">
+      <div class="bar" id="bar"><i id="barFill"></i></div>
+      <div class="gnums"><span id="posTxt">0%</span><span id="wpmTxt"></span><span id="leftTxt">–:––</span></div>
+    </div>
+
+    <button class="play" id="btnPlay">PLAY</button>
+
+    <div class="speed">
+      <button id="btnSlower" aria-label="Slower">−</button>
+      <div class="v"><b id="spdV">40</b><small>speed</small></div>
+      <button id="btnFaster" aria-label="Faster">+</button>
+    </div>
+
+    <input type="range" class="sl" id="spdSlider" min="0" max="200" step="1" value="40"
+           aria-label="Speed">
+
+    <button class="pvtoggle" id="btnPreview">👁 Show what the talent sees</button>
+    <div class="pvbox" id="pvBox"><div class="pvframe" id="pvFrame"></div></div>
+
+    <div class="row3">
+      <button id="btnBack">▲ Back</button>
+      <button id="btnTop">⤒ Top</button>
+      <button id="btnAhead">▼ Ahead</button>
+    </div>
+
+    <div class="air2">
+      <button id="btnShow">Put on air</button>
+      <button id="btnHide">Take off air</button>
+    </div>
+
+    <h4>Sections</h4>
+    <div class="secs" id="secs"></div>
+    <p class="none" id="noSecs">No bookmarks in this script. Start a line with ## to add one.</p>
+  </div>
+
+<script src="/sg-live.js"></script>
+<script src="/prompter-remote.js"></script>
+</body>
+</html>

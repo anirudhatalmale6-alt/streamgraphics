@@ -70,6 +70,10 @@
       <button class="btn ghost" id="boardDelete" style="font-size:12px;color:#e06">Delete</button>
       <span style="flex:1"></span>
       <span class="mini" style="color:var(--muted)">Big-button scorer:</span><a id="scorerLink" href="/scorer" target="_blank" style="color:#7c9cff;font-weight:700">open ↗</a>
+      <code id="scorerUrl" style="font-size:12px;color:var(--muted)">…/scorer</code>
+      <button class="btn ghost" id="scorerCopy" style="font-size:12px">Copy</button>
+      <button class="btn ghost" id="scorerQr" style="font-size:12px" title="show a code the phone's camera can read">▦ QR</button>
+      <div id="scorerQrBox" style="display:none;flex-basis:100%;margin-top:4px;padding-top:12px;border-top:1px solid var(--line)"></div>
     </div>
     <section class="panel hero">
       <div class="preview" style="align-items:flex-start;justify-content:center">
@@ -215,6 +219,7 @@
 
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>
+  <script src="/sg-qr.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/scoreboard.js"></script>
   <script src="/ver.js"></script>

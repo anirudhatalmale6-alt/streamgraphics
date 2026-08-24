@@ -50,6 +50,31 @@
   .speedbox .v{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;min-width:52px;text-align:center}
   .speedbox button{width:42px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-weight:900;font-size:17px;cursor:pointer}
   .speedbox button:hover{border-color:var(--accent)}
+  /* collapsible panels — the page is long, and the formatting controls sit below two of the
+     tallest panels on it. Folding those away is the difference between reaching Look in one
+     scroll and three. */
+  .panel > h3.fold{cursor:pointer;display:flex;align-items:center;gap:9px;user-select:none}
+  .panel > h3.fold:hover{color:var(--accent)}
+  .panel > h3.fold .car{display:inline-block;transition:transform .15s;font-size:11px;color:var(--muted)}
+  .panel.collapsed > h3.fold .car{transform:rotate(-90deg)}
+  .panel.collapsed > .panelbody{display:none}
+  .panel > h3.fold .folded{display:none;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+  .panel.collapsed > h3.fold .folded{display:inline}
+  .foldbar{display:flex;justify-content:flex-end;margin-bottom:8px}
+  .foldbar button{background:none;border:none;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;padding:4px 6px}
+  .foldbar button:hover{color:var(--accent)}
+  /* saved scripts */
+  .liblist{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .librow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:9px 12px}
+  .librow.on{border-color:var(--accent);background:#12202e}
+  .librow .nm{font-weight:800;font-size:15px}
+  .librow .meta{font-size:11px;color:var(--muted)}
+  .librow .sp{flex:1}
+  .librow button{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 11px;font-weight:700;font-size:12px;cursor:pointer}
+  .librow button:hover{border-color:var(--accent)}
+  .librow button.load{background:var(--accent);border-color:var(--accent);color:#06121f;font-weight:900}
+  .librow .live{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);font-weight:900}
+  .librow .dirty{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#e7b53c;font-weight:900}
 
   #marks{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .mkbtn{display:inline-flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;max-width:280px}
@@ -83,7 +108,7 @@
   <header class="top">
     <div style="display:flex;align-items:center">
       <div class="brand"><span class="dot"></span> StreamGraphics Pro <small>Teleprompter</small></div>
-      <nav class="topnav"><a href="/prompter-output" target="_blank">Open output ↗</a><a href="/prompter-output?mirror=1" target="_blank">Mirrored ↗</a><a href="/links">All links</a><a href="/">All graphics</a></nav>
+      <nav class="topnav"><a href="/prompter-output" target="_blank">Open output ↗</a><a href="/prompter-output?mirror=1" target="_blank">Mirrored ↗</a><a id="navRemote" href="/prompter-remote" target="_blank">📱 Remote (phone / tablet) ↗</a><a href="/links">All links</a><a href="/">All graphics</a></nav>
     </div>
     <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
   </header>
@@ -102,7 +127,16 @@
       <span class="urlgrp"><span class="mini" style="color:var(--muted)">Mirrored</span>
         <code id="outUrlM">…?mirror=1</code>
         <button id="copyBtnM" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button></span>
+      <!-- The phone remote. Shown as an address rather than only a link, because the device
+           that needs it is in someone else's hand — see SGLinks.phoneLink in sg-links.js. -->
+      <span class="urlgrp"><span class="mini" style="color:var(--muted)">📱 Remote</span>
+        <code id="outUrlR">…/prompter-remote</code>
+        <button id="copyBtnR" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button>
+        <button id="qrBtnR" title="show a code the phone's camera can read" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">▦ QR</button></span>
+      <div id="qrBoxR" style="display:none;flex-basis:100%;margin-top:4px;padding-top:12px;border-top:1px solid var(--line)"></div>
     </div>
+
+    <div class="foldbar"><button id="btnFoldAll" type="button">Collapse all</button></div>
 
     <!-- Put the output on a monitor without dragging a window across the desk. -->
     <section class="panel" style="margin-bottom:14px">
@@ -112,6 +146,7 @@
         <select class="inp" id="screenPick" style="width:auto;display:none"></select>
         <button class="btn" id="btnSendNormal" style="display:none">Open normal there ▸</button>
         <button class="btn ghost" id="btnSendMirror" style="display:none">Open mirrored there ▸</button>
+        <button class="btn ghost" id="btnCloseSent" style="display:none">✕ Close prompter window</button>
       </div>
       <p class="mini" id="screenHint" style="color:var(--muted);margin:0"></p>
     </section>
@@ -185,6 +220,23 @@
       <p class="mini" style="color:var(--muted);margin-top:8px">Word (.docx), rich text (.rtf) and plain text (.txt, .md). Headings in a Word document come across as bookmarks on their own — you don't have to add the ## by hand.</p>
     </section>
 
+    <!-- saved scripts -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3>Saved scripts</h3>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn" id="btnLibSave">💾 Save this script</button>
+        <button class="btn ghost" id="btnLibSaveAs">Save as new…</button>
+        <button class="btn ghost" id="btnLibAddDoc">＋ Add a document…</button>
+        <input type="file" id="libFile" accept=".txt,.text,.md,.markdown,.rtf,.docx" style="display:none">
+        <span class="mini" id="libNow" style="color:var(--muted)"></span>
+      </div>
+      <div id="libList" class="liblist"></div>
+      <p class="mini" id="libEmpty" style="color:var(--muted);margin:0">
+        Nothing saved yet. Write or open a script above, then press <b>Save this script</b> — it
+        stays here for next time, and loading one never destroys another.
+      </p>
+    </section>
+
     <!-- look -->
     <section class="panel" style="margin-bottom:14px">
       <h3>How it looks</h3>
@@ -200,6 +252,7 @@
         </select>
         <label>Size</label><input type="range" class="rng" id="stSize" min="24" max="160" step="2"><span class="mono" id="szV">64</span>
         <label>Line spacing</label><input type="range" class="rng" id="stLH" min="1" max="2.6" step="0.05"><span class="mono" id="lhV">1.45</span>
+        <label title="How much space a blank line in the script leaves between paragraphs">Paragraph gap</label><input type="range" class="rng" id="stGap" min="0" max="300" step="5"><span class="mono" id="gapV">100%</span>
       </div>
       <div class="lrow">
         <label>Column width</label><input type="range" class="rng" id="stW" min="30" max="100" step="1"><span class="mono" id="wV">82</span>
@@ -248,6 +301,7 @@
 
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>
+  <script src="/sg-qr.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/sg-prompter.js"></script>
   <script src="/prompter.js"></script>

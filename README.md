@@ -220,8 +220,22 @@ Milestone 1 delivers the full pipeline plus the **timer family**:
 **From a second PC on the same network:** use the `http://192.168.x.x:PORT/output`
 address the console printed (the machine's LAN IP), not `localhost`.
 
-> Windows may ask to allow Node through the firewall the first time — click **Allow**
-> so other machines on your network can reach it.
+**Saved scripts.** The teleprompter keeps a library of named scripts. Write or open one, press
+**Save this script**, and it stays there. Loading one never destroys another, and if the script
+on air has unsaved changes it asks before replacing it. Deleting a saved script leaves whatever
+is currently on air exactly where it is.
+
+**Sending the prompter to a second monitor.** Pick the monitor and press send. To take it back,
+press **Close prompter window** — the button only appears while something is actually out there,
+and it still works if you have reloaded the control page since sending.
+
+> The first time you launch it, Windows asks whether to allow **StreamGraphics Pro** through
+> the firewall. Tick **Private networks** and click **Allow** so other machines on your
+> network can reach the output. It is asked once per computer, not once per launch.
+>
+> Windows asks this about any program that listens for connections; there is no way to stop
+> it asking without an administrator installer. If you only ever use OBS on this same
+> computer you can safely click Cancel — `localhost` keeps working either way.
 
 ## Drive it
 Open the **control** URL in your browser (on any machine on the network). Pick a mode,

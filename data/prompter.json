@@ -1,0 +1,23 @@
+{
+  "script": "## Opening\nWelcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. Welcome to the show. ",
+  "style": {
+    "font": "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    "size": 64,
+    "lineHeight": 1.45,
+    "bold": true,
+    "align": "left",
+    "width": 82,
+    "paraGap": 100,
+    "color": "#ffffff",
+    "bg": "#0a0a0a",
+    "chroma": "",
+    "showMarks": true,
+    "markColor": "#f4a63c",
+    "cue": "both",
+    "cuePos": 38,
+    "cueColor": "#e03131",
+    "fade": true
+  },
+  "speed": 45,
+  "jumpPx": 220
+}

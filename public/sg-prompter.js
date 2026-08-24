@@ -46,7 +46,7 @@
      precisely how this app is used at a venue. */
   function sig(p) {
     var s = (p && p.style) || {};
-    var str = [(p && p.script) || '', s.font, s.size, s.lineHeight, s.bold ? 1 : 0, s.align, s.width, s.showMarks ? 1 : 0].join('\u0000');
+    var str = [(p && p.script) || '', s.font, s.size, s.lineHeight, s.bold ? 1 : 0, s.align, s.width, s.showMarks ? 1 : 0, s.paraGap].join('\u0000');
     var h = 0x811c9dc5;
     for (var i = 0; i < str.length; i++) {
       var c = str.charCodeAt(i);
@@ -72,6 +72,11 @@
     docEl.style.fontWeight = s.bold ? '700' : '400';
     docEl.style.textAlign = (['left', 'center', 'right'].indexOf(s.align) >= 0 ? s.align : 'left');
 
+    var gap = Number(s.paraGap);
+    if (!isFinite(gap)) gap = 100;
+    gap = Math.max(0, Math.min(300, gap));
+    var blankPx = Math.round(size * lh * (gap / 100));
+
     var blocks = parse(p && p.script);
     var html = '<div class="pr-pad" style="height:' + pad + 'px"></div>';
     for (var i = 0; i < blocks.length; i++) {
@@ -80,7 +85,11 @@
         if (!s.showMarks) continue;   // operator-only bookmark: keep it off the talent's screen
         html += '<div class="pr-l pr-mark" data-mark="' + esc(b.text) + '">' + esc(b.text) + '</div>';
       } else if (b.type === 'blank') {
-        html += '<div class="pr-l blank">&nbsp;</div>';
+        /* A blank line in the script IS the paragraph break, and its height used to be exactly
+           one line — take it or leave it. gap is a percentage of that, so 100 is unchanged,
+           40 tightens it and 200 gives a clear pause between thoughts. An explicit height on
+           an empty div rather than &nbsp;, so the number means what it says. */
+        html += '<div class="pr-l blank" style="height:' + blankPx + 'px"></div>';
       } else {
         html += '<div class="pr-l">' + esc(b.text) + '</div>';
       }

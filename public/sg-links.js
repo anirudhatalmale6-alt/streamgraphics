@@ -128,6 +128,86 @@
     } else fallback();
   };
 
+  /* ---- links meant for a PHONE ----
+   *
+   * A page can link to the phone remote with a plain <a href="/prompter-remote">, and on the
+   * StreamGraphics computer it opens perfectly — which is exactly what makes it a trap. That
+   * link carries the host of the page it was clicked from, and on this machine that host is
+   * localhost. Read it off the screen, type it into a phone, and the phone dials ITSELF.
+   *
+   * So a phone-facing link gets three things instead of one: an href pointing at the address
+   * other devices can reach, the address shown as text so it can be read out or typed, and a
+   * QR the camera can take straight off the screen (the encoder is already in the app, offline
+   * — see sg-qr.js). If this computer has no network address at all, the QR is REFUSED rather
+   * than drawn around a localhost URL: a QR that scans to a dead page looks like it worked and
+   * sends the operator hunting through phone settings for a fault that is not there.
+   */
+  SG.phoneLink = function (opts) {
+    var path = opts.path;
+    var link = opts.link || null;          // <a> whose href must be network-reachable
+    var out  = opts.out  || null;          // element that displays the address as text
+    var copy = opts.copy || null;          // copy button
+    var qrBtn = opts.qr   || null;         // QR toggle button
+    var box  = opts.box  || null;          // container the QR is drawn into
+
+    function url() { return SG.url(typeof path === 'function' ? path() : path); }
+
+    /* No address to hand out: loopback with nothing else on this machine. */
+    function unreachable() { return SG.ready && SG.localOnly && !SG.ips.length; }
+
+    function paint() {
+      var u = url();
+      if (link) link.href = u;
+      if (out) out.textContent = u;
+      if (box && box.style.display !== 'none') draw();
+    }
+
+    function draw() {
+      if (!box) return;
+      box.innerHTML = '';
+      var wrap = document.createElement('div');
+      if (unreachable()) {
+        wrap.style.cssText = 'font-size:13px;line-height:1.5;color:#e08a72;max-width:420px';
+        wrap.textContent = 'This computer is not on a network, so there is no address a phone could open. '
+          + 'Connect it to the same Wi-Fi or Ethernet as the phone, then try again.';
+        box.appendChild(wrap);
+        return;
+      }
+      var u = url();
+      var q = window.SGQR && SGQR.svg(u, { level: 'M', quiet: 3 });
+      if (!q) {                                   // encoder missing, or a URL too long to encode
+        wrap.style.cssText = 'font-size:13px;color:var(--muted)';
+        wrap.textContent = u;
+        box.appendChild(wrap);
+        return;
+      }
+      wrap.style.cssText = 'display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+      var img = document.createElement('div');
+      img.style.cssText = 'width:168px;height:168px;background:#fff;padding:8px;border-radius:10px;flex:none';
+      img.innerHTML = q.svg;
+      var cap = document.createElement('div');
+      cap.style.cssText = 'font-size:13px;line-height:1.6;color:var(--muted);max-width:320px';
+      cap.innerHTML = 'Point the phone’s camera at this code — no app needed. '
+        + 'Or type it in:<br><b style="color:var(--txt);font-family:ui-monospace,Menlo,Consolas,monospace">'
+        + String(u).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; })
+        + '</b><br>The phone has to be on the same Wi‑Fi as this computer.';
+      wrap.appendChild(img); wrap.appendChild(cap);
+      box.appendChild(wrap);
+    }
+
+    if (copy) copy.onclick = function () { SG.copy(url(), this); };
+    if (qrBtn && box) {
+      qrBtn.onclick = function () {
+        var open = box.style.display !== 'none';
+        box.style.display = open ? 'none' : 'block';
+        if (!open) draw();
+      };
+    }
+    SG.onbase(paint);
+    SG.load(paint);          // ips/localOnly are only trustworthy once /netinfo has answered
+    return { refresh: paint, url: url };
+  };
+
   window.SGLinks = SG;
   SG.load();
 })();
