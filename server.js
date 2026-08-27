@@ -1747,8 +1747,19 @@ function zipRead(buf, wanted) {
   return null;
 }
 
-/* word/document.xml -> lines. One <w:p> is one line, which is exactly how a prompter wants
- * it: what the writer pressed Enter on becomes what the talent reads as a line. */
+/* word/document.xml -> lines.
+ *
+ * 🚨 Word has TWO kinds of break and this used to flatten both of them.
+ *   <w:p>  is a paragraph — what the writer pressed Enter on. It comes out as a paragraph
+ *          here too, which in a script means a BLANK LINE between the two. That blank line is
+ *          the thing the "Paragraph gap" slider stretches, so before this an imported Word
+ *          document left the slider with nothing at all to act on: dragging it did nothing
+ *          and the talent got a solid wall of text. Mark reported exactly that.
+ *   <w:br> is a line break inside a paragraph — Shift+Enter. It was being replaced with a
+ *          SPACE, which is how a script written with deliberate short lines arrived as one
+ *          long run-on. It is a newline now, because that is what it is.
+ * A document that already has empty paragraphs in it is unaffected: documentToScript()
+ * collapses any run of blank lines back down to one. */
 function docxToText(buf) {
   const xml = zipRead(buf, 'word/document.xml');
   if (!xml) throw new Error('this file has no document text in it');
@@ -1770,14 +1781,17 @@ function docxToText(buf) {
     const heading = /<w:pStyle[^>]*w:val="(?:Title|Subtitle|Heading[1-4])"/i.test(t)
                  || /<w:outlineLvl[^>]*w:val="[0-3]"/i.test(t);
     t = t.replace(/<w:tab\b[^>]*>/g, '\t')
-         .replace(/<w:br\b[^>]*>/g, ' ')      // a soft break inside a paragraph is not a new line
+         /* Shift+Enter. Kept as a real newline — except inside a heading, where the whole
+            paragraph becomes one "## " bookmark name and a newline would split the name off
+            it and leave half the heading sitting in the script as ordinary words. */
+         .replace(/<w:br\b[^>]*>/g, heading ? ' ' : '\n')
          .replace(/<w:noBreakHyphen\b[^>]*>/g, '-')
          .replace(/<[^>]*>/g, '');
     t = decodeXmlEntities(t).replace(/ /g, ' ').replace(/[ \t]+$/, '');
     // Don't double the marker up if the writer happened to type it as well.
     if (heading && t.trim() && !/^\s*##/.test(t)) t = '## ' + t.trim();
     return t;
-  }).join('\n');
+  }).join('\n\n');   // one Word paragraph = one script paragraph = a blank line between
 }
 
 /* RTF, walked as a stream of groups and control words. Only the parts that carry body text
@@ -1832,10 +1846,15 @@ function rtfToText(buf) {
      be turned into a "## " bookmark the way a Word heading is. RTF carries that as
      \\outlinelevel on the paragraph - style numbers (\\s1, \\s2) look like the same thing and are
      not: they point into a stylesheet where 1 can mean anything the author wanted. */
-  const flush = () => {
+  /* 🚨 `para` is the same distinction docxToText() draws: \par and \sect END A PARAGRAPH, so
+     they leave a blank line behind for the "Paragraph gap" slider to stretch, while \line is
+     Shift+Enter and only ends the line. Both used to flush identically, which is why a script
+     saved out of Word as .rtf imported with no paragraph spacing anywhere in it. */
+  const flush = (para) => {
     let t = line.replace(/[ \t]+$/, '');
     if (heading && t.trim() && !/^\s*##/.test(t)) t = '## ' + t.trim();
     out.push(t); line = ''; heading = false;
+    if (para) out.push('');
   };
   while (i < s.length) {
     const c = s[i];
@@ -1860,7 +1879,8 @@ function rtfToText(buf) {
       const word = m[1], num = m[2];
       if (SKIP.test(word) && !skipping()) skipAt = depth;
       else if (!skipping()) {
-        if (word === 'par' || word === 'line' || word === 'sect') flush();
+        if (word === 'par' || word === 'sect') flush(true);
+        else if (word === 'line') flush(false);
         else if (word === 'tab') line += '\t';
         else if (word === 'outlinelevel' && num != null && +num >= 0 && +num <= 3) heading = true;
         else if (word === 's' && num != null && headingStyles.has(+num)) heading = true;
@@ -1880,7 +1900,7 @@ function rtfToText(buf) {
     if (!skipping()) line += c;
     i++;
   }
-  flush();
+  flush(false);   // whatever is left after the last \par — no trailing blank
   return out.join('\n');
 }
 

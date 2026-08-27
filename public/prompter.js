@@ -271,6 +271,123 @@
     if (f) importFile(f);
   });
 
+  /* ---- Word, arriving by the other two routes ----
+   *
+   * 🚨 The importer is not the only way a script gets in here. Most of the time it is pasted,
+   * and a paste out of Word carries the same fault the importer had: every paragraph arrives
+   * as a plain line break with no blank line between, so the "Paragraph gap" slider has
+   * nothing to stretch and appears to do nothing at all.
+   *
+   * Word puts a full HTML copy on the clipboard alongside the plain text, and THAT still knows
+   * what a paragraph is. So when the plain text has no paragraph spacing in it but the HTML
+   * does, the HTML is used. Anything else — a plain-text paste, a paste that already has blank
+   * lines in it, a paste this yields nothing better for — is left exactly alone. */
+  var BLOCK = /^(P|DIV|H1|H2|H3|H4|H5|H6|LI|TR|BLOCKQUOTE|PRE|SECTION|ARTICLE|ADDRESS)$/;
+  /* Markers. Control characters on purpose: neither can occur in text a person pasted,
+     so splitting on them cannot cut a script in half. Written as escapes so this file
+     itself stays plain ASCII - the installer build refuses stray control bytes. */
+  var PARA = '\u0000', HEAD = '\u0001';
+
+  function walkHtml(node, out) {
+    if (node.nodeType === 3) { out.push(String(node.nodeValue).replace(/\s+/g, ' ')); return; }
+    if (node.nodeType !== 1) return;
+    var tag = String(node.nodeName || '').toUpperCase();
+    if (tag === 'BR') { out.push('\n'); return; }     // Shift+Enter: a line break, not a paragraph
+    if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return;
+    var block = BLOCK.test(tag);
+    // Word writes headings as <p class=MsoHeading1>, not as <h1>, when it exports HTML.
+    var head = /^H[1-4]$/.test(tag) || /Mso(Title|Subtitle|Heading[1-4])/i.test(node.className || '');
+    if (block) out.push(PARA);
+    if (head) out.push(HEAD);
+    for (var c = node.firstChild; c; c = c.nextSibling) walkHtml(c, out);
+    if (block) out.push(PARA);
+  }
+
+  function htmlToScript(html) {
+    var d;
+    try { d = new DOMParser().parseFromString(String(html), 'text/html'); } catch (e) { return ''; }
+    if (!d || !d.body) return '';
+    var out = [];
+    walkHtml(d.body, out);
+    return out.join('').split(PARA).map(function (chunk) {
+      var heading = chunk.indexOf(HEAD) >= 0;
+      var t = chunk.split(HEAD).join('').replace(/\u00a0/g, ' ');
+      if (heading) t = t.replace(/\s+/g, ' ');       // a bookmark name is one line by definition
+      t = t.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/^[ \t]+|[ \t]+$/g, '');
+      if (heading && t && !/^\s*##/.test(t)) t = '## ' + t;
+      return t;
+    }).filter(function (t) {
+      /* Every block pushes a marker on the way in AND on the way out, so nesting leaves empty
+         chunks between the real ones. They carry nothing: the blank line between paragraphs
+         comes from the join below, not from these. */
+      return t !== '';
+    }).join('\n\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/\s+$/, '');
+  }
+
+  /* Put text in without destroying the undo history — a paste the operator cannot Ctrl+Z is
+     worse than the fault this fixes. execCommand is deprecated and still the only way to do it
+     in a textarea; the manual splice is there for the day it is removed. */
+  function insertText(el, text) {
+    el.focus();
+    var done = false;
+    try { done = document.execCommand('insertText', false, text); } catch (e) { done = false; }
+    if (!done) {
+      var a = el.selectionStart, b = el.selectionEnd;
+      el.value = el.value.slice(0, a) + text + el.value.slice(b);
+      el.selectionStart = el.selectionEnd = a + text.length;
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function onPaste(e) {
+    var cb = e.clipboardData || window.clipboardData;
+    if (!cb || !cb.getData) return;
+    var html = '';
+    try { html = cb.getData('text/html') || ''; } catch (err) { html = ''; }
+    if (!html) return;                                  // plain text: nothing to improve
+    var plain = '';
+    try { plain = cb.getData('text/plain') || ''; } catch (err) { plain = ''; }
+    if (/\n[ \t]*\n/.test(plain)) return;               // already has paragraph spacing — hands off
+    var text = htmlToScript(html);
+    if (!text || text.indexOf('\n\n') < 0) return;      // no paragraphs found: leave the browser to it
+    e.preventDefault();
+    insertText(e.target, text);
+    docSay('Pasted from Word — ' + (text.split(/\n[ \t]*\n/).length) +
+           ' paragraphs, with the blank lines the Paragraph gap slider needs.', true);
+  }
+  scriptEl.addEventListener('paste', onPaste);
+  pvText.addEventListener('paste', onPaste);
+
+  /* ---- and for the scripts that are already in here ----
+     The two fixes above only help the next document. This one repairs the script on screen,
+     so nothing has to be imported again. Idempotent on purpose: a paragraph that already has
+     a gap after it is not given a second one, so pressing it twice changes nothing. */
+  function spaceOutParagraphs(t) {
+    var lines = String(t == null ? '' : t).replace(/\r\n|\r/g, '\n').split('\n'), out = [], added = 0;
+    for (var i = 0; i < lines.length; i++) {
+      out.push(lines[i]);
+      if (i + 1 < lines.length && lines[i].trim() && lines[i + 1].trim()) { out.push(''); added++; }
+    }
+    return { text: out.join('\n'), added: added };
+  }
+
+  $('btnSpaceOut').onclick = function () {
+    var cur = scriptEl.value;
+    if (!cur.trim()) { docSay('There is no script to space out yet.', false); return; }
+    var r = spaceOutParagraphs(cur);
+    if (!r.added) { docSay('Every paragraph already has a blank line after it — nothing to change.', true); return; }
+    var el = (editing ? pvText : scriptEl);
+    el.focus();
+    el.setSelectionRange(0, el.value.length);
+    insertText(el, r.text);                    // replaces the lot, and Ctrl+Z still puts it back
+    scriptEl.value = r.text; pvText.value = r.text;
+    localScript = r.text;
+    stats(r.text);
+    send({ type: 'pr_script', text: r.text });
+    docSay('Added a blank line after ' + r.added + ' paragraph' + (r.added === 1 ? '' : 's') +
+           '. The Paragraph gap slider now has something to stretch — Ctrl+Z undoes it.', true);
+  };
+
   /* ---- put the output on a monitor ----
      Uses the Window Management API, which needs a secure context — on the StreamGraphics PC
      itself http://localhost counts as one, which is exactly where this is used. From a tablet
@@ -335,7 +452,12 @@
   function openOn(mirrored) {
     var i = Math.max(0, Math.min(screens.length - 1, +screenPick.value || 0));
     var s = screens[i];
-    try { localStorage.setItem(SKEY, String(i)); } catch (e) {}
+    // Both: the name is what survives a monitor being unplugged, the index is the fallback
+    // for a screen whose name the browser would not tell us.
+    try {
+      localStorage.setItem(SKEY, String(i));
+      localStorage.setItem(SKEY + '.name', s ? s.label : '');
+    } catch (e) {}
     var url = SGLinks.url('/prompter-output?fs=1' + (mirrored ? '&mirror=1' : ''));
     var feat = s
       ? 'popup=yes,left=' + s.left + ',top=' + s.top + ',width=' + s.width + ',height=' + s.height
@@ -612,6 +734,7 @@
   refreshCloseBtn();
 
   function fillScreens(list) {
+    var before = screens.length;
     screens = list;
     screenPick.innerHTML = '';
     list.forEach(function (s, i) {
@@ -619,16 +742,58 @@
       o.value = String(i); o.textContent = s.label;
       screenPick.appendChild(o);
     });
-    var saved = 0;
-    try { saved = parseInt(localStorage.getItem(SKEY), 10) || 0; } catch (e) {}
-    screenPick.value = String(Math.max(0, Math.min(list.length - 1, saved)));
-    screenPick.style.display = '';
+    /* 🚨 The choice used to be remembered as a POSITION IN THIS LIST, which is only stable
+       while the monitors are. Unplug the second of three and the saved "2" now points at a
+       different physical screen — so the prompter opens on the wrong monitor, in a room where
+       that means it opens in front of the audience. Remembered by name now, with the old
+       stored index still honoured once so nobody's existing choice is thrown away. */
+    var want = -1, savedName = '';
+    try { savedName = localStorage.getItem(SKEY + '.name') || ''; } catch (e) {}
+    if (savedName) {
+      for (var i = 0; i < list.length; i++) if (list[i].label === savedName) { want = i; break; }
+    }
+    if (want < 0) {
+      var savedIdx = 0;
+      try { savedIdx = parseInt(localStorage.getItem(SKEY), 10) || 0; } catch (e) {}
+      want = Math.max(0, Math.min(list.length - 1, savedIdx));
+    }
+    screenPick.value = String(want);
+    screenPick.style.display = list.length ? '' : 'none';
     $('btnSendNormal').style.display = '';
     $('btnSendMirror').style.display = '';
-    $('btnFindScreens').style.display = 'none';
-    screenHint.textContent = list.length > 1
-      ? 'Pick the monitor and send it. The choice is remembered.'
-      : 'Only one monitor is connected, so this will open on it.';
+    /* 🚨 Mark's bug, in one line: this button used to hide itself the moment it worked. Plug in
+       a monitor after that and there was no way to look again short of restarting the app. It
+       stays. */
+    $('btnFindScreens').style.display = '';
+    $('btnFindScreens').textContent = list.length ? 'Check for monitor changes' : 'Find my monitors';
+    if (!list.length) return;
+    var changed = before && before !== list.length;
+    screenHint.textContent = (changed ? 'Monitor list updated — ' + list.length + ' connected. ' : '') +
+      (list.length > 1
+        ? 'Pick the monitor and send it. The choice is remembered by name.'
+        : 'Only one monitor is connected, so this will open on it.') +
+      (savedName && want >= 0 && list[want] && list[want].label === savedName ? '' :
+       (savedName ? ' ("' + savedName + '" is not connected right now.)' : ''));
+  }
+
+  /* Ask the browser to tell us when a monitor is plugged in or unplugged, so the list is right
+     without anybody having to think about it. Attached to the ScreenDetails object we already
+     hold; the button remains for the cases where the event does not fire (and for the operator
+     who simply wants to be sure). */
+  var screenDetails = null;
+  function watchScreens(d) {
+    if (!d || d === screenDetails) return;
+    screenDetails = d;
+    if (typeof d.addEventListener !== 'function') return;
+    d.addEventListener('screenschange', function () { fillScreens(mapScreens(d)); });
+  }
+  function mapScreens(d) {
+    return (d.screens || []).map(function (s, i) {
+      return {
+        left: s.availLeft, top: s.availTop, width: s.availWidth, height: s.availHeight,
+        label: (s.label || ('Monitor ' + (i + 1))) + ' — ' + s.width + '×' + s.height + (s.isPrimary ? ' (main)' : '')
+      };
+    });
   }
 
   $('btnFindScreens').onclick = function () {
@@ -644,20 +809,33 @@
       return;
     }
     window.getScreenDetails().then(function (d) {
-      fillScreens((d.screens || []).map(function (s, i) {
-        return {
-          left: s.availLeft, top: s.availTop, width: s.availWidth, height: s.availHeight,
-          label: (s.label || ('Monitor ' + (i + 1))) + ' — ' + s.width + '×' + s.height + (s.isPrimary ? ' (main)' : '')
-        };
-      }));
+      watchScreens(d);
+      fillScreens(mapScreens(d));
     }).catch(function () {
       screenHint.textContent = 'Permission to see your monitors was declined. Allow it in the address bar, or open the output link and drag the window across.';
     });
+  };
+  screenPick.onchange = function () {
+    var s = screens[+this.value];
+    try { localStorage.setItem(SKEY + '.name', s ? s.label : ''); localStorage.setItem(SKEY, this.value); } catch (e) {}
   };
   $('btnSendNormal').onclick = function () { openOn(false); };
   $('btnSendMirror').onclick = function () { openOn(true); };
   if (!canPlace()) {
     $('btnFindScreens').textContent = 'Open the output in its own window';
+  } else if (navigator.permissions && navigator.permissions.query) {
+    /* Permission for this is remembered by the browser, so on the studio PC it has usually
+       already been given. Where it has, fill the list in on load and keep watching — then a
+       monitor swapped between shows is simply right, with nothing to press. Where it has not,
+       nothing happens and the button behaves as it always did: asking is the operator's move,
+       not something to spring on them the moment the page opens. */
+    try {
+      navigator.permissions.query({ name: 'window-management' }).then(function (st) {
+        if (!st || st.state !== 'granted') return;
+        window.getScreenDetails().then(function (d) { watchScreens(d); fillScreens(mapScreens(d)); })
+          .catch(function () {});
+      }).catch(function () {});
+    } catch (e) {}
   }
 
   /* ---- look ---- */

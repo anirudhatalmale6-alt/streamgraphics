@@ -212,12 +212,13 @@
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px">
         <button class="btn ghost" id="btnOpenDoc">Open a document…</button>
         <input type="file" id="docFile" accept=".txt,.text,.md,.markdown,.rtf,.docx" style="display:none">
+        <button class="btn ghost" id="btnSpaceOut" title="Puts a blank line after every paragraph — that blank line is what the Paragraph gap slider stretches. Pressing it twice changes nothing.">¶ Space out paragraphs</button>
         <span class="mini" style="color:var(--muted)" id="scriptStats">—</span>
         <span style="flex:1"></span>
         <span class="mini" style="color:var(--muted)">Saved automatically. Two hashes at the start of a line (## Intro) makes a bookmark.</span>
       </div>
       <div class="mini" id="docMsg" style="margin-top:8px;display:none"></div>
-      <p class="mini" style="color:var(--muted);margin-top:8px">Word (.docx), rich text (.rtf) and plain text (.txt, .md). Headings in a Word document come across as bookmarks on their own — you don't have to add the ## by hand.</p>
+      <p class="mini" style="color:var(--muted);margin-top:8px">Word (.docx), rich text (.rtf) and plain text (.txt, .md). Headings in a Word document come across as bookmarks on their own — you don't have to add the ## by hand, and Word's paragraphs and Shift+Enter line breaks are both kept. Pasting straight out of Word keeps them too. For a script that arrived flat from somewhere else, <b>¶ Space out paragraphs</b> repairs it.</p>
     </section>
 
     <!-- saved scripts -->
