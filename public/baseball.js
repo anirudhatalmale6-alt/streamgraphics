@@ -160,4 +160,18 @@
   es.onopen = function () { conn.classList.add('ok'); connTxt.textContent = 'live'; };
   es.onerror = function () { conn.classList.remove('ok'); connTxt.textContent = 'reconnecting…'; };
   es.onmessage = function (e) { try { var msg = JSON.parse(e.data); if (msg.state && msg.state.baseball) render(msg.state.baseball); } catch (err) {} };
+
+  /* ---- put this output on a chosen monitor (sg-screens.js) ----
+   * The panel supplies an empty row and a hint line; the module draws the controls, remembers
+   * the monitor BY NAME, keeps the window handle across a reload of this page, and offers a way
+   * to close the window again. One implementation for every panel that has an output. */
+  if (window.SGScreens && document.getElementById('screenRow')) {
+    SGScreens.mount({
+      root: document.getElementById('screenRow'),
+      hint: document.getElementById('screenHint'),
+      key: 'sg.baseball.screen',
+      what: 'scoreboard',
+      outputs: [{ label: 'Open the scoreboard there ▸', path: '/baseball-output', name: 'sgout-baseball' }]
+    });
+  }
 })();

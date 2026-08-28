@@ -1679,4 +1679,18 @@
     };
     apply();
   })();
+
+  /* ---- put this output on a chosen monitor (sg-screens.js) ----
+   * The panel supplies an empty row and a hint line; the module draws the controls, remembers
+   * the monitor BY NAME, keeps the window handle across a reload of this page, and offers a way
+   * to close the window again. One implementation for every panel that has an output. */
+  if (window.SGScreens && document.getElementById('screenRow')) {
+    SGScreens.mount({
+      root: document.getElementById('screenRow'),
+      hint: document.getElementById('screenHint'),
+      key: 'sg.lowerthird.screen',
+      what: 'graphics',
+      outputs: [{ label: 'Open the graphics output there ▸', path: '/lowerthird-output', name: 'sgout-lowerthird' }]
+    });
+  }
 })();

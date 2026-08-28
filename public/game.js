@@ -261,4 +261,18 @@
       if (msg.state && msg.state.game) render(msg.state.game);
     } catch (err) {}
   };
+
+  /* ---- put this output on a chosen monitor (sg-screens.js) ----
+   * The panel supplies an empty row and a hint line; the module draws the controls, remembers
+   * the monitor BY NAME, keeps the window handle across a reload of this page, and offers a way
+   * to close the window again. One implementation for every panel that has an output. */
+  if (window.SGScreens && document.getElementById('screenRow')) {
+    SGScreens.mount({
+      root: document.getElementById('screenRow'),
+      hint: document.getElementById('screenHint'),
+      key: 'sg.game.screen',
+      what: 'scoreboard',
+      outputs: [{ label: 'Open the scoreboard there ▸', path: '/game-output', name: 'sgout-game' }]
+    });
+  }
 })();

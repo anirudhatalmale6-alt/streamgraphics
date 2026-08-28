@@ -389,6 +389,11 @@
   };
 
   /* ---- put the output on a monitor ----
+     🚨 public/sg-screens.js is the SHARED version of everything below, used by the graphics
+     builder, the scoreboards and the Show Library. This copy stays for now because it drives a
+     live show and no test covers it; a change to the behaviour here has to be made in BOTH
+     until this panel is folded onto that module (and tests written for it).
+
      Uses the Window Management API, which needs a secure context — on the StreamGraphics PC
      itself http://localhost counts as one, which is exactly where this is used. From a tablet
      across the network it does not, and could not anyway: no browser can place a window on a

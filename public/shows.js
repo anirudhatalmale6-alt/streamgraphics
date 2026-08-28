@@ -672,4 +672,18 @@
   connect();
   // The address another computer can reach, not localhost — see sg-links.js.
   SGLinks.onbase(function () { $('outUrl').textContent = SGLinks.url('/program-output'); });
+
+  /* ---- put this output on a chosen monitor (sg-screens.js) ----
+   * The panel supplies an empty row and a hint line; the module draws the controls, remembers
+   * the monitor BY NAME, keeps the window handle across a reload of this page, and offers a way
+   * to close the window again. One implementation for every panel that has an output. */
+  if (window.SGScreens && document.getElementById('screenRow')) {
+    SGScreens.mount({
+      root: document.getElementById('screenRow'),
+      hint: document.getElementById('screenHint'),
+      key: 'sg.program.screen',
+      what: 'Program',
+      outputs: [{ label: 'Open the Program output there ▸', path: '/program-output', name: 'sgout-program' }]
+    });
+  }
 })();

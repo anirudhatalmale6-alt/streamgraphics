@@ -80,6 +80,14 @@
       <p class="mini" style="color:var(--muted)">In the Graphics Builder, name a text (or image) layer a "CSV field" — e.g. PlayerName. Then hit "Import CSV" on that graphic above; each row fills the fields and becomes a version you can step through (◀ ▶) or jump to by name. Great for rosters, speakers, graduations.</p>
       <p class="mini" style="color:var(--muted);margin-top:8px"><b style="color:var(--txt)">Fixing the sheet mid-event:</b> hit <b>✎ Edit rows</b> on any graphic that has a spreadsheet. Shorten a name that's running off the lower third, delete someone who scratched, add a late entry, or change the running order — while the show is live. Every change saves as you make it, and if you edit the entry that's currently on air the output updates straight away. There's a filter box for finding one person among hundreds, and an Undo if you delete the wrong row.</p>
     </section>
+
+    <!-- Put this output full screen on a chosen monitor — see sg-screens.js. -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3 style="margin-bottom:8px">Put it on a monitor</h3>
+      <p class="mini" style="color:var(--muted);margin:-2px 0 10px">Feeding a screen, a projector or a hardware switcher straight off this computer? Send the output full screen to a second monitor instead of dragging a window across the desk. It remembers which monitor by name, and closes again from here.</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px" id="screenRow"></div>
+      <p class="mini" id="screenHint" style="color:var(--muted);margin:0"></p>
+    </section>
   </main>
 
   <footer class="foot">
@@ -157,6 +165,7 @@
 
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>
+  <script src="/sg-screens.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/shows.js"></script>
   <script src="/ver.js"></script>

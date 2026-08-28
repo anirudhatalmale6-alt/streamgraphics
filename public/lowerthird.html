@@ -209,6 +209,14 @@
       </p>
     </section>
 
+    <!-- Put this output full screen on a chosen monitor — see sg-screens.js. -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3 style="margin-bottom:8px">Put it on a monitor</h3>
+      <p class="mini" style="color:var(--muted);margin:-2px 0 10px">Feeding a screen, a projector or a hardware switcher straight off this computer? Send the output full screen to a second monitor instead of dragging a window across the desk. It remembers which monitor by name, and closes again from here.</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px" id="screenRow"></div>
+      <p class="mini" id="screenHint" style="color:var(--muted);margin:0"></p>
+    </section>
+
     <div class="builder">
       <div class="stagewrap">
         <div class="canvas" id="canvas">
@@ -757,6 +765,7 @@
 
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>
+  <script src="/sg-screens.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/sg-bullets.js"></script>
   <script src="/sg-box.js"></script>
