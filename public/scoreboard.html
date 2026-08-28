@@ -205,6 +205,12 @@
         <div class="row"><label>Backdrop</label><input class="inp" id="stBackdrop" placeholder="paste a URL, or Browse ▸"><label class="browsebtn">Browse<input type="file" accept="image/*" data-browse-style="backdropUrl"></label></div>
       </section>
     </div>
+
+    <!-- ONE control for "what am I feeding, and what do I paste into it" — see sg-output.js. -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3 style="margin-bottom:8px">Choose your output</h3>
+      <div id="outputBox"></div>
+    </section>
   </main>
 
   <footer class="foot">
@@ -212,13 +218,14 @@
       <span>Output for OBS / vMix / browser:</span>
       <code id="outUrl">…/scoreboard-output</code>
       <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy link</button>
-      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:var(--txt)"><input type="checkbox" id="chroma" style="width:18px;height:18px;accent-color:var(--go)"> Green screen (for hardware switchers)</label>
+      <span class="mini" style="color:var(--muted)">Feeding a switcher? See <b>Choose your output</b> below.</span>
     </div>
     <span class="hint">OBS: Browser Source · vMix: Web Browser input · any browser viewer · 1920×1080.</span>
   </footer>
 
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>
+  <script src="/sg-output.js"></script>
   <script src="/sg-qr.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/scoreboard.js"></script>

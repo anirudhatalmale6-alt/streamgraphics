@@ -320,7 +320,7 @@
       if (editing !== 'stBracket') $('stBracket').value = s.style.bracketColor || '#7a1420';
       if (editing !== 'stAnim') $('stAnim').value = s.style.animation || 'slide-up';
       if (editing !== 'stBackdrop') $('stBackdrop').value = s.style.backdropUrl || '';
-      if ($('chroma')) $('chroma').checked = !!s.style.chroma;
+      if (outputCtl) outputCtl.set(s.style.chroma || '');
       if (s.style.position) document.querySelectorAll('#posGrid button').forEach(function (b) {
         b.classList.toggle('on', b.dataset.pos === s.style.position);
       });
@@ -380,6 +380,7 @@
     $('boardDelete').disabled = boards.length <= 1;
     scorerPath = '/scorer?board=' + encodeURIComponent(cur);
     scorerLink.refresh();          // href, the visible address AND an open QR all follow the board
+    if (outputCtl) outputCtl.refresh();   // and so does the link the output control hands over
     outPath = '/scoreboard-output?board=' + encodeURIComponent(cur);
     paintOut();
   }
@@ -399,6 +400,15 @@
   };
 
   // green-screen toggle + copy link
-  $('chroma').onchange = function () { send({ type: 'sb_style', style: { chroma: $('chroma').checked ? 'green' : '' } }); };
   $('copyBtn').onclick = function () { SGLinks.copy($('outUrl').textContent, this); };
+
+  /* ---- Choose your output (sg-output.js) ----
+   * A named court carries ?board= in its output URL, so the path is rebuilt whenever the court
+   * changes — otherwise the link this control hands over belongs to a different scoreboard. */
+  var outputCtl = (window.SGOutput && document.getElementById('outputBox')) ? SGOutput.mount({
+    root: document.getElementById('outputBox'),
+    path: function () { return outPath; },
+    key: 'sg.scoreboard.output',
+    onChange: function (chroma) { send({ type: 'sb_style', style: { chroma: chroma } }); }
+  }) : null;
 })();

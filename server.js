@@ -237,6 +237,10 @@ function defaultState() {
       layers: defaultLowerThirdLayers()
     },
 
+    /* The Program output's background. It used to borrow the graphics builder's, which meant
+       one setting for two different outputs: putting the builder on green also put the Program
+       feed on green, and there was no way to have one transparent and the other keyed. */
+    program: { chroma: '' },
     // The Show Library — saved named graphics, recallable and toggleable on the Program output.
     shows: [],
     // Saved teleprompter scripts. The prompter itself holds ONE live script; this is the drawer.
@@ -784,6 +788,70 @@ function builtinTemplates() {
       Object.assign({ id: 'lb', type: 'text', x: 182, y: 862, w: 880, h: 34, z: 2, text: 'COMING UP NEXT', font: "'Segoe UI', Arial, sans-serif", size: 22, bold: true, color: '#e7b53c', align: 'left' }, an('fade', 'fade')),
       Object.assign({ id: 'ti', type: 'text', x: 182, y: 902, w: 880, h: 90, z: 3, text: 'Next segment title', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 46, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'slide-left', inDelay: 150, inDur: 450, outAnim: 'fade', outDur: 250 })
     ] },
+    /* HEAD-TO-HEAD. The design Mark asked for when he said "sports pack": two sides, photos,
+       team colours and a stack of stat rows. It is here as a BUILT-IN because it is the clearest
+       demonstration of what the fields engine is for — every changing thing on it is declared, so
+       filling it in for the next fixture is a form, and filling it in for a whole pool is a
+       spreadsheet. Nothing about the design is hard-coded to a sport: the row labels are fields
+       too, so the same graphic serves volleyball, basketball or a debate. */
+    { id: 'bt_matchup', name: 'Head to Head — Matchup', kind: 'lowerthird', builtin: true,
+      desc: 'Two sides, photos, team colours and four stat rows — all filled in from a form or a spreadsheet.',
+      fields: [
+      { key: 'Title', label: 'Fixture / pool', type: 'text', default: 'POOL A — MATCH 1' },
+      { key: 'TeamA', label: 'Left name', type: 'text', default: 'TEAM A' },
+      { key: 'PhotoA', label: 'Left photo', type: 'image', default: '' },
+      { key: 'ColourA', label: 'Left colour', type: 'colour', default: '#1d4e86' },
+      { key: 'TeamB', label: 'Right name', type: 'text', default: 'TEAM B' },
+      { key: 'PhotoB', label: 'Right photo', type: 'image', default: '' },
+      { key: 'ColourB', label: 'Right colour', type: 'colour', default: '#8a1c1c' },
+      { key: 'Stat1Label', label: 'Row 1 — what it is', type: 'text', default: 'SETS WON' },
+      { key: 'Stat1A', label: 'Row 1 — left', type: 'text', default: '0' },
+      { key: 'Stat1B', label: 'Row 1 — right', type: 'text', default: '0' },
+      { key: 'Stat2Label', label: 'Row 2 — what it is', type: 'text', default: 'MATCH POINTS' },
+      { key: 'Stat2A', label: 'Row 2 — left', type: 'text', default: '0' },
+      { key: 'Stat2B', label: 'Row 2 — right', type: 'text', default: '0' },
+      { key: 'Stat3Label', label: 'Row 3 — what it is', type: 'text', default: 'ACES' },
+      { key: 'Stat3A', label: 'Row 3 — left', type: 'text', default: '0' },
+      { key: 'Stat3B', label: 'Row 3 — right', type: 'text', default: '0' },
+      { key: 'Stat4Label', label: 'Row 4 — what it is', type: 'text', default: 'BLOCKS' },
+      { key: 'Stat4A', label: 'Row 4 — left', type: 'text', default: '0' },
+      { key: 'Stat4B', label: 'Row 4 — right', type: 'text', default: '0' }
+      ],
+      layers: [
+      Object.assign({ id: 'bg', type: 'box', x: 0, y: 0, w: 1920, h: 1080, z: 1, fill: '#0b1220', opacity: 100, radius: 0 }, an('fade', 'fade')),
+      Object.assign({ id: 'pa', type: 'box', x: 0, y: 0, w: 960, h: 660, z: 2, fill: '#1d4e86', fieldColor: 'ColourA', opacity: 100, radius: 0 }, an('fade', 'fade')),
+      Object.assign({ id: 'pb', type: 'box', x: 960, y: 0, w: 960, h: 660, z: 3, fill: '#8a1c1c', fieldColor: 'ColourB', opacity: 100, radius: 0 }, an('fade', 'fade')),
+      Object.assign({ id: 'fa', type: 'image', x: 140, y: 40, w: 680, h: 560, z: 4, src: '', field: 'PhotoA', shape: 'none', fit: 'cover' }, an('fade', 'fade')),
+      Object.assign({ id: 'fb', type: 'image', x: 1100, y: 40, w: 680, h: 560, z: 5, src: '', field: 'PhotoB', shape: 'none', fit: 'cover' }, an('fade', 'fade')),
+      Object.assign({ id: 'na', type: 'text', x: 100, y: 596, w: 760, h: 56, z: 6, text: 'TEAM A', field: 'TeamA', font: "'Segoe UI', Arial, sans-serif", size: 42, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'nb', type: 'text', x: 1060, y: 596, w: 760, h: 56, z: 7, text: 'TEAM B', field: 'TeamB', font: "'Segoe UI', Arial, sans-serif", size: 42, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'tb', type: 'box', x: 0, y: 660, w: 1920, h: 96, z: 8, fill: '#0b1220', opacity: 100, radius: 0 }, an('fade', 'fade')),
+      Object.assign({ id: 'ti', type: 'text', x: 0, y: 660, w: 1920, h: 96, z: 9, text: 'POOL A \u2014 MATCH 1', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 44, bold: true, color: '#e7b53c', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'r1bar', type: 'box', x: 470, y: 786, w: 980, h: 48, z: 20, fill: '#f2f5f9', opacity: 96, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r1ca', type: 'box', x: 210, y: 786, w: 240, h: 48, z: 21, fill: '#1d4e86', fieldColor: 'ColourA', opacity: 100, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r1cb', type: 'box', x: 1470, y: 786, w: 240, h: 48, z: 22, fill: '#8a1c1c', fieldColor: 'ColourB', opacity: 100, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r1l', type: 'text', x: 470, y: 786, w: 980, h: 48, z: 23, text: 'SETS WON', field: 'Stat1Label', font: "'Segoe UI', Arial, sans-serif", size: 26, bold: true, color: '#0b1220', align: 'center', shadow: false }, an('fade', 'fade')),
+      Object.assign({ id: 'r1a', type: 'text', x: 210, y: 786, w: 240, h: 48, z: 23, text: '0', field: 'Stat1A', font: "'Segoe UI', Arial, sans-serif", size: 32, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'r1b', type: 'text', x: 1470, y: 786, w: 240, h: 48, z: 23, text: '0', field: 'Stat1B', font: "'Segoe UI', Arial, sans-serif", size: 32, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'r2bar', type: 'box', x: 470, y: 844, w: 980, h: 48, z: 24, fill: '#f2f5f9', opacity: 96, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r2ca', type: 'box', x: 210, y: 844, w: 240, h: 48, z: 25, fill: '#1d4e86', fieldColor: 'ColourA', opacity: 100, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r2cb', type: 'box', x: 1470, y: 844, w: 240, h: 48, z: 26, fill: '#8a1c1c', fieldColor: 'ColourB', opacity: 100, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r2l', type: 'text', x: 470, y: 844, w: 980, h: 48, z: 27, text: 'MATCH POINTS', field: 'Stat2Label', font: "'Segoe UI', Arial, sans-serif", size: 26, bold: true, color: '#0b1220', align: 'center', shadow: false }, an('fade', 'fade')),
+      Object.assign({ id: 'r2a', type: 'text', x: 210, y: 844, w: 240, h: 48, z: 27, text: '0', field: 'Stat2A', font: "'Segoe UI', Arial, sans-serif", size: 32, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'r2b', type: 'text', x: 1470, y: 844, w: 240, h: 48, z: 27, text: '0', field: 'Stat2B', font: "'Segoe UI', Arial, sans-serif", size: 32, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'r3bar', type: 'box', x: 470, y: 902, w: 980, h: 48, z: 28, fill: '#f2f5f9', opacity: 96, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r3ca', type: 'box', x: 210, y: 902, w: 240, h: 48, z: 29, fill: '#1d4e86', fieldColor: 'ColourA', opacity: 100, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r3cb', type: 'box', x: 1470, y: 902, w: 240, h: 48, z: 30, fill: '#8a1c1c', fieldColor: 'ColourB', opacity: 100, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r3l', type: 'text', x: 470, y: 902, w: 980, h: 48, z: 31, text: 'ACES', field: 'Stat3Label', font: "'Segoe UI', Arial, sans-serif", size: 26, bold: true, color: '#0b1220', align: 'center', shadow: false }, an('fade', 'fade')),
+      Object.assign({ id: 'r3a', type: 'text', x: 210, y: 902, w: 240, h: 48, z: 31, text: '0', field: 'Stat3A', font: "'Segoe UI', Arial, sans-serif", size: 32, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'r3b', type: 'text', x: 1470, y: 902, w: 240, h: 48, z: 31, text: '0', field: 'Stat3B', font: "'Segoe UI', Arial, sans-serif", size: 32, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'r4bar', type: 'box', x: 470, y: 960, w: 980, h: 48, z: 32, fill: '#f2f5f9', opacity: 96, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r4ca', type: 'box', x: 210, y: 960, w: 240, h: 48, z: 33, fill: '#1d4e86', fieldColor: 'ColourA', opacity: 100, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r4cb', type: 'box', x: 1470, y: 960, w: 240, h: 48, z: 34, fill: '#8a1c1c', fieldColor: 'ColourB', opacity: 100, radius: 8 }, an('fade', 'fade')),
+      Object.assign({ id: 'r4l', type: 'text', x: 470, y: 960, w: 980, h: 48, z: 35, text: 'BLOCKS', field: 'Stat4Label', font: "'Segoe UI', Arial, sans-serif", size: 26, bold: true, color: '#0b1220', align: 'center', shadow: false }, an('fade', 'fade')),
+      Object.assign({ id: 'r4a', type: 'text', x: 210, y: 960, w: 240, h: 48, z: 35, text: '0', field: 'Stat4A', font: "'Segoe UI', Arial, sans-serif", size: 32, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+      Object.assign({ id: 'r4b', type: 'text', x: 1470, y: 960, w: 240, h: 48, z: 35, text: '0', field: 'Stat4B', font: "'Segoe UI', Arial, sans-serif", size: 32, bold: true, color: '#ffffff', align: 'center' }, an('fade', 'fade')),
+    ] },
     { id: 'bt_sponsor', name: 'Sponsor Bar', kind: 'lowerthird', builtin: true, layers: [
       Object.assign({ id: 'bar', type: 'box', x: 0, y: 985, w: 1920, h: 95, z: 1, fill: '#ffffff', opacity: 100, radius: 0 }, an('slide-up', 'slide-up')),
       Object.assign({ id: 'lb', type: 'text', x: 120, y: 1012, w: 700, h: 42, z: 2, text: 'SPONSORED BY', font: "'Segoe UI', Arial, sans-serif", size: 26, bold: true, color: '#111111', align: 'left' }, an('fade', 'fade')),
@@ -824,8 +892,9 @@ function autoFields(layers) {
     add(l.field, t, l.type === 'image' ? (l.src || '') : (l.text || ''));
   });
   list.forEach(l => {
-    if (!l || typeof l !== 'object' || !l.fieldColor) return;
-    add(l.fieldColor, 'colour', (l.type === 'box' || l.type === 'ticker') ? l.fill : l.color);
+    if (!l || typeof l !== 'object') return;
+    if (l.fieldColor) add(l.fieldColor, 'colour', (l.type === 'box' || l.type === 'ticker') ? l.fill : l.color);
+    if (l.fieldTint) add(l.fieldTint, 'colour', l.tint);
   });
   return sanitizeFields(out);
 }
@@ -837,7 +906,12 @@ function saveTemplates() { writeJson(TPL_FILE, function () { return { items: sta
 // Built-ins declare their fields too — derived from their own layers, so the two can never
 // disagree and a new built-in cannot be added without one.
 function allTemplates() {
-  const built = builtinTemplates().map(t => Object.assign({}, t, { fields: autoFields(t.layers) }));
+  // A built-in may declare its own field list when the ORDER matters — a matchup form that
+  // opens on "Photo A" instead of the fixture title reads backwards. Otherwise it is read off
+  // the layers, so a new built-in cannot ship without one.
+  const built = builtinTemplates().map(t => Object.assign({}, t, {
+    fields: (t.fields && t.fields.length) ? sanitizeFields(t.fields) : autoFields(t.layers)
+  }));
   return built.concat(state.userTemplates || []);
 }
 
@@ -1530,6 +1604,7 @@ function applyAction(action) {
     case 'lt_show': state.lowerthird.visible = true;  break;
     case 'lt_hide': state.lowerthird.visible = false; break;
     case 'lt_chroma': state.lowerthird.chroma = String(action.value || ''); break;
+    case 'pg_chroma': state.program.chroma = String(action.value || ''); break;
     case 'lt_layers': // control panel sends the full layer array on any edit
       if (Array.isArray(action.layers)) {
         state.lowerthird.layers = action.layers.slice(0, 100);

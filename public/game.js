@@ -163,7 +163,6 @@
   $('stPos').onchange    = function () { send({ type: 'gm_style', style: { position: this.value } }); };
   $('stAnim').onchange   = function () { send({ type: 'gm_style', style: { animation: this.value } }); };
   $('stAccent').oninput  = function () { send({ type: 'gm_style', style: { accent: this.value } }); };
-  $('chromaSel').onchange = function () { send({ type: 'gm_style', style: { chroma: this.value } }); };
   $('stTimeouts').onchange = function () { send({ type: 'gm_style', style: { showTimeouts: this.checked } }); };
   $('stDown').onchange   = function () { send({ type: 'gm_style', style: { showDown: this.checked } }); };
   $('stShot').onchange   = function () { send({ type: 'gm_style', style: { showShotClock: this.checked } }); };
@@ -239,7 +238,7 @@
     showNudge(Math.round(Number(st.offsetX)) || 0, Math.round(Number(st.offsetY)) || 0);
     setVal($('stAnim'), st.animation || 'slide-up');
     if (document.activeElement !== $('stAccent')) $('stAccent').value = st.accent || '#f4a63c';
-    setVal($('chromaSel'), st.chroma || '');
+    if (outputCtl) outputCtl.set(st.chroma || '');
     $('stTimeouts').checked = st.showTimeouts !== false;
     $('stDown').checked = st.showDown !== false;
     $('stShot').checked = st.showShotClock !== false;
@@ -275,4 +274,14 @@
       outputs: [{ label: 'Open the scoreboard there ▸', path: '/game-output', name: 'sgout-game' }]
     });
   }
+
+  /* ---- Choose your output (sg-output.js) ----
+   * One control for the mode AND the address to paste. See the module header for why the two
+   * belong together. */
+  var outputCtl = (window.SGOutput && document.getElementById('outputBox')) ? SGOutput.mount({
+    root: document.getElementById('outputBox'),
+    path: '/game-output',
+    key: 'sg.game.output',
+    onChange: function (chroma) { send({ type: 'gm_style', style: { chroma: chroma } }); }
+  }) : null;
 })();

@@ -69,7 +69,7 @@
           + ';font-weight:' + (l.bold ? '800' : '400') + ';font-style:' + (l.italic ? 'italic' : 'normal') + ';text-align:' + (l.align || 'left')
           + ';align-items:' + (l.align === 'center' ? 'center' : (l.align === 'right' ? 'flex-end' : 'flex-start')) + (l.shadow === false ? '' : ';text-shadow:0 2px 8px rgba(0,0,0,.55)');
         inner = '<div class="li ly-text" style="' + st + '">' + esc(l.text || '') + '</div>';
-      } else if (l.type === 'image') inner = '<img class="li ly-img ' + (l.fit === 'cover' ? 'cover ' : '') + (l.shape || 'none') + '" src="' + esc(l.src || '') + '" style="width:100%;height:100%' + (l.shadow ? ';filter:drop-shadow(0 3px 10px rgba(0,0,0,.55))' : '') + '">';
+      } else if (l.type === 'image') inner = SGImg.html(l);
       else if (l.type === 'video') {
         var vrad = l.shape === 'circle' ? '50%' : (l.shape === 'rounded' ? '16px' : '0');
         inner = '<video class="li ly-vid" src="' + esc(l.src || '') + '"' + (l.loop ? ' loop' : '') + (l.muted === false ? '' : ' muted') + ' autoplay playsinline preload="auto" style="width:100%;height:100%;object-fit:' + (l.fit === 'cover' ? 'cover' : 'contain') + ';border-radius:' + vrad + '"></video>';
@@ -191,16 +191,28 @@
      * colour is the case that actually comes up, and two dropdowns per layer would cost more in
      * confusion than they buy. Blank or nonsense is IGNORED rather than applied: a spreadsheet
      * cell holding "TBC" must not paint the accent bar black mid-show. */
+    function hex(v) {
+      if (v == null) return null;
+      var c = String(v).trim();
+      return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c) ? c : null;
+    }
     function colourFrom(l) {
       if (!l.fieldColor) return null;
-      var c = val(l.fieldColor);
-      if (c == null) return null;
-      c = String(c).trim();
-      if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c)) return null;
+      var c = hex(val(l.fieldColor));
+      if (!c) return null;
       return (l.type === 'box' || l.type === 'ticker') ? { fill: c } : { color: c };
     }
+    /* An IMAGE's tint is its own binding: the shape stays, the colour is filled in. A club
+       colour arriving in a spreadsheet column is what makes one overlay design serve every team
+       in the league. Same rule as fieldColor — only a #hex is applied, so "TBC" in a cell leaves
+       the artwork as the designer drew it. */
+    function tintFrom(l) {
+      if (l.type !== 'image' || !l.fieldTint) return null;
+      var c = hex(val(l.fieldTint));
+      return c ? { tint: c, recolor: 'tint' } : null;
+    }
     return layers.map(function (l) {
-      var col = colourFrom(l);
+      var col = colourFrom(l) || tintFrom(l);
       if (col) l = Object.assign({}, l, col);
       if (!l.field) return l;
       var v = val(l.field); if (v == null) return l;
@@ -272,7 +284,9 @@
   }
 
   function render(state) {
-    applyChroma(state.lowerthird && state.lowerthird.chroma);
+    // The Program feed has its own background now. It used to read the graphics builder's,
+    // so one control drove two outputs that are routed to different places.
+    applyChroma(state.program && state.program.chroma);
     MEDIA_MAP = {}; (state.media || []).forEach(function (rel) { MEDIA_MAP[rel.split('/').pop().toLowerCase()] = rel; });
     var shows = state.shows || [];
     var onIds = {};

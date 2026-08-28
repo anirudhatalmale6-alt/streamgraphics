@@ -623,6 +623,7 @@
       try {
         var m = JSON.parse(e.data); if (!m.state) return;
         shows = m.state.shows || [];
+        if (outputCtl) outputCtl.set((m.state.program && m.state.program.chroma) || '');
         ltLayers = (m.state.lowerthird && m.state.lowerthird.layers) || [];
         var n = ltLayers.length;
         $('saveHint').textContent = 'Snapshots the Graphics Builder — currently ' + n + ' layer' + (n === 1 ? '' : 's') + '.';
@@ -686,4 +687,14 @@
       outputs: [{ label: 'Open the Program output there ▸', path: '/program-output', name: 'sgout-program' }]
     });
   }
+
+  /* ---- Choose your output (sg-output.js) ----
+   * One control for the mode AND the address to paste. See the module header for why the two
+   * belong together. */
+  var outputCtl = (window.SGOutput && document.getElementById('outputBox')) ? SGOutput.mount({
+    root: document.getElementById('outputBox'),
+    path: '/program-output',
+    key: 'sg.program.output',
+    onChange: function (chroma) { post({ type: 'pg_chroma', value: chroma }); }
+  }) : null;
 })();

@@ -264,7 +264,7 @@
     }
     if (l.type === 'image') {
       if (!l.src) return '<div class="li" style="width:100%;height:100%;border:2px dashed #6b7a90;border-radius:' + (l.shape === 'circle' ? '50%' : '10px') + ';display:flex;align-items:center;justify-content:center;color:#9fb0c8;font-size:26px">IMAGE</div>';
-      return '<img class="li ly-img ' + (l.fit === 'cover' ? 'cover ' : '') + (l.shape || 'none') + '" src="' + esc(l.src) + '" style="width:100%;height:100%' + (l.shadow ? ';filter:drop-shadow(0 3px 10px rgba(0,0,0,.55))' : '') + '">';
+      return SGImg.html(l, true);
     }
     if (l.type === 'video') {
       if (!l.src) return '<div class="li" style="width:100%;height:100%;border:2px dashed #6b7a90;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#9fb0c8;font-size:26px">▶ VIDEO</div>';
@@ -421,7 +421,14 @@
     }
     if (l.type === 'text') { $('pText').value = l.text || ''; $('pFont').value = l.font || "'Segoe UI', Arial, sans-serif"; $('pSize').value = l.size || 34; $('pBold').checked = !!l.bold; $('pItalic').checked = !!l.italic; $('pShadow').checked = (l.shadow !== false); $('pColor').value = l.color || '#ffffff'; $('pAlign').value = l.align || 'left'; }
     if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
-    if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; $('pImgShadow').checked = !!l.shadow; }
+    if (l.type === 'image') {
+      $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; $('pImgShadow').checked = !!l.shadow;
+      $('pRecolor').value = l.recolor || 'none';
+      $('pTint').value = l.tint || '#e7b53c';
+      $('pHue').value = l.hue == null ? 0 : l.hue;
+      $('pFieldTint').value = l.fieldTint || '';
+      paintRecolor();
+    }
     if (l.type === 'text' || l.type === 'image' || l.type === 'bullets' || l.type === 'qr') { $('pField').value = l.field || ''; }
     if (l.type !== 'image' && l.type !== 'video') { $('pFieldColor').value = l.fieldColor || ''; }
     if (l.type === 'box' || l.type === 'ticker') {
@@ -518,6 +525,31 @@
   $('pSrc').oninput = function () { mutate(function (l) { l.src = $('pSrc').value; }); };
   $('pField').oninput = function () { mutate(function (l) { var v = $('pField').value.trim(); if (v) l.field = v; else delete l.field; }); };
   $('pFieldColor').oninput = function () { mutate(function (l) { var v = $('pFieldColor').value.trim(); if (v) l.fieldColor = v; else delete l.fieldColor; }); };
+
+  /* ---- recolouring an image ----
+   * Tint paints a colour THROUGH the artwork's shape (a mask); hue rotates the colours it
+   * already has. They are separate modes rather than one clever control because a hue angle
+   * cannot land on a chosen colour and a mask cannot preserve a photograph — offering one and
+   * quietly doing the other is how a design looks right here and wrong on air. */
+  function paintRecolor() {
+    var m = $('pRecolor').value;
+    $('pTintWrap').style.display = (m === 'tint') ? 'inline-flex' : 'none';
+    $('pHueWrap').style.display = (m === 'hue') ? 'inline-flex' : 'none';
+    $('pTintFieldRow').style.display = (m === 'tint') ? 'flex' : 'none';
+    $('pHueV').textContent = $('pHue').value + '\u00b0';
+    var h = $('pRecolorHint');
+    h.style.display = (m === 'none') ? 'none' : '';
+    h.textContent = (m === 'tint')
+      ? 'Uses the shape of the artwork and fills it with the colour — draw the panel once in white, then any team colour fills it. A picture on a solid background will come out as a solid rectangle; use Shift the hue for photos.'
+      : 'Rotates the colours the image already has. Good for a photo or a multi-coloured graphic; it cannot land on one specific colour — that is what Tint is for.';
+  }
+  $('pRecolor').onchange = function () {
+    paintRecolor();
+    mutate(function (l) { var v = $('pRecolor').value; if (v === 'none') delete l.recolor; else l.recolor = v; });
+  };
+  $('pTint').oninput = function () { mutate(function (l) { l.tint = $('pTint').value; }); };
+  $('pHue').oninput = function () { $('pHueV').textContent = this.value + '\u00b0'; mutate(function (l) { l.hue = +$('pHue').value; }); };
+  $('pFieldTint').oninput = function () { mutate(function (l) { var v = $('pFieldTint').value.trim(); if (v) l.fieldTint = v; else delete l.fieldTint; }); };
 
   /* ---- surface controls: gradient, soft edges, drop shadow (boxes and tickers) ---- */
   // Only show the sub-controls that are doing anything, so the panel doesn't grow a row of
@@ -1468,14 +1500,19 @@
   $('btnOffAir').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_hide' }) }); };
   $('saveToLib').onclick = saveToLibrary;
   $('newDesign').onclick = function () { if (confirm('Start a new blank design? (Save to Library first if you want to keep the current one.)')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '', fields: [] }) }); };
-  function sendChroma() {
-    var v = $('chromaSel').value;
-    $('chromaColor').style.display = (v === 'custom') ? '' : 'none';
-    if (v === 'custom') v = $('chromaColor').value;
-    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_chroma', value: v }) });
-  }
-  $('chromaSel').onchange = sendChroma;
-  $('chromaColor').oninput = sendChroma;
+  /* The background colour is now part of one "Choose your output" control — see sg-output.js.
+     It used to be a box called "Chroma key" whose first option was Off (meaning transparent) and
+     whose Black meant a luma key, with key+fill living somewhere else entirely: three names for
+     one decision. */
+  var outputCtl = window.SGOutput && $('outputBox') ? SGOutput.mount({
+    root: $('outputBox'),
+    path: '/lowerthird-output',
+    key: 'sg.lowerthird.output',
+    onChange: function (chroma) {
+      fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({ type: 'lt_chroma', value: chroma }) });
+    }
+  }) : null;
   $('copyBtn').onclick = function () { SGLinks.copy($('outUrl').textContent, this); };
 
   /* ---- server state ---- */
@@ -1496,11 +1533,7 @@
         }
         if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
         var _live = !!lt.visible; $('btnOnAir').classList.toggle('live', _live); $('btnOffAir').classList.toggle('standby', !_live);
-        if (document.activeElement !== $('chromaSel') && document.activeElement !== $('chromaColor')) {
-          var cv = lt.chroma || '', preset = ['', '#00b140', '#0047ff', '#ff00ff', '#ffffff', '#000000', '#ff0000'];
-          if (preset.indexOf(cv) >= 0) { $('chromaSel').value = cv; $('chromaColor').style.display = 'none'; }
-          else { $('chromaSel').value = 'custom'; $('chromaColor').value = cv; $('chromaColor').style.display = ''; }
-        }
+        if (outputCtl) outputCtl.set(lt.chroma || '');
         if (!loaded) { loaded = true; layers = (lt.layers || []).map(function (l) { return l; }); if (layers.length) selId = layers[0].id; renderCanvas(); renderList(); syncProps(); }
         else if (JSON.stringify(lt.layers) !== JSON.stringify(layers) && !drag) {
           // reset (or another operator) changed layers — reload
@@ -1643,42 +1676,6 @@
 
   renderFields();
 
-  /* ---- key + fill panel ----
-   * Two more views of the SAME graphic for a hardware switcher (see sg-key.js). The URLs are
-   * built through SGLinks for the same reason every other link on this page is: the switcher PC
-   * is not this PC, and a localhost link copied onto it points that machine at itself. */
-  (function () {
-    var btn = $('keyfillBtn'), panel = $('keyfillPanel');
-    if (!btn || !panel) return;
-    var PATHS = { Fill: '/lowerthird-output?key=fill', Key: '/lowerthird-output?key=key' };
-
-    function paint() {
-      Object.keys(PATHS).forEach(function (k) {
-        var u = SGLinks.url(PATHS[k]);
-        $('kf' + k).textContent = u;
-        $('kf' + k + 'Open').href = u;
-      });
-    }
-    ['Fill', 'Key'].forEach(function (k) {
-      $('kf' + k + 'Copy').onclick = function () { SGLinks.copy($('kf' + k).textContent, this); };
-    });
-    SGLinks.onbase(paint);
-
-    var open = false;
-    try { open = localStorage.getItem('lt_keyfill_open') === '1'; } catch (e) {}
-    function apply() {
-      panel.style.display = open ? '' : 'none';
-      btn.classList.toggle('on', open);
-      if (open) paint();          // an address chosen on another panel may have moved on
-    }
-    btn.onclick = function () {
-      open = !open;
-      try { localStorage.setItem('lt_keyfill_open', open ? '1' : '0'); } catch (e) {}
-      apply();
-      if (open) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    };
-    apply();
-  })();
 
   /* ---- put this output on a chosen monitor (sg-screens.js) ----
    * The panel supplies an empty row and a hint line; the module draws the controls, remembers

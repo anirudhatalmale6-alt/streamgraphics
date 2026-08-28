@@ -79,6 +79,12 @@
       <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button>
     </div>
 
+
+    <!-- ONE control for "what am I feeding, and what do I paste into it" — see sg-output.js. -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3 style="margin-bottom:8px">Choose your output</h3>
+      <div id="outputBox"></div>
+    </section>
     <!-- Put this output full screen on a chosen monitor — see sg-screens.js. -->
     <section class="panel" style="margin-bottom:14px">
       <h3 style="margin-bottom:8px">Put it on a monitor</h3>
@@ -255,10 +261,7 @@
         <label class="mini" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stShot" checked> <span id="stShotLabel">Show play clock</span></label>
         <label class="mini only-bb" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stFouls" checked> Show team fouls</label>
         <span style="flex:1"></span>
-        <span class="mini" style="color:var(--muted)">Chroma</span>
-        <select class="inp" id="chromaSel" style="width:auto">
-          <option value="">Off (transparent)</option><option value="#00b140">Green</option><option value="#0047ff">Blue</option><option value="#ff00ff">Magenta</option><option value="#000000">Black (luma key)</option>
-        </select>
+        
       </div>
       <p class="mini" style="color:var(--muted2);margin-top:6px">Feeding a hardware switcher? This board has key + fill too — add <code>?key=fill</code> and <code>?key=key</code> to the output link, one on each video output. Every output link is on the <a href="/links" style="color:var(--accent)">Browser source links</a> page.</p>
     </section>
@@ -272,6 +275,7 @@
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>
   <script src="/sg-screens.js"></script>
+  <script src="/sg-output.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/game.js"></script>
   <script src="/ver.js"></script>

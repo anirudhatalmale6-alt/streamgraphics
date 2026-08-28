@@ -81,6 +81,12 @@
       <p class="mini" style="color:var(--muted);margin-top:8px"><b style="color:var(--txt)">Fixing the sheet mid-event:</b> hit <b>✎ Edit rows</b> on any graphic that has a spreadsheet. Shorten a name that's running off the lower third, delete someone who scratched, add a late entry, or change the running order — while the show is live. Every change saves as you make it, and if you edit the entry that's currently on air the output updates straight away. There's a filter box for finding one person among hundreds, and an Undo if you delete the wrong row.</p>
     </section>
 
+
+    <!-- ONE control for "what am I feeding, and what do I paste into it" — see sg-output.js. -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3 style="margin-bottom:8px">Choose your output</h3>
+      <div id="outputBox"></div>
+    </section>
     <!-- Put this output full screen on a chosen monitor — see sg-screens.js. -->
     <section class="panel" style="margin-bottom:14px">
       <h3 style="margin-bottom:8px">Put it on a monitor</h3>
@@ -166,6 +172,7 @@
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>
   <script src="/sg-screens.js"></script>
+  <script src="/sg-output.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/shows.js"></script>
   <script src="/ver.js"></script>

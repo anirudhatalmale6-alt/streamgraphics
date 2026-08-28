@@ -157,56 +157,14 @@
       <span class="mini" style="color:var(--muted)">Output:</span>
       <code id="outUrl" style="background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:12px">…/lowerthird-output</code>
       <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button>
-      <!-- one group, so the label never ends a line with its own select on the next one -->
-      <span style="display:inline-flex;align-items:center;gap:10px">
-      <span class="mini" style="color:var(--muted);font-weight:600">Chroma key</span>
-      <select class="inp" id="chromaSel" style="width:auto" title="a solid background colour for hardware keyers — pick one that isn't in your graphic">
-        <option value="">Off (transparent)</option>
-        <option value="#00b140">Green</option>
-        <option value="#0047ff">Blue</option>
-        <option value="#ff00ff">Magenta</option>
-        <option value="#ffffff">White</option>
-        <option value="#000000">Black (luma key)</option>
-        <option value="#ff0000">Red</option>
-        <option value="custom">Custom…</option>
-      </select>
-      <input type="color" id="chromaColor" value="#ff8800" style="display:none;width:36px;height:30px" title="custom chroma colour">
-      <button class="btn ghost" id="keyfillBtn" style="font-size:12px" title="two feeds for a hardware switcher — fill and key">Key + fill…</button>
-      </span>
     </div>
 
-    <!-- Key + fill. Off screen until asked for: it is the right answer for a hardware switcher
-         and irrelevant to everyone running OBS or vMix, which is most people most of the time. -->
-    <section class="panel" id="keyfillPanel" style="display:none;margin-bottom:16px">
-      <h3 style="margin-top:0">Key + fill — for a hardware switcher</h3>
-      <p class="mini" style="margin:-4px 0 12px;line-height:1.6">
-        OBS and vMix take this graphic with its transparency intact, so one link is all you need.
-        HDMI has no transparency in it, so a hardware switcher has to be told what is see-through.
-        A <b>luma key</b> guesses it from brightness — set Chroma key to <b>Black (luma key)</b> above
-        and that is all it takes, but anything dark in the graphic goes see-through with the background:
-        drop shadows, a dark brand bar, the shaded edge of a letter.<br>
-        <b>Key + fill</b> does not guess. Send these two pages out of two video outputs and wire them to
-        the switcher's fill and key inputs. Soft edges and see-through panels come out looking the way
-        they do in OBS. On an ATEM, turn <b>pre-multiplied key</b> on.
-      </p>
-      <div class="kfrow">
-        <div class="kfnm">FILL<div class="mini" style="font-weight:400">the graphic, on black</div></div>
-        <code class="kflk" id="kfFill">…</code>
-        <button class="btn ghost" id="kfFillCopy" style="font-size:12px">Copy</button>
-        <a class="btn ghost" id="kfFillOpen" style="font-size:12px;text-decoration:none" target="_blank" rel="noopener">Open ↗</a>
-      </div>
-      <div class="kfrow">
-        <div class="kfnm">KEY<div class="mini" style="font-weight:400">the matte — white where the graphic is</div></div>
-        <code class="kflk" id="kfKey">…</code>
-        <button class="btn ghost" id="kfKeyCopy" style="font-size:12px">Copy</button>
-        <a class="btn ghost" id="kfKeyOpen" style="font-size:12px;text-decoration:none" target="_blank" rel="noopener">Open ↗</a>
-      </div>
-      <p class="mini" style="margin:12px 0 0;line-height:1.6">
-        Both pages follow the same graphic live, so they take and clear together — there is nothing extra
-        to drive. They need <b>two video outputs</b> from this computer. With only one, stay on the luma or
-        chroma key; both still work exactly as before. Every other output has the same two links on the
-        <a href="/links" style="color:var(--accent)">Browser source links</a> page.
-      </p>
+
+    <!-- ONE control for the whole "what am I feeding, and what do I paste into it" question.
+         See sg-output.js — the mode and the address are the same decision. -->
+    <section class="panel" style="margin-bottom:16px">
+      <h3 style="margin-bottom:8px">Choose your output</h3>
+      <div id="outputBox"></div>
     </section>
 
     <!-- Put this output full screen on a chosen monitor — see sg-screens.js. -->
@@ -424,6 +382,25 @@
               <select class="inp" id="pFit" style="width:auto"><option value="contain">Fit</option><option value="cover">Fill</option></select>
               <label style="width:auto;margin-left:6px" title="drop shadow to help a PNG pop over video"><input type="checkbox" id="pImgShadow"> Shadow</label>
             </div>
+
+            <!-- Recolour. Two modes because neither covers both jobs — see sg-img.js. -->
+            <div class="row only-image"><label>Recolour</label>
+              <select class="inp" id="pRecolor" style="width:auto">
+                <option value="none">Off</option>
+                <option value="tint">Tint to a colour</option>
+                <option value="hue">Shift the hue</option>
+              </select>
+              <span id="pTintWrap" style="display:none;align-items:center;gap:6px">
+                <input type="color" id="pTint" value="#e7b53c">
+              </span>
+              <span id="pHueWrap" style="display:none;align-items:center;gap:6px;flex:1;min-width:0">
+                <input class="range" id="pHue" type="range" min="0" max="360" value="0" style="flex:1"><span id="pHueV" class="mono">0&deg;</span>
+              </span>
+            </div>
+            <div class="row only-image" id="pTintFieldRow" style="display:none"><label style="width:auto;color:#7c9cff">Tint from field</label>
+              <input class="inp" id="pFieldTint" list="fieldKeys" placeholder="e.g. TeamColour" style="flex:1;min-width:0">
+            </div>
+            <div class="only-image mini" id="pRecolorHint" style="color:var(--muted2);font-size:11px;margin:-4px 0 8px;display:none"></div>
 
             <div class="row only-video"><label>Video</label><input class="inp" id="pVSrc" placeholder="URL or Browse (mp4/webm)"><label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="video/*" id="pVFile" style="display:none"></label></div>
             <div class="row only-video" style="gap:14px;flex-wrap:wrap">
@@ -766,9 +743,11 @@
   <script src="/sg-live.js"></script>
   <script src="/sg-links.js"></script>
   <script src="/sg-screens.js"></script>
+  <script src="/sg-output.js"></script>
   <script src="/sg-autoreload.js"></script>
   <script src="/sg-bullets.js"></script>
   <script src="/sg-box.js"></script>
+  <script src="/sg-img.js"></script>
   <script src="/sg-qr.js"></script>
   <script src="/lowerthird.js"></script>
   <script src="/ver.js"></script>
