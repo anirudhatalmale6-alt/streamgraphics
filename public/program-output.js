@@ -185,7 +185,23 @@
     if (!row) return layers;
     var keys = Object.keys(row);
     function val(field) { var f = String(field || '').toLowerCase(); for (var i = 0; i < keys.length; i++) if (keys[i].toLowerCase() === f) return row[keys[i]]; return null; }
+    /* A COLOUR can be filled in as well as a word. `fieldColor` names a field holding a colour,
+     * and it drives the one colour that layer is really about: the fill of a box or a ticker bar,
+     * the text colour of everything else. One binding rather than a property matrix — a team
+     * colour is the case that actually comes up, and two dropdowns per layer would cost more in
+     * confusion than they buy. Blank or nonsense is IGNORED rather than applied: a spreadsheet
+     * cell holding "TBC" must not paint the accent bar black mid-show. */
+    function colourFrom(l) {
+      if (!l.fieldColor) return null;
+      var c = val(l.fieldColor);
+      if (c == null) return null;
+      c = String(c).trim();
+      if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c)) return null;
+      return (l.type === 'box' || l.type === 'ticker') ? { fill: c } : { color: c };
+    }
     return layers.map(function (l) {
+      var col = colourFrom(l);
+      if (col) l = Object.assign({}, l, col);
       if (!l.field) return l;
       var v = val(l.field); if (v == null) return l;
       if (l.type === 'text') return Object.assign({}, l, { text: v });

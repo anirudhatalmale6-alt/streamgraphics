@@ -51,6 +51,18 @@
   .gchip{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;white-space:nowrap}
   .gchip:hover{border-color:var(--accent)}
   .gchip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  /* declared-field rows */
+  .fldrow{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:8px;flex-wrap:wrap}
+  .fldrow input,.fldrow select{background:var(--panel);border:1px solid var(--line);border-radius:7px;color:var(--txt);padding:7px 9px;font:inherit;font-size:13px;min-width:0}
+  .fldrow .fk{width:150px;font-weight:700}
+  .fldrow .fl{width:170px}
+  .fldrow .ft{width:auto}
+  .fldrow .fd{flex:1;min-width:150px}
+  .fldrow .fops{margin-left:auto;display:flex;gap:5px}
+  .fldrow .fops button{font-size:12px;padding:5px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer}
+  .fldrow .fops button:hover{border-color:var(--accent)}
+  .fldrow .fops button.del:hover{border-color:#e06;color:#e06}
+  @media(max-width:760px){.fldrow .fk,.fldrow .fl{width:100%}}
   /* key + fill link rows — same shape as the ones on the Browser source links page */
   .kfrow{display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px;flex-wrap:wrap}
   .kfnm{font-weight:800;letter-spacing:.08em;min-width:150px;flex:0 0 auto}
@@ -336,10 +348,17 @@
             </div>
             <div class="row only-text"><label>Colour</label><input type="color" id="pColor" value="#ffffff"></div>
 
-            <div class="row fieldrow" style="border-top:1px dashed var(--line);padding-top:10px"><label style="width:auto;color:#7c9cff">CSV field</label>
-              <input class="inp" id="pField" placeholder="e.g. PlayerName — matches a spreadsheet column" style="flex:1;min-width:0">
+            <div class="row fieldrow" style="border-top:1px dashed var(--line);padding-top:10px"><label style="width:auto;color:#7c9cff">Fills from field</label>
+              <input class="inp" id="pField" list="fieldKeys" placeholder="e.g. PlayerName" style="flex:1;min-width:0">
             </div>
-            <div class="fieldrow mini" style="color:var(--muted2);font-size:11px;margin:-4px 0 8px">Name this a field to fill it from a CSV column in the Show Library (leave blank for fixed text).</div>
+            <div class="fieldrow mini" style="color:var(--muted2);font-size:11px;margin:-4px 0 8px">Leave blank for fixed text. Named, it gets filled in from the Fields list below — or from a spreadsheet column of the same name.</div>
+
+            <!-- A colour can be filled in too. Separate box, because a layer often takes its WORDS
+                 from one field and its COLOUR from another (a name, and the team's colour). -->
+            <div class="row colourfieldrow"><label style="width:auto;color:#7c9cff">Colour from field</label>
+              <input class="inp" id="pFieldColor" list="fieldKeys" placeholder="e.g. TeamColour" style="flex:1;min-width:0">
+            </div>
+            <div class="colourfieldrow mini" style="color:var(--muted2);font-size:11px;margin:-4px 0 8px">Drives the fill of a box or ticker, and the text colour of anything else. Only a #hex value is used; anything else is ignored, so a stray "TBC" in a spreadsheet can't black out the bar mid-show.</div>
 
             <div class="row only-box"><label>Fill</label><input type="color" id="pFill" value="#0b1f3a"><input class="inp s" id="pOpacity" type="number" min="0" max="100" value="95" title="opacity %"> %</div>
             <div class="row only-box"><label>Radius</label><input class="range" id="pRadius" type="range" min="0" max="120" value="12"><span id="pRadiusV" class="mono">12</span></div>
@@ -639,7 +658,46 @@
         </section>
       </div>
     </div>
+
+    <!-- ---- FIELDS: what this design asks to be filled in ----------------------------------
+         Full width rather than in the side column: a field is a key, a label, a type and a
+         default, and four things on a 320px column wrap into an unreadable stack. -->
+    <section class="panel" id="fieldsPanel">
+      <h3 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <span>Fields — what this design asks to be filled in</span>
+        <span style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn ghost" id="fldDetect" style="font-size:12px" title="read the design and list every field the layers already point at">Find the fields in this design</button>
+          <button class="btn ghost" id="fldAdd" style="font-size:12px">＋ Add a field</button>
+        </span>
+      </h3>
+      <p class="mini" style="color:var(--muted);margin:0 0 12px;line-height:1.6">
+        A field is one thing that changes between showings — a name, a job title, a headshot, a team colour.
+        Point a layer at a field with its <b style="color:#7c9cff">Fills from field</b> box, then declare it here with a
+        label and a type. Save the design to the <a href="/shows" style="color:var(--accent)">Show Library</a> and
+        whoever runs the show gets a form with exactly these boxes on it — no builder, no spreadsheet.
+        The same names are spreadsheet column names, so one design can be filled in by hand or mail-merged
+        from a CSV of 400 rows without changing anything.
+      </p>
+      <!-- Without these the row reads "Name / Name / Text / First Last" and there is no telling
+           which box is which. -->
+      <div class="fldrow" id="fldHead" style="background:transparent;border:none;padding:0 11px 4px;margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2)">
+        <span style="width:150px;flex:none">Name</span>
+        <span style="width:170px;flex:none">Label on the form</span>
+        <span style="width:auto;flex:none;min-width:120px">Type</span>
+        <span style="flex:1;min-width:150px">Default</span>
+      </div>
+      <div id="fldList"></div>
+      <p class="mini" id="fldEmpty" style="color:var(--muted2);border:1px dashed var(--line);border-radius:10px;padding:16px;text-align:center;display:none">
+        This design has no fields yet. Hit <b>Find the fields in this design</b> — if any layer already points at one,
+        it will be listed. Otherwise add them by hand.
+      </p>
+    </section>
   </main>
+
+  <!-- Every declared key, offered to both "fills from" boxes. A datalist SUGGESTS rather than
+       restricts, which matters: a spreadsheet column that was never declared must still be
+       typeable, or attaching an existing CSV would stop working. -->
+  <datalist id="fieldKeys"></datalist>
 
   <!-- pop-out editor for long ticker text -->
   <div id="tkModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;align-items:center;justify-content:center">

@@ -100,6 +100,36 @@
     </div>
   </div>
 
+  <!-- ---- FILL IN: the form a design generates from its declared fields --------------------
+       This is the whole point of declaring fields: whoever runs the show gets these boxes and
+       nothing else — no builder, no spreadsheet, no column names to guess at. It edits the
+       entry that is currently selected, live, exactly as the row editor does. -->
+  <div id="fillModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(720px,95vw);max-height:88vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h3 id="fillTitle" style="margin:0 0 3px;flex:1;min-width:200px">Fill in</h3>
+        <div class="airstate" id="fillAir" style="min-width:78px;text-align:center">OFF AIR</div>
+        <button class="btn go" id="fillOn" title="put this graphic on air">On air ▸</button>
+        <button class="btn" id="fillOff" title="take it off air — stays here so you can keep typing">◂ Off air</button>
+      </div>
+      <div id="fillVersions" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0 2px">
+        <span class="mini" style="color:var(--muted)">Version</span>
+        <button class="minibtn" id="fillPrev" title="previous version">◀</button>
+        <select class="inp" id="fillSel" style="min-width:180px"></select>
+        <button class="minibtn" id="fillNext" title="next version">▶</button>
+        <span class="mini" id="fillCount" style="color:var(--muted)"></span>
+      </div>
+      <p class="mini" style="color:var(--muted);margin:6px 0 12px">Typing goes straight to the graphic — there is no Save button, so nothing is lost mid-show. Every version you keep is a row, so the same design can also be mail-merged from a spreadsheet later.</p>
+      <div id="fillForm" style="overflow:auto;flex:1;min-height:60px"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap">
+        <button class="minibtn" id="fillAddVer" title="keep what is on screen and start another one — a second guest, a second sponsor">＋ Keep this and add another</button>
+        <span class="mini" id="fillMsg" style="color:var(--muted)"></span>
+        <span style="flex:1"></span>
+        <button class="btn go" id="fillDone">Done</button>
+      </div>
+    </div>
+  </div>
+
   <div id="rowsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
     <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(1140px,95vw);max-height:88vh;display:flex;flex-direction:column">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">

@@ -11,6 +11,7 @@
     return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action) }).catch(function () {});
   }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var escA = esc;   // esc() already escapes the double quote, so attribute values are safe with it
 
   // Minimal CSV parser — handles quoted fields, embedded commas, and "" escapes.
   function parseCSV(text) {
@@ -27,6 +28,180 @@
     if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
     return rows.filter(function (r) { return r.some(function (c) { return String(c).trim() !== ''; }); });
   }
+  /* ---- FILL IN ---------------------------------------------------------------------------
+   *
+   * A design can declare the handful of things that change between showings — a name, a title,
+   * a headshot, a team colour — and this turns that declaration into a form. The operator sees
+   * those boxes and nothing else.
+   *
+   * It writes into the preset's ROWS, which is the mechanism the CSV mail-merge has always used,
+   * so there is one substitution path rather than two. A form entry and a spreadsheet row are
+   * the same thing; "keep this and add another" is literally an extra row. That means a design
+   * filled in by hand today can be handed a 400-row spreadsheet tomorrow with nothing to change.
+   */
+  var fill = null;              // { id, name, fields, columns, rows, cur } while the form is open
+  var fillTimers = {};
+
+  function fillPost(a) { return post(a); }
+
+  // Same debounce as the row editor: typing must not fire a request per keystroke, and whatever
+  // is pending has to be flushed before the form is closed or re-read, or the last few letters
+  // typed are lost at exactly the moment they matter.
+  function fillSet(col, value) {
+    var k = col;
+    if (fillTimers[k]) clearTimeout(fillTimers[k].id);
+    var fire = function () {
+      delete fillTimers[k];
+      if (fill) fillPost({ type: 'show_setcell', id: fill.id, n: fill.cur, col: col, value: value });
+    };
+    fillTimers[k] = { id: setTimeout(fire, 220), fire: fire };
+    if (fill && fill.rows[fill.cur]) fill.rows[fill.cur][col] = value;
+  }
+  function flushFill() {
+    Object.keys(fillTimers).forEach(function (k) { var t = fillTimers[k]; if (t) { clearTimeout(t.id); t.fire(); } });
+  }
+
+  function fillLabel(i) {
+    var r = fill.rows[i] || {}, key = fill.fields.length ? fill.fields[0].key : (fill.columns[0] || '');
+    var v = String(r[key] == null ? '' : r[key]).trim();
+    return v || ('Version ' + (i + 1));
+  }
+
+  function renderFill() {
+    var box = $('fillForm'), row = fill.rows[fill.cur] || {};
+    // Media names, so an image field offers what has actually been uploaded instead of asking
+    // the operator to remember a filename.
+    var media = (window.__sgMedia || []).map(function (m) { return m.rel || m.name || ''; }).filter(Boolean);
+    box.innerHTML = '<datalist id="fillMedia">' + media.map(function (m) { return '<option value="' + escA(m) + '"></option>'; }).join('') + '</datalist>'
+      + fill.fields.map(function (f, i) {
+      var v = row[f.key] == null ? '' : String(row[f.key]);
+      var ctl;
+      if (f.type === 'multiline') {
+        ctl = '<textarea class="inp" data-f="' + escA(f.key) + '" rows="3" style="width:100%;resize:vertical">' + esc(v) + '</textarea>';
+      } else if (f.type === 'colour') {
+        // A colour box cannot be empty, so the hex is offered as text as well — that is the
+        // only way to clear it back to whatever the design itself says.
+        ctl = '<span style="display:flex;gap:8px;align-items:center">'
+            + '<input type="color" data-f="' + escA(f.key) + '" data-colour="1" value="' + escA(/^#[0-9a-f]{6}$/i.test(v) ? v : '#ffffff') + '" style="width:44px;height:34px;padding:2px">'
+            + '<input class="inp" data-fx="' + escA(f.key) + '" value="' + escA(v) + '" placeholder="#rrggbb — blank leaves the design’s own colour" style="flex:1">'
+            + '</span>';
+      } else if (f.type === 'image') {
+        ctl = '<input class="inp" data-f="' + escA(f.key) + '" list="fillMedia" value="' + escA(v) + '" placeholder="file name, e.g. headshot.jpg — upload images below" style="width:100%">';
+      } else {
+        ctl = '<input class="inp" data-f="' + escA(f.key) + '"' + (f.type === 'number' ? ' type="number"' : '') + ' value="' + escA(v) + '" style="width:100%">';
+      }
+      return '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">'
+        + '<label style="color:var(--muted);font-size:12px">' + esc(f.label || f.key)
+        + (f.hint ? ' <span style="color:var(--muted2)">— ' + esc(f.hint) + '</span>' : '') + '</label>'
+        + ctl + '</div>';
+    }).join('');
+
+    box.querySelectorAll('[data-f]').forEach(function (inp) {
+      var col = inp.getAttribute('data-f');
+      inp.oninput = function () {
+        fillSet(col, inp.value);
+        // The colour picker and its hex box are two views of one value; move them together or
+        // the operator reads a colour off one that the graphic is not using.
+        if (inp.dataset.colour) {
+          var tx = box.querySelector('[data-fx="' + CSS.escape(col) + '"]');
+          if (tx) tx.value = inp.value;
+        }
+      };
+    });
+    box.querySelectorAll('[data-fx]').forEach(function (inp) {
+      var col = inp.getAttribute('data-fx');
+      inp.oninput = function () {
+        fillSet(col, inp.value);
+        var sw = box.querySelector('[data-f="' + CSS.escape(col) + '"]');
+        if (sw && /^#[0-9a-f]{6}$/i.test(inp.value)) sw.value = inp.value;
+      };
+    });
+
+    var many = fill.rows.length > 1;
+    $('fillVersions').style.display = many ? 'flex' : 'none';
+    if (many) {
+      $('fillSel').innerHTML = fill.rows.map(function (r, i) {
+        return '<option value="' + i + '"' + (i === fill.cur ? ' selected' : '') + '>' + esc(fillLabel(i)) + '</option>';
+      }).join('');
+      $('fillCount').textContent = (fill.cur + 1) + ' / ' + fill.rows.length;
+    }
+    paintFillAir();
+  }
+
+  function paintFillAir() {
+    if (!fill) return;
+    var me = shows.filter(function (x) { return x.id === fill.id; })[0];
+    var on = !!(me && me.on);
+    var el = $('fillAir');
+    el.textContent = on ? 'ON AIR' : 'OFF AIR';
+    el.className = 'airstate' + (on ? ' live' : '');
+  }
+
+  /* Open the form. A design can declare a field the spreadsheet behind it has never heard of —
+   * someone added "Sponsor" to the design after the CSV was imported — so the columns are
+   * squared up FIRST. Without that, show_setcell silently refuses an unknown column and the
+   * operator types into a box that does nothing. */
+  function openFill(id, it) {
+    var fields = it.fields || [];
+    if (!fields.length) return;
+    $('fillMsg').textContent = '';
+    fetch('/show-rows?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (res) {
+      var cols = res.columns || [], rows = res.rows || [];
+      var missing = fields.filter(function (f) {
+        return !cols.some(function (c) { return String(c).toLowerCase() === String(f.key).toLowerCase(); });
+      });
+      var work = missing.map(function (f) { return fillPost({ type: 'show_addcol', id: id, col: f.key }); });
+      if (!rows.length) {
+        var seed = {}; fields.forEach(function (f) { seed[f.key] = f.default || ''; });
+        work.push(fillPost({ type: 'show_addrow', id: id, row: seed }));
+      }
+      var after = work.length
+        ? Promise.all(work).then(function () { return fetch('/show-rows?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }); })
+        : Promise.resolve(res);
+      return after;
+    }).then(function (res) {
+      fill = { id: id, name: it.name, fields: fields, columns: res.columns || [], rows: res.rows || [],
+               cur: Math.max(0, Math.min((res.rowIndex || 0), (res.rows || []).length - 1)) };
+      $('fillTitle').textContent = 'Fill in — ' + fill.name;
+      $('fillModal').style.display = 'flex';
+      renderFill();
+    }).catch(function () { alert('Could not reach the app.'); });
+  }
+
+  function closeFill() { flushFill(); fill = null; $('fillModal').style.display = 'none'; }
+
+  function fillGoto(n) {
+    if (!fill) return;
+    flushFill();
+    fill.cur = Math.max(0, Math.min(n, fill.rows.length - 1));
+    fillPost({ type: 'show_rowselect', id: fill.id, cmd: 'goto', n: fill.cur });
+    renderFill();
+  }
+
+  $('fillDone').onclick = closeFill;
+  $('fillModal').onclick = function (e) { if (e.target === $('fillModal')) closeFill(); };
+  $('fillOn').onclick = function () { if (fill) fillPost({ type: 'show_toggle', id: fill.id, on: true }); };
+  $('fillOff').onclick = function () { if (fill) fillPost({ type: 'show_toggle', id: fill.id, on: false }); };
+  $('fillPrev').onclick = function () { if (fill) fillGoto(fill.cur - 1); };
+  $('fillNext').onclick = function () { if (fill) fillGoto(fill.cur + 1); };
+  $('fillSel').onchange = function () { fillGoto(+this.value); };
+  $('fillAddVer').onclick = function () {
+    if (!fill) return;
+    flushFill();
+    // Copies what is on screen rather than starting blank: the next guest usually shares the
+    // event name, the sponsor and the colours, and only the person changes.
+    var seed = Object.assign({}, fill.rows[fill.cur] || {});
+    fillPost({ type: 'show_addrow', id: fill.id, row: seed }).then(function () {
+      return fetch('/show-rows?id=' + encodeURIComponent(fill.id)).then(function (r) { return r.json(); });
+    }).then(function (res) {
+      if (!fill) return;
+      fill.rows = res.rows || []; fill.columns = res.columns || [];
+      fill.cur = fill.rows.length - 1;
+      $('fillMsg').textContent = 'Added version ' + fill.rows.length + ' — edit it below.';
+      renderFill();
+    }).catch(function () {});
+  };
+
   function closeManual() { $('manualModal').style.display = 'none'; }
   function openManual(id, it) {
     function build(cols) {
@@ -271,6 +446,7 @@
         + '<div class="nm">' + esc(it.name) + (rowCount ? ' <span class="kind" style="color:#7c9cff">' + rowCount + ' rows</span>' : '') + '</div>'
         + '<button class="minibtn" data-act="up" title="move up in the list" style="width:26px">▲</button>'
         + '<button class="minibtn" data-act="down" title="move down in the list" style="width:26px">▼</button>'
+        + ((it.fields && it.fields.length) ? '<button class="minibtn" data-act="fill" title="fill in this design\'s own fields" style="border-color:#7c9cff;color:#cfe0f5;font-weight:700">✎ Fill in</button>' : '')
         + '<label class="minibtn" title="attach a CSV to mail-merge into this graphic">Import CSV<input type="file" accept=".csv,text/csv" data-act="csvfile" style="display:none"></label>'
         + '<button class="minibtn" data-act="manual" title="add one entry by hand (fill the fields)">Manual Add</button>'
         + '<button class="minibtn" data-act="load" title="open this preset in the Graphics Builder to edit its design">Edit Preset</button>'
@@ -328,6 +504,7 @@
       var pv = row.querySelector('[data-act="prev"]'); if (pv) pv.onclick = function () { post({ type: 'show_rowselect', id: id, cmd: 'prev' }); };
       var nx = row.querySelector('[data-act="next"]'); if (nx) nx.onclick = function () { post({ type: 'show_rowselect', id: id, cmd: 'next' }); };
       var rs = row.querySelector('[data-act="rowsel"]'); if (rs) rs.onchange = function () { post({ type: 'show_rowselect', id: id, cmd: 'goto', n: +rs.value }); };
+      var fi = row.querySelector('[data-act="fill"]'); if (fi) fi.onclick = function () { openFill(id, it); };
       row.querySelector('[data-act="manual"]').onclick = function () { openManual(id, it); };
       var an = row.querySelector('[data-act="anim"]'); if (an) an.onchange = function () { post({ type: 'show_rowmode', id: id, mode: an.checked ? 'reanimate' : 'cut' }); };
       var dl = row.querySelector('[data-act="delay"]'); if (dl) dl.onchange = function () { post({ type: 'show_rowdelay', id: id, ms: +dl.value }); };
@@ -387,6 +564,7 @@
   function refreshMediaList() {
     fetch('/media-list').then(function (r) { return r.json(); }).then(function (res) {
       var files = (res && res.files) || [], folders = (res && res.folders) || [];
+      window.__sgMedia = files.map(function (p) { return { rel: p }; });   // offered to image fields on the fill-in form
       // keep the upload-target dropdown in sync (preserve selection)
       var sel = $('mediaFolder'), cur = sel.value;
       sel.innerHTML = '<option value="">(top level)</option>' + folders.map(function (f) { return '<option value="' + esc(f) + '">' + esc(f) + '</option>'; }).join('');
@@ -452,6 +630,22 @@
         // Companion module or a phone, and row numbers must match the server or edits land on
         // the wrong entry. Structural edits of our own get a grace window so our in-flight
         // POST doesn't look like somebody else's change.
+        // The fill-in form shows an ON AIR badge and a version picker; both can be moved from a
+        // Stream Deck or another browser, so they follow the server rather than this page.
+        if (fill) {
+          var fme = shows.filter(function (x) { return x.id === fill.id; })[0];
+          if (!fme) closeFill();
+          else {
+            paintFillAir();
+            var fi2 = fme.rowIndex || 0;
+            if (fi2 !== fill.cur && !Object.keys(fillTimers).length) {
+              fill.cur = fi2;
+              fetch('/show-rows?id=' + encodeURIComponent(fill.id)).then(function (r) { return r.json(); })
+                .then(function (res) { if (fill) { fill.rows = res.rows || []; fill.columns = res.columns || []; renderFill(); } })
+                .catch(function () {});
+            }
+          }
+        }
         if (rowsEdit) {
           var me = shows.filter(function (x) { return x.id === rowsEdit.id; })[0];
           if (me) {

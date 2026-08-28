@@ -233,6 +233,7 @@ function defaultState() {
       w: 1920, h: 1080,
       vcmd: { id: '', cmd: '', seq: 0 },   // transient video playback command (play/pause/restart)
       editingShowId: '',                   // which library preset (if any) the builder is currently editing
+      fields: [],                          // what this design asks to be filled in — see sanitizeFields()
       layers: defaultLowerThirdLayers()
     },
 
@@ -456,6 +457,58 @@ process.on('exit', flushWrites);
 function saveLibrary() { writeJson(LIB_FILE, function () { return { teams: state.library.teams }; }); }
 state.library = { teams: loadLibrary() };
 
+/* ---- DECLARED FIELDS ------------------------------------------------------------------
+ * A design can declare the handful of things that change between one showing of it and the
+ * next: a name, a title, a headshot, a team colour. Each declared field is
+ *
+ *     { key, label, type, default, hint }
+ *
+ * and `key` deliberately shares one namespace with spreadsheet column names, because a layer
+ * has always pointed at its content with `l.field` and that is matched against CSV columns
+ * case-insensitively. Declaring fields therefore adds NO new substitution path: the same
+ * design can be filled in by hand on a form, or by a 400-row spreadsheet, or both, and the
+ * output does not know or care which happened. Anything else would have meant a second
+ * mail-merge implementation, and the two would have drifted apart within a month.
+ *
+ * The declaration is what makes a template portable. Without it the only clue about what a
+ * design expects is a column name typed into a layer somewhere, invisible to whoever has to
+ * fill the thing in — which is precisely the job this is meant to remove.
+ */
+const FIELD_TYPES = ['text', 'multiline', 'image', 'colour', 'number'];
+const FIELD_LIMIT = 40;
+function sanitizeFields(arr) {
+  if (!Array.isArray(arr)) return [];
+  const seen = Object.create(null);
+  const out = [];
+  arr.forEach(f => {
+    if (!f || typeof f !== 'object') return;
+    const key = String(f.key == null ? '' : f.key).trim().slice(0, 80);
+    if (!key) return;
+    // Keys are matched case-insensitively downstream, so two that differ only in case would
+    // be the same field wearing two labels — and the second would silently win.
+    const lc = key.toLowerCase();
+    if (seen[lc]) return;
+    seen[lc] = 1;
+    const type = FIELD_TYPES.indexOf(String(f.type || '')) >= 0 ? String(f.type) : 'text';
+    out.push({
+      key,
+      label: String(f.label == null || f.label === '' ? key : f.label).slice(0, 120),
+      type,
+      default: String(f.default == null ? '' : f.default).slice(0, 600),
+      hint: String(f.hint == null ? '' : f.hint).slice(0, 200)
+    });
+  });
+  return out.slice(0, FIELD_LIMIT);
+}
+// The row a form starts from: every declared field at its default. Used when a design that
+// declares fields is saved to the Library with no spreadsheet behind it yet — without this the
+// operator opens the fill-in form and is asked to invent the column names themselves.
+function defaultsRow(fields) {
+  const r = {};
+  (fields || []).forEach(f => { r[f.key] = f.default || ''; });
+  return r;
+}
+
 // Persist the lower-third design so a saved layout survives a restart.
 const LT_FILE = path.join(DATA_DIR, 'lowerthird.json');
 (function () {
@@ -463,10 +516,15 @@ const LT_FILE = path.join(DATA_DIR, 'lowerthird.json');
     if (fs.existsSync(LT_FILE)) {
       const j = JSON.parse(fs.readFileSync(LT_FILE, 'utf8'));
       if (j && Array.isArray(j.layers)) state.lowerthird.layers = j.layers;
+      if (j && Array.isArray(j.fields)) state.lowerthird.fields = sanitizeFields(j.fields);
     }
   } catch (e) {}
 })();
-function saveLowerThird() { writeJson(LT_FILE, function () { return { layers: state.lowerthird.layers }; }); }
+function saveLowerThird() {
+  writeJson(LT_FILE, function () {
+    return { layers: state.lowerthird.layers, fields: state.lowerthird.fields || [] };
+  });
+}
 
 // The TELEPROMPTER script + look. The live scroll position is deliberately NOT saved — a
 // restart should hand you the script back at the top, not halfway down last night's read.
@@ -575,7 +633,9 @@ function builtinTemplates() {
   return [
     { id: 'bt_lower3', name: 'Lower Third — Clean', kind: 'lowerthird', builtin: true, layers: [
       Object.assign({ id: 'bg', type: 'box', x: 150, y: 915, w: 620, h: 96, z: 1, fill: '#0b1f3a', opacity: 92, radius: 12 }, an('slide-up', 'slide-up')),
-      Object.assign({ id: 'ac', type: 'box', x: 150, y: 915, w: 8, h: 96, z: 2, fill: '#e7b53c', opacity: 100, radius: 12 }, { inAnim: 'slide-up', inDelay: 80, inDur: 500, outAnim: 'fade', outDelay: 60, outDur: 300 }),
+      // fieldColor makes the accent a FILLED-IN thing rather than a design decision — swap a team
+      // colour without opening the builder. It is the one built-in that shows a colour field off.
+      Object.assign({ id: 'ac', type: 'box', x: 150, y: 915, w: 8, h: 96, z: 2, fill: '#e7b53c', fieldColor: 'Accent', opacity: 100, radius: 12 }, { inAnim: 'slide-up', inDelay: 80, inDur: 500, outAnim: 'fade', outDelay: 60, outDur: 300 }),
       Object.assign({ id: 'nm', type: 'text', x: 182, y: 928, w: 560, h: 42, z: 3, text: 'First Last', field: 'Name', font: "'Segoe UI', Arial, sans-serif", size: 34, bold: true, color: '#ffffff', align: 'left' }, { inAnim: 'slide-left', inDelay: 220, inDur: 480, outAnim: 'fade', outDelay: 0, outDur: 250 }),
       Object.assign({ id: 'tt', type: 'text', x: 182, y: 972, w: 560, h: 28, z: 4, text: 'TITLE / ROLE', field: 'Title', font: "'Segoe UI', Arial, sans-serif", size: 17, color: '#e7b53c', align: 'left' }, { inAnim: 'slide-left', inDelay: 300, inDur: 480, outAnim: 'fade', outDelay: 0, outDur: 250 })
     ] },
@@ -644,11 +704,55 @@ function builtinTemplates() {
     ] }
   ];
 }
+/* Work out what a design asks to be filled in, by reading the design itself.
+ *
+ * A layer has always pointed at its content with `l.field`, and a colour can now do the same
+ * with `l.fieldColor`. Everything needed for a declaration is therefore already in the layers —
+ * the name, what sort of thing it is, and a sensible default in the placeholder the designer
+ * typed. So this is the ONE implementation: the built-in templates get their field lists from
+ * it, and the builder's "Find the fields" button runs it on the server too rather than carrying
+ * a second copy that would drift.
+ *
+ * It is a starting point, not a verdict: the list it produces is editable before anyone saves it.
+ */
+function autoFields(layers) {
+  const out = [], seen = Object.create(null);
+  function add(key, type, def) {
+    const k = String(key || '').trim(); if (!k) return;
+    const lc = k.toLowerCase(); if (seen[lc]) return;
+    seen[lc] = 1;
+    out.push({ key: k, label: k, type, default: def == null ? '' : String(def), hint: '' });
+  }
+  const list = Array.isArray(layers) ? layers : [];
+  // Content first, colours after. Two passes rather than one, because a form that opens with
+  // "Accent colour" above "Name" reads as if the colour is the point of the graphic — and the
+  // layer that carries the accent is usually drawn before the layer that carries the name.
+  list.forEach(l => {
+    if (!l || typeof l !== 'object' || !l.field) return;
+    const t = l.type === 'image' ? 'image'
+            : l.type === 'bullets' ? 'multiline'
+            : 'text';
+    // The placeholder the designer typed IS the best default there is — it is what they chose
+    // to look at while they were positioning it.
+    add(l.field, t, l.type === 'image' ? (l.src || '') : (l.text || ''));
+  });
+  list.forEach(l => {
+    if (!l || typeof l !== 'object' || !l.fieldColor) return;
+    add(l.fieldColor, 'colour', (l.type === 'box' || l.type === 'ticker') ? l.fill : l.color);
+  });
+  return sanitizeFields(out);
+}
+
 (function () {
   try { if (fs.existsSync(TPL_FILE)) { const j = JSON.parse(fs.readFileSync(TPL_FILE, 'utf8')); if (j && Array.isArray(j.items)) state.userTemplates = j.items; if (j && Array.isArray(j.packs)) state.packs = j.packs; } } catch (e) {}
 })();
 function saveTemplates() { writeJson(TPL_FILE, function () { return { items: state.userTemplates, packs: state.packs || [] }; }); }
-function allTemplates() { return builtinTemplates().concat(state.userTemplates || []); }
+// Built-ins declare their fields too — derived from their own layers, so the two can never
+// disagree and a new built-in cannot be added without one.
+function allTemplates() {
+  const built = builtinTemplates().map(t => Object.assign({}, t, { fields: autoFields(t.layers) }));
+  return built.concat(state.userTemplates || []);
+}
 
 /* TEMPLATE PACKS — a named, shippable bundle of templates. A pack is just a JSON file, so it
  * can be sold, emailed or dropped in a shared folder. Installing one tags each of its templates
@@ -827,10 +931,14 @@ function wireState() {
       return { id: l.id, name: l.name || '', type: l.type, index: (l.index == null ? -1 : l.index),
                count: stepCount(it, l) };
     });
-    if (it.on) return Object.assign({}, it, { reveals: reveals }); // ON: in full (payload + rows) for the Program output
+    /* The declared FIELD LIST travels for every preset, on or off. It is at most forty short
+       objects, and without it the Library cannot tell which presets can be filled in on a form
+       without fetching every payload it has just deliberately left behind. */
+    const fields = sanitizeFields(it.payload && it.payload.fields);
+    if (it.on) return Object.assign({}, it, { reveals: reveals, fields: fields }); // ON: in full (payload + rows) for the Program output
     // OFF: metadata only + light row info (labels for the picker), but not the heavy payload/rows.
     return {
-      reveals: reveals,
+      reveals: reveals, fields: fields,
       id: it.id, name: it.name, kind: it.kind, on: it.on,
       columns: it.columns || [], rowKey: it.rowKey || '', rowIndex: it.rowIndex || 0, rowTransition: it.rowTransition || 'cut', rowDelay: it.rowDelay == null ? 1000 : it.rowDelay,
       rowCount: it.rows ? it.rows.length : 0,
@@ -1180,11 +1288,23 @@ function applyAction(action) {
       if (Array.isArray(action.layers)) {
         state.lowerthird.layers = action.layers.slice(0, 100);
         if (action.editingShowId !== undefined) state.lowerthird.editingShowId = String(action.editingShowId || '');
+        // Starting a blank design sends fields:[] with it. Without that, a new design silently
+        // inherits the last one's field list and asks the operator for a headshot it never uses.
+        if (action.fields !== undefined) state.lowerthird.fields = sanitizeFields(action.fields);
         saveLowerThird();
       }
       break;
+    case 'lt_fields':   // the design in the builder declares (or stops declaring) what it needs filling in
+      state.lowerthird.fields = sanitizeFields(action.fields);
+      saveLowerThird();
+      break;
+    case 'lt_fields_detect':   // read the design and propose the field list — one implementation, see autoFields()
+      state.lowerthird.fields = autoFields(state.lowerthird.layers);
+      saveLowerThird();
+      break;
     case 'lt_reset':
       state.lowerthird.layers = defaultLowerThirdLayers();
+      state.lowerthird.fields = [];
       saveLowerThird();
       break;
     case 'lt_vcmd': // video play/pause/restart command to a specific video layer
@@ -1240,13 +1360,25 @@ function applyAction(action) {
       const name = String(action.name || 'Untitled').slice(0, 120);
       const kind = String(action.kind || 'lowerthird');
       const payload = action.payload && typeof action.payload === 'object' ? action.payload : {};
+      payload.fields = sanitizeFields(payload.fields);
       const existing = action.id ? state.shows.find(x => x.id === action.id) : null;
-      let savedId;
-      if (existing) { existing.name = name; existing.kind = kind; existing.payload = payload; savedId = existing.id; }
+      let savedId, saved;
+      if (existing) { existing.name = name; existing.kind = kind; existing.payload = payload; savedId = existing.id; saved = existing; }
       else {
         if (state.shows.length >= 300) break;
         savedId = 'S' + Date.now().toString(36) + (state.shows.length);
-        state.shows.push({ id: savedId, name, kind, payload, on: false });
+        saved = { id: savedId, name, kind, payload, on: false };
+        state.shows.push(saved);
+      }
+      /* A design that declares fields and has no spreadsheet behind it gets one row of its own
+       * defaults, and columns named after the fields. Otherwise the operator opens the fill-in
+       * form on a preset with no rows and there is nothing to type into — the form would have
+       * to invent the column names, and the first typo would create a column the design is not
+       * looking at. Only ever done when there is no data to disturb. */
+      if (payload.fields.length && !(saved.rows && saved.rows.length)) {
+        saved.columns = payload.fields.map(f => f.key);
+        saved.rows = [defaultsRow(payload.fields)];
+        saved.rowIndex = 0;
       }
       // Link the builder to the preset it just saved, so its next "Save" updates the same one.
       if (kind === 'lowerthird') state.lowerthird.editingShowId = savedId;
@@ -1257,6 +1389,7 @@ function applyAction(action) {
       const it = state.shows.find(x => x.id === action.id);
       if (it && it.payload && Array.isArray(it.payload.layers)) {
         state.lowerthird.layers = JSON.parse(JSON.stringify(it.payload.layers));
+        state.lowerthird.fields = sanitizeFields(it.payload.fields);
         state.lowerthird.editingShowId = it.id;
         saveLowerThird();
       }
@@ -1314,8 +1447,9 @@ function applyAction(action) {
       const name = String(action.name || 'Template').slice(0, 120);
       const kind = String(action.kind || 'lowerthird');
       const layers = Array.isArray(action.layers) ? action.layers.slice(0, 100) : [];
+      const fields = sanitizeFields(action.fields);
       if (!state.userTemplates) state.userTemplates = [];
-      if (state.userTemplates.length < 500) state.userTemplates.push({ id: 'ut_' + Date.now().toString(36) + state.userTemplates.length, name, kind, layers });
+      if (state.userTemplates.length < 500) state.userTemplates.push({ id: 'ut_' + Date.now().toString(36) + state.userTemplates.length, name, kind, layers, fields });
       saveTemplates(); break;
     }
     case 'tpl_delete': state.userTemplates = (state.userTemplates || []).filter(x => x.id !== action.id); saveTemplates(); break;
@@ -1332,7 +1466,14 @@ function applyAction(action) {
     }
     case 'tpl_load': { // load a template's design into the Graphics Builder
       const t = allTemplates().find(x => x.id === action.id);
-      if (t && Array.isArray(t.layers)) { state.lowerthird.layers = JSON.parse(JSON.stringify(t.layers)); state.lowerthird.editingShowId = ''; saveLowerThird(); }
+      if (t && Array.isArray(t.layers)) {
+        state.lowerthird.layers = JSON.parse(JSON.stringify(t.layers));
+        // A template's field list travels WITH it. That is what makes a pack usable by someone
+        // who has never seen the design: the form it wants comes out of the file.
+        state.lowerthird.fields = sanitizeFields(t.fields);
+        state.lowerthird.editingShowId = '';
+        saveLowerThird();
+      }
       break;
     }
 
@@ -2431,7 +2572,8 @@ const server = http.createServer((req, res) => {
       packs: state.packs || [],
       templates: allTemplates().map(t => ({
         id: t.id, name: t.name, kind: t.kind, builtin: !!t.builtin,
-        pack: t.pack || '', desc: t.desc || '', layers: t.layers || []
+        pack: t.pack || '', desc: t.desc || '', layers: t.layers || [],
+        fields: sanitizeFields(t.fields)
       }))
     }));
     return;
@@ -2458,7 +2600,8 @@ const server = http.createServer((req, res) => {
               version: String(j.version || '1.0').slice(0, 20),
               description: String(j.description || '').slice(0, 600)
             },
-            templates: picked.map(t => inlineMedia({ name: t.name, kind: t.kind || 'lowerthird', desc: t.desc || '', layers: t.layers || [] }))
+            // fields travel with the design — a pack without them is a picture nobody can fill in
+            templates: picked.map(t => inlineMedia({ name: t.name, kind: t.kind || 'lowerthird', desc: t.desc || '', layers: t.layers || [], fields: sanitizeFields(t.fields) }))
           };
         }
       } catch (e) { out = null; }
@@ -2492,6 +2635,7 @@ const server = http.createServer((req, res) => {
               kind: String(raw.kind || 'lowerthird'),
               desc: String(raw.desc || '').slice(0, 400),
               layers: raw.layers.slice(0, 100),
+              fields: sanitizeFields(raw.fields),
               pack: pid
             });
             added++;

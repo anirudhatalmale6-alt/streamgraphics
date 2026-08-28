@@ -7,6 +7,7 @@
   var SCALE = 0.375;                 // 1920x1080 stage shown inside a fluid 16:9 canvas — recomputed by fitStage()
   var layers = [], selId = null, selIds = [], loaded = false, seq = 0, editing = false;
   var showsMeta = [], editingShowId = '', templates = [];   // Show-Library metadata, editing link, Templates list
+  var fields = [];                   // what this design declares it needs filled in — see the Fields panel
   var cstage = $('cstage');
 
   // The canvas resizes with the window (so the side panel never gets pushed off the edge).
@@ -415,11 +416,14 @@
       // soft-edge and shadow controls a box does - one implementation, one set of controls.
       show('.only-surface', l.type === 'box' || l.type === 'ticker');
       show('.fieldrow', l.type === 'text' || l.type === 'image' || l.type === 'bullets' || l.type === 'qr');   // CSV field: text, image, a whole bullet list, or a per-row QR
+      // Anything that HAS a colour can take it from a field. An image and a video do not have one.
+      show('.colourfieldrow', l.type !== 'image' && l.type !== 'video');
     }
     if (l.type === 'text') { $('pText').value = l.text || ''; $('pFont').value = l.font || "'Segoe UI', Arial, sans-serif"; $('pSize').value = l.size || 34; $('pBold').checked = !!l.bold; $('pItalic').checked = !!l.italic; $('pShadow').checked = (l.shadow !== false); $('pColor').value = l.color || '#ffffff'; $('pAlign').value = l.align || 'left'; }
     if (l.type === 'box') { $('pFill').value = l.fill || '#0b1f3a'; $('pOpacity').value = l.opacity == null ? 95 : l.opacity; $('pRadius').value = l.radius || 0; $('pRadiusV').textContent = l.radius || 0; }
     if (l.type === 'image') { $('pSrc').value = l.src || ''; $('pShape').value = l.shape || 'none'; $('pFit').value = l.fit || 'contain'; $('pImgShadow').checked = !!l.shadow; }
     if (l.type === 'text' || l.type === 'image' || l.type === 'bullets' || l.type === 'qr') { $('pField').value = l.field || ''; }
+    if (l.type !== 'image' && l.type !== 'video') { $('pFieldColor').value = l.fieldColor || ''; }
     if (l.type === 'box' || l.type === 'ticker') {
       $('pFillMode').value = l.fillMode || 'solid';
       $('pFill2').value = l.fill2 || '#12b886';
@@ -513,6 +517,7 @@
   $('pRadius').oninput = function () { $('pRadiusV').textContent = $('pRadius').value; mutate(function (l) { l.radius = +$('pRadius').value; }); };
   $('pSrc').oninput = function () { mutate(function (l) { l.src = $('pSrc').value; }); };
   $('pField').oninput = function () { mutate(function (l) { var v = $('pField').value.trim(); if (v) l.field = v; else delete l.field; }); };
+  $('pFieldColor').oninput = function () { mutate(function (l) { var v = $('pFieldColor').value.trim(); if (v) l.fieldColor = v; else delete l.fieldColor; }); };
 
   /* ---- surface controls: gradient, soft edges, drop shadow (boxes and tickers) ---- */
   // Only show the sub-controls that are doing anything, so the panel doesn't grow a row of
@@ -866,7 +871,7 @@
   $('tplModal').onclick = function (e) { if (e.target === $('tplModal')) closeTpl(); };
   $('tplSaveCur').onclick = function () {
     var name = prompt('Save the current design as a template named:', 'My Template'); if (name == null) return;
-    tplAct({ type: 'tpl_save', name: name.trim() || 'My Template', kind: 'lowerthird', layers: layers });
+    tplAct({ type: 'tpl_save', name: name.trim() || 'My Template', kind: 'lowerthird', layers: layers, fields: fields });
     var b = $('tplSaveCur'), o = b.textContent; b.textContent = 'Saved ✓'; setTimeout(function () { b.textContent = o; }, 1400);
     setTimeout(function () { tplFetch(renderTemplates); }, 250);
   };
@@ -955,13 +960,13 @@
       name = prompt('Save this design to the Show Library as:', suggested || 'Untitled graphic');
       if (name == null) return; name = name.trim() || 'Untitled graphic';
     }
-    var act = { type: 'show_save', name: name, kind: 'lowerthird', payload: { layers: layers } };
+    var act = { type: 'show_save', name: name, kind: 'lowerthird', payload: { layers: layers, fields: fields } };
     if (updateId) act.id = updateId;
     fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(act) })
       .then(function () {
         var b = $('saveToLib'), old = b.textContent; b.textContent = updateId ? 'Updated ✓' : 'Saved ✓'; setTimeout(function () { b.textContent = old; }, 1500);
         if (!updateId && confirm('Saved "' + name + '" to the Show Library.\n\nStart a new blank design so you can build the next one?')) {
-          fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '' }) });
+          fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '', fields: [] }) });
         }
       }).catch(function () { alert('Save failed — is the server running?'); });
   }
@@ -1462,7 +1467,7 @@
   $('btnOnAir').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_show' }) }); };
   $('btnOffAir').onclick = function () { fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_hide' }) }); };
   $('saveToLib').onclick = saveToLibrary;
-  $('newDesign').onclick = function () { if (confirm('Start a new blank design? (Save to Library first if you want to keep the current one.)')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '' }) }); };
+  $('newDesign').onclick = function () { if (confirm('Start a new blank design? (Save to Library first if you want to keep the current one.)')) fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'lt_layers', layers: [], editingShowId: '', fields: [] }) }); };
   function sendChroma() {
     var v = $('chromaSel').value;
     $('chromaColor').style.display = (v === 'custom') ? '' : 'none';
@@ -1482,6 +1487,13 @@
         var m = JSON.parse(e.data);
         if (m.serverTime) { var meas = m.serverTime - Date.now(); clockOffset = clockOffset === 0 ? meas : Math.round(clockOffset * 0.7 + meas * 0.3); }
         if (m.state) { showsMeta = m.state.shows || []; templates = m.state.templates || []; if (m.state.lowerthird) editingShowId = m.state.lowerthird.editingShowId || '';  }
+        /* The field list is server state like everything else, so loading a template or a preset
+           repaints this panel without the builder needing to know it happened. Skipped while a box
+           in the panel has focus, or a repaint eats the letter being typed into it. */
+        if (m.state && m.state.lowerthird && !fieldsFocused()) {
+          var nf = m.state.lowerthird.fields || [];
+          if (JSON.stringify(nf) !== JSON.stringify(fields)) { fields = nf; renderFields(); }
+        }
         if (!m.state || !m.state.lowerthird) return; var lt = m.state.lowerthird;
         var _live = !!lt.visible; $('btnOnAir').classList.toggle('live', _live); $('btnOffAir').classList.toggle('standby', !_live);
         if (document.activeElement !== $('chromaSel') && document.activeElement !== $('chromaColor')) {
@@ -1521,6 +1533,115 @@
   })();
   // The address another computer can reach, not localhost — see sg-links.js.
   SGLinks.onbase(function () { $('outUrl').textContent = SGLinks.url('/lowerthird-output'); });
+
+  /* ---- FIELDS: what this design asks to be filled in -------------------------------------
+   *
+   * A field is { key, label, type, default, hint }. `key` is what a layer's "Fills from field"
+   * box names, and it lives in the SAME namespace as spreadsheet column names — which is the
+   * whole trick. Declaring fields adds no new substitution path: the output has always filled a
+   * layer from a named column, so a design can be filled in on a form, or mail-merged from a
+   * 400-row CSV, or both, and nothing downstream has to know which happened.
+   *
+   * The list is server state (so a template carries its own form with it), and the panel is a
+   * plain editor over it. Every edit posts the WHOLE list rather than a delta: it is at most
+   * forty short objects, and a delta protocol here would buy nothing but ways to be wrong.
+   */
+  var FIELD_TYPES = [
+    ['text', 'Text'],
+    ['multiline', 'Text (several lines)'],
+    ['image', 'Image'],
+    ['colour', 'Colour'],
+    ['number', 'Number']
+  ];
+
+  /* esc() in this file does not escape a double quote, and every value below goes into an
+     attribute. A label with a " in it would end the attribute early and swallow the rest of
+     the row. */
+  function escA(s) { return esc(s).replace(/"/g, '&quot;'); }
+
+  function fieldsFocused() {
+    var p = $('fldList'), a = document.activeElement;
+    return !!(p && a && p.contains(a));
+  }
+  function sendFields() {
+    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({ type: 'lt_fields', fields: fields }) });
+    paintFieldKeys();
+  }
+  // The datalist behind both "fills from" boxes. Suggestions only — an undeclared spreadsheet
+  // column must still be typeable or attaching an existing CSV would break.
+  function paintFieldKeys() {
+    var dl = $('fieldKeys'); if (!dl) return;
+    dl.innerHTML = fields.map(function (f) {
+      return '<option value="' + escA(f.key) + '">' + escA(f.label && f.label !== f.key ? f.label : '') + '</option>';
+    }).join('');
+  }
+
+  function renderFields() {
+    var box = $('fldList'); if (!box) return;
+    $('fldEmpty').style.display = fields.length ? 'none' : '';
+    $('fldHead').style.display = fields.length ? 'flex' : 'none';   // column labels are noise with no rows under them
+    box.innerHTML = fields.map(function (f, i) {
+      return '<div class="fldrow" data-i="' + i + '">'
+        + '<input class="fk" data-k="key" value="' + escA(f.key) + '" placeholder="Name" title="the name a layer points at, and the spreadsheet column name">'
+        + '<input class="fl" data-k="label" value="' + escA(f.label || '') + '" placeholder="Label on the form">'
+        + '<select class="ft" data-k="type">' + FIELD_TYPES.map(function (t) {
+            return '<option value="' + t[0] + '"' + (f.type === t[0] ? ' selected' : '') + '>' + t[1] + '</option>';
+          }).join('') + '</select>'
+        + '<input class="fd" data-k="default" value="' + escA(f.default || '') + '" placeholder="Default value (optional)">'
+        + '<span class="fops">'
+        + '<button data-mv="-1" title="move up"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
+        + '<button data-mv="1" title="move down"' + (i === fields.length - 1 ? ' disabled' : '') + '>↓</button>'
+        + '<button class="del" data-del="1" title="remove this field">✕</button>'
+        + '</span></div>';
+    }).join('');
+
+    box.querySelectorAll('.fldrow').forEach(function (row) {
+      var i = +row.dataset.i;
+      row.querySelectorAll('[data-k]').forEach(function (inp) {
+        inp.oninput = function () { fields[i][inp.dataset.k] = inp.value; sendFields(); };
+      });
+      row.querySelectorAll('[data-mv]').forEach(function (b) {
+        b.onclick = function () {
+          var j = i + (+b.dataset.mv); if (j < 0 || j >= fields.length) return;
+          var t = fields[i]; fields[i] = fields[j]; fields[j] = t;
+          renderFields(); sendFields();
+        };
+      });
+      row.querySelector('[data-del]').onclick = function () {
+        // Deleting the declaration does NOT unpick the layers that point at it — the design
+        // still works, it just stops asking for that one on the form. Saying so beats a
+        // confirm box nobody reads.
+        fields.splice(i, 1); renderFields(); sendFields();
+      };
+    });
+    paintFieldKeys();
+  }
+
+  $('fldAdd').onclick = function () {
+    // Named Field2, Field3… rather than all "Field": two fields with the same key are one field
+    // as far as every consumer is concerned, and the second would quietly never be filled.
+    var n = 1, used = {}; fields.forEach(function (f) { used[String(f.key).toLowerCase()] = 1; });
+    while (used['field' + n]) n++;
+    fields.push({ key: 'Field' + n, label: 'Field ' + n, type: 'text', default: '', hint: '' });
+    renderFields(); sendFields();
+    var rows = $('fldList').querySelectorAll('.fldrow');
+    if (rows.length) rows[rows.length - 1].querySelector('.fk').select();
+  };
+
+  $('fldDetect').onclick = function () {
+    // Computed on the SERVER, from the same function the built-in templates use, so there is
+    // one definition of "what fields does this design have" rather than two that drift.
+    fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({ type: 'lt_fields_detect' }) })
+      .then(function () {
+        var b = $('fldDetect'), o = b.textContent;
+        b.textContent = 'Read the design ✓';
+        setTimeout(function () { b.textContent = o; }, 1500);
+      });
+  };
+
+  renderFields();
 
   /* ---- key + fill panel ----
    * Two more views of the SAME graphic for a hardware switcher (see sg-key.js). The URLs are
