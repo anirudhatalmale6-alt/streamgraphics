@@ -1,0 +1,75 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; background: transparent !important; overflow: hidden;
+  font-family: Arial, 'Helvetica Neue', sans-serif; }
+body.chroma { background: var(--chroma) !important; }
+
+#stage { position: fixed; inset: 0; padding: 40px; }
+
+.gm { position: absolute; will-change: transform, opacity; }
+.gm .anim { transition: transform .5s cubic-bezier(.16,1,.3,1), opacity .45s ease; }
+.gm[data-anim] .anim { opacity: 1; transform: none; }
+.gm.is-out[data-anim="slide-up"] .anim { opacity: 0; transform: translateY(46px); }
+.gm.is-out[data-anim="fade"] .anim    { opacity: 0; }
+.gm.is-out[data-anim="scale"] .anim   { opacity: 0; transform: scale(.9); }
+.gm.is-hidden { display: none; }
+
+/* positions — identical to the other boards on purpose. An operator who has learned where
+   "bottom-left" puts the volleyball board should not have to learn it again per sport.
+   The nudge (--nx/--ny) goes on the EDGE OFFSETS, never a transform: the centred positions
+   already spend theirs on translate(-50%) and the show/hide animation spends another on .anim. */
+.pos-top-left{top:calc(40px + var(--ny,0px));left:calc(40px + var(--nx,0px))}.pos-top-center{top:calc(40px + var(--ny,0px));left:calc(50% + var(--nx,0px));transform:translateX(-50%)}.pos-top-right{top:calc(40px + var(--ny,0px));right:calc(40px - var(--nx,0px))}
+.pos-mid-left{top:calc(50% + var(--ny,0px));left:calc(40px + var(--nx,0px));transform:translateY(-50%)}.pos-mid-center{top:calc(50% + var(--ny,0px));left:calc(50% + var(--nx,0px));transform:translate(-50%,-50%)}.pos-mid-right{top:calc(50% + var(--ny,0px));right:calc(40px - var(--nx,0px));transform:translateY(-50%)}
+.pos-bottom-left{bottom:calc(40px - var(--ny,0px));left:calc(40px + var(--nx,0px))}.pos-bottom-center{bottom:calc(40px - var(--ny,0px));left:calc(50% + var(--nx,0px));transform:translateX(-50%)}.pos-bottom-right{bottom:calc(40px - var(--ny,0px));right:calc(40px - var(--nx,0px))}
+
+/* ---- the bug ---- */
+.bug { display: flex; align-items: stretch; background: #12161d; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 14px 40px rgba(0,0,0,.5); color: #fff; }
+
+.teams { display: flex; flex-direction: column; min-width: 330px; }
+.trow { display: flex; align-items: center; height: 46px; }
+.trow + .trow { border-top: 1px solid rgba(255,255,255,.10); }
+.trow .bar { width: 7px; align-self: stretch; flex: none; }
+.trow .lg { width: 30px; height: 30px; object-fit: contain; margin: 0 8px 0 10px; flex: none; }
+.trow .ab { width: 32px; text-align: center; font-weight: 900; font-size: 16px; letter-spacing: -.5px; flex: none; }
+.trow .nm { flex: 1; font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; }
+.trow .sc { width: 62px; text-align: center; font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums;
+  background: rgba(255,255,255,.06); align-self: stretch; display: flex; align-items: center; justify-content: center; }
+
+/* Possession: a wedge in the team's own row rather than a separate readout. On air it has to be
+   answerable at a glance, and a label saying "POSS: AWY" is not a glance. */
+.trow .poss { width: 14px; flex: none; text-align: center; font-size: 13px; line-height: 1; color: transparent; }
+.trow.has .poss { color: var(--accent, #f4a63c); }
+
+/* Timeouts left, as pips. Football and basketball both count them down, and both put them
+   next to the team rather than in the middle of the board. */
+.tos { display: flex; gap: 3px; align-items: center; padding-right: 8px; flex: none; }
+.tos i { width: 14px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); display: inline-block; }
+.tos i.on { background: var(--accent, #f4a63c); }
+
+/* Basketball fouls + the bonus. The bonus is worked out from the foul count, not stored:
+   two sources for one fact is how a board ends up saying BONUS with three fouls on it. */
+/* The count and its label are <span>s, so they need to be told to stack — inline they render
+   as "3FOULS" jammed together, which is unreadable at broadcast size. */
+.fl { width: 46px; flex: none; text-align: center; font-variant-numeric: tabular-nums; }
+.fl .n { display: block; font-size: 16px; font-weight: 900; line-height: 1.05 }
+.fl .l { display: block; font-size: 8px; letter-spacing: .1em; color: #9aa6b5; font-weight: 800 }
+.trow.bonus .fl .n { color: #ff5470 }
+
+/* situation panel */
+.sit { display: flex; align-items: center; gap: 18px; padding: 0 18px; border-left: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.03); }
+.blk { text-align: center; min-width: 44px }
+.blk .num { font-size: 30px; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums }
+.blk .lbl { font-size: 9px; letter-spacing: .12em; color: #9aa6b5; font-weight: 800 }
+.blk.small .num { font-size: 22px }
+.blk.wide { min-width: 96px }
+
+/* The clock is the thing people look at, so it is the biggest thing on the board. It also
+   stops blinking the moment it is stopped — a frozen clock that still pulses reads as running. */
+.clk .num { font-size: 38px; letter-spacing: -1px }
+.clk.stopped .num { color: #9aa6b5 }
+.shot .num { color: var(--accent, #f4a63c) }
+.shot.stopped .num { opacity: .55 }
+
+.flag { background: #f4d03f; color: #1a1206; font-weight: 900; font-size: 12px; letter-spacing: .1em;
+  padding: 5px 9px; border-radius: 5px; }

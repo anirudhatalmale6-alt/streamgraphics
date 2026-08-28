@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamGraphics Pro — Football / Basketball Control</title>
+<link rel="stylesheet" href="/control.css">
+<style>
+  .previewwrap{background:repeating-conic-gradient(#0e131b 0% 25%,#10151f 0% 50%) 50%/26px 26px;border:1px solid var(--line);border-radius:12px;overflow:hidden;height:360px;position:relative}
+  .previewwrap iframe{position:absolute;top:0;left:0;width:1280px;height:720px;border:0;transform:scale(.5);transform-origin:top left}
+  @media(max-width:900px){.previewwrap iframe{transform:scale(.36)}.previewwrap{height:260px}}  /* 720 x .36 = 259 */
+  .cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.cols2{grid-template-columns:1fr}}
+  .teamcard{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel2);min-width:0}
+  .teamcard h4{font-size:13px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .teamcard .swatch{width:16px;height:16px;border-radius:4px;border:1px solid #0006}
+  .frow{display:flex;gap:8px;align-items:center;margin-bottom:9px;flex-wrap:wrap}
+  .frow label{width:54px;font-size:12px;color:var(--muted)}
+  .frow .inp{min-width:0}
+  .browsebtn{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+  .browsebtn:hover{border-color:var(--accent)}
+  .browsebtn input[type=file]{display:none}
+  .pm{display:flex;gap:6px;align-items:center}
+  .pm button{min-width:38px;height:34px;padding:0 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-weight:800;cursor:pointer}
+  .pm button:hover{border-color:var(--accent)}
+  .pm .v{min-width:40px;text-align:center;font-weight:900;font-variant-numeric:tabular-nums}
+  /* Score buttons are deliberately oversized. This is pressed in a hurry, often on a laptop
+     trackpad in a hot truck, and a missed +7 is on screen for everyone to see. */
+  .scorebtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .scorebtns button{flex:1;min-width:64px;font-size:17px;font-weight:900;padding:13px 0;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer}
+  .scorebtns button:hover{border-color:var(--accent)}
+  .scorebtns button.minus{color:#e06}
+  /* The clock. One giant readout and one giant start/stop, because that is 90% of the job. */
+  .clockrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .bigclock{font-size:54px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-2px;min-width:170px;text-align:center;
+    background:#0a0e14;border:1px solid var(--line);border-radius:12px;padding:6px 16px}
+  .bigclock.running{color:#7ee2b0;border-color:#2f7d5a}
+  .startstop{font-size:20px;font-weight:900;padding:18px 30px;border-radius:12px;border:none;cursor:pointer;background:#1f9d55;color:#fff;min-width:170px}
+  .startstop.on{background:#c92a2a}
+  .adj{display:flex;gap:6px;flex-wrap:wrap}
+  .adj button{padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-weight:800;cursor:pointer;font-size:13px}
+  .adj button:hover{border-color:var(--accent)}
+  .sportsel{display:flex;gap:6px}
+  .sportsel button{padding:9px 18px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-weight:700;cursor:pointer}
+  .sportsel button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .only-fb,.only-bb{display:none}
+  body.sport-football .only-fb{display:block}
+  body.sport-basketball .only-bb{display:block}
+  body.sport-football .frow.only-fb,body.sport-basketball .frow.only-bb{display:flex}
+  .downbtns{display:flex;gap:6px;flex-wrap:wrap}
+  .downbtns button{padding:10px 16px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-weight:800;cursor:pointer}
+  .downbtns button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .matchbtns{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 10px}
+  @media(max-width:700px){main{padding:12px}.bigclock{font-size:42px;min-width:140px}.startstop{min-width:130px;padding:16px 20px}}
+</style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23166534'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='30' font-weight='bold' fill='%23ffffff' text-anchor='middle'%3EGM%3C/text%3E%3C/svg%3E">
+</head>
+<body class="sport-football">
+  <header class="top">
+    <div style="display:flex;align-items:center">
+      <div class="brand"><span class="dot"></span> StreamGraphics Pro <small>Football / Basketball</small></div>
+      <nav class="topnav"><a href="/scoreboards">☰ Scoreboards</a><a href="/game-output" target="_blank">Open output ↗</a><a href="/">All graphics</a></nav>
+    </div>
+    <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
+  </header>
+
+  <main>
+    <div class="outbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:14px">
+      <button class="btn big show" id="btnShow">Take to air ▸</button>
+      <button class="btn big hide" id="btnHide">◂ Off air</button>
+      <div class="airstate" id="airState" style="min-width:90px">OFF AIR</div>
+      <div class="sportsel" id="sportSel">
+        <button data-sport="football">Football</button>
+        <button data-sport="basketball">Basketball</button>
+      </div>
+      <span style="flex:1"></span>
+      <span class="mini" style="color:var(--muted)">Output:</span>
+      <code id="outUrl" style="background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:12px">…/game-output</code>
+      <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button>
+    </div>
+
+    <section class="panel" style="margin-bottom:14px">
+      <div class="previewwrap"><iframe id="pv" src="/game-output?preview=1" title="preview"></iframe></div>
+    </section>
+
+    <!-- THE CLOCK. First on the page because it is most of the job. -->
+    <section class="panel" style="margin-bottom:14px">
+      <h3 style="margin-bottom:10px">Game clock</h3>
+      <div class="clockrow">
+        <div class="bigclock" id="bigClock">12:00</div>
+        <button class="startstop" id="btnClock">START</button>
+        <div class="adj">
+          <button data-adj="-60000">−1:00</button>
+          <button data-adj="-10000">−10s</button>
+          <button data-adj="-1000">−1s</button>
+          <button data-adj="1000">+1s</button>
+          <button data-adj="10000">+10s</button>
+          <button data-adj="60000">+1:00</button>
+        </div>
+        <div class="pm">
+          <span class="mini" style="color:var(--muted)">Set</span>
+          <input class="inp" id="clockSet" placeholder="12:00" style="width:82px;text-align:center;font-weight:800">
+          <button id="btnClockSet">Set</button>
+          <button id="btnClockReset" title="back to a full period">Full period</button>
+        </div>
+      </div>
+      <div class="frow" style="margin-top:12px">
+        <label style="width:auto">Period length</label>
+        <input class="inp" id="lenSet" placeholder="12:00" style="width:82px;text-align:center;font-weight:800">
+        <button class="btn ghost" id="btnLen" style="font-size:12px">Apply</button>
+        <span class="mini" style="color:var(--muted)">high-school football 12:00 · NBA 12:00 · college basketball 20:00 halves · youth varies — set it to your league</span>
+      </div>
+      <p class="mini" style="color:var(--muted2);margin-top:4px">The clock runs on the app itself, not in this browser — every screen and every second machine reads the same number, and a refresh mid-quarter changes nothing.</p>
+    </section>
+
+    <!-- The second clock: SHOT clock in basketball, PLAY clock in football. One control. -->
+    <section class="panel" id="shotSection" style="margin-bottom:14px">
+      <h3 style="margin-bottom:10px" id="shotTitle">Play clock</h3>
+      <div class="clockrow">
+        <div class="bigclock" id="bigShot">40</div>
+        <button class="startstop" id="btnShot">START</button>
+        <div class="adj">
+          <button id="btnShotReset">Reset full</button>
+          <button id="btnShotReset2">Reset short</button>
+          <button data-shotadj="-1000">−1s</button>
+          <button data-shotadj="1000">+1s</button>
+        </div>
+        <div class="pm">
+          <span class="mini" style="color:var(--muted)">Full</span>
+          <input class="inp" id="shotLen" placeholder="40" style="width:60px;text-align:center;font-weight:800">
+          <span class="mini" style="color:var(--muted)">Short</span>
+          <input class="inp" id="shotLen2" placeholder="25" style="width:60px;text-align:center;font-weight:800">
+          <button class="btn ghost" id="btnShotLen" style="font-size:12px">Apply</button>
+        </div>
+      </div>
+      <p class="mini" style="color:var(--muted2);margin-top:8px" id="shotHint">NFL 40 / 25 seconds. Set both to match your league.</p>
+    </section>
+
+    <!-- teams -->
+    <div class="cols2" style="margin-bottom:14px">
+      <section class="teamcard" data-team="0">
+        <h4><span class="swatch" id="sw0"></span> Away team</h4>
+        <div class="frow"><label>Name</label><input class="inp" data-f="name" placeholder="Away" style="flex:1"></div>
+        <div class="frow"><label>Abbr</label><input class="inp" data-f="abbr" placeholder="AWY" maxlength="5" style="width:90px;text-transform:uppercase">
+          <label>Colour</label><input type="color" data-f="color" value="#1d4e86"></div>
+        <div class="frow"><label>Logo</label><input class="inp" data-f="logoUrl" placeholder="paste a URL, or Browse ▸" style="flex:1"><label class="browsebtn">Browse<input type="file" accept="image/*" data-browse-team="0"></label></div>
+        <div class="frow"><label style="width:auto">Score</label><div class="pm"><button data-score="-1">−</button><span class="v" id="s0">0</span><button data-score="1">+</button></div>
+          <button class="btn ghost" data-poss="0" style="font-size:12px;margin-left:auto">Give possession</button></div>
+        <div class="scorebtns only-fb">
+          <button data-score="6">+6 TD</button><button data-score="1">+1 PAT</button><button data-score="2">+2</button><button data-score="3">+3 FG</button><button class="minus" data-score="-1">−1</button>
+        </div>
+        <div class="scorebtns only-bb">
+          <button data-score="1">+1</button><button data-score="2">+2</button><button data-score="3">+3</button><button class="minus" data-score="-1">−1</button>
+        </div>
+        <div class="frow" style="margin-top:10px">
+          <span class="mini" style="width:64px;color:var(--muted)">Timeouts</span>
+          <div class="pm"><button data-to="-1">−</button><span class="v" id="t0">3</span><button data-to="1">+</button></div>
+          <span class="mini only-bb" style="width:56px;color:var(--muted);margin-left:10px">Fouls</span>
+          <div class="pm only-bb"><button data-foul="-1">−</button><span class="v" id="f0">0</span><button data-foul="1">+</button></div>
+        </div>
+      </section>
+      <section class="teamcard" data-team="1">
+        <h4><span class="swatch" id="sw1"></span> Home team</h4>
+        <div class="frow"><label>Name</label><input class="inp" data-f="name" placeholder="Home" style="flex:1"></div>
+        <div class="frow"><label>Abbr</label><input class="inp" data-f="abbr" placeholder="HOM" maxlength="5" style="width:90px;text-transform:uppercase">
+          <label>Colour</label><input type="color" data-f="color" value="#8a1c1c"></div>
+        <div class="frow"><label>Logo</label><input class="inp" data-f="logoUrl" placeholder="paste a URL, or Browse ▸" style="flex:1"><label class="browsebtn">Browse<input type="file" accept="image/*" data-browse-team="1"></label></div>
+        <div class="frow"><label style="width:auto">Score</label><div class="pm"><button data-score="-1">−</button><span class="v" id="s1">0</span><button data-score="1">+</button></div>
+          <button class="btn ghost" data-poss="1" style="font-size:12px;margin-left:auto">Give possession</button></div>
+        <div class="scorebtns only-fb">
+          <button data-score="6">+6 TD</button><button data-score="1">+1 PAT</button><button data-score="2">+2</button><button data-score="3">+3 FG</button><button class="minus" data-score="-1">−1</button>
+        </div>
+        <div class="scorebtns only-bb">
+          <button data-score="1">+1</button><button data-score="2">+2</button><button data-score="3">+3</button><button class="minus" data-score="-1">−1</button>
+        </div>
+        <div class="frow" style="margin-top:10px">
+          <span class="mini" style="width:64px;color:var(--muted)">Timeouts</span>
+          <div class="pm"><button data-to="-1">−</button><span class="v" id="t1">3</span><button data-to="1">+</button></div>
+          <span class="mini only-bb" style="width:56px;color:var(--muted);margin-left:10px">Fouls</span>
+          <div class="pm only-bb"><button data-foul="-1">−</button><span class="v" id="f1">0</span><button data-foul="1">+</button></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- situation -->
+    <section class="panel" style="margin-bottom:14px">
+      <div class="matchbtns">
+        <button class="btn go" id="btnNewPeriod">Next period ▸</button>
+        <button class="btn" id="btnPossNone">No possession</button>
+        <button class="btn ghost" id="btnRestart" style="color:#e06">⟲ Restart game</button>
+        <span class="mini" style="align-self:center;color:var(--muted)">Currently: <b id="perLabel">1st</b></span>
+      </div>
+      <div class="frow">
+        <label style="width:auto">Period</label>
+        <div class="pm"><button data-per="-1">−</button><span class="v" id="vPeriod">1</span><button data-per="1">+</button></div>
+        <label style="width:auto;margin-left:10px">of</label>
+        <select class="inp" id="periods" style="width:auto"><option value="2">2 (halves)</option><option value="4">4 (quarters)</option></select>
+        <label style="width:auto;margin-left:10px">Label</label>
+        <input class="inp" id="perCustom" placeholder="blank = 1st, 2nd, OT…" style="width:170px">
+      </div>
+
+      <div class="frow only-fb" style="border-top:1px dashed var(--line);padding-top:12px;margin-top:12px">
+        <label style="width:auto">Down</label>
+        <div class="downbtns" id="downBtns">
+          <button data-down="1">1st</button><button data-down="2">2nd</button><button data-down="3">3rd</button><button data-down="4">4th</button>
+        </div>
+        <label style="width:auto;margin-left:10px">To go</label>
+        <div class="pm"><button data-dist="-1">−</button><span class="v" id="vDist">10</span><button data-dist="1">+</button></div>
+        <button class="btn ghost" id="btnGoal" style="font-size:12px">& Goal</button>
+        <button class="btn ghost" id="btnFirst" style="font-size:12px">1st &amp; 10</button>
+      </div>
+      <div class="frow only-fb">
+        <label style="width:auto">Ball on</label>
+        <input class="inp" id="ballOn" placeholder="e.g. HOM 34" style="width:140px">
+        <button class="btn ghost" id="btnFlag" style="font-size:12px">🚩 Flag</button>
+        <span class="mini" style="color:var(--muted)">Flag shows a marker on the board until you press it again.</span>
+      </div>
+    </section>
+
+    <!-- look -->
+    <section class="panel">
+      <h3 style="margin-bottom:10px">Look</h3>
+      <div class="frow">
+        <label style="width:auto">Position</label>
+        <select class="inp" id="stPos" style="width:auto">
+          <option value="top-left">Top left</option><option value="top-center">Top center</option><option value="top-right">Top right</option>
+          <option value="mid-left">Mid left</option><option value="mid-center">Mid center</option><option value="mid-right">Mid right</option>
+          <option value="bottom-left">Bottom left</option><option value="bottom-center">Bottom center</option><option value="bottom-right">Bottom right</option>
+        </select>
+        <label style="width:auto">Accent</label><input type="color" id="stAccent" value="#f4a63c">
+        <label style="width:auto">Animation</label>
+        <select class="inp" id="stAnim" style="width:auto"><option value="slide-up">Slide up</option><option value="fade">Fade</option><option value="scale">Scale</option></select>
+      </div>
+      <div class="frow">
+        <label style="width:auto">Nudge</label>
+        <div class="nudgepad" id="nudgePad">
+          <span></span><button data-nx="0" data-ny="-1" title="Up">&#9650;</button><span></span>
+          <button data-nx="-1" data-ny="0" title="Left">&#9664;</button><button data-nreset="1" title="Back to the exact corner">0</button><button data-nx="1" data-ny="0" title="Right">&#9654;</button>
+          <span></span><button data-nx="0" data-ny="1" title="Down">&#9660;</button><span></span>
+        </div>
+        <span id="nudgeV" class="mono">0, 0</span>
+        <span class="mini" style="color:var(--muted)">5px a click &middot; hold Shift for 25 &middot; 0 puts it back</span>
+      </div>
+      <div class="frow">
+        <label class="mini" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stTimeouts" checked> Show timeouts</label>
+        <label class="mini only-fb" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stDown" checked> Show down &amp; distance</label>
+        <label class="mini" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stShot" checked> <span id="stShotLabel">Show play clock</span></label>
+        <label class="mini only-bb" style="width:auto;display:inline-flex;align-items:center;gap:6px"><input type="checkbox" id="stFouls" checked> Show team fouls</label>
+        <span style="flex:1"></span>
+        <span class="mini" style="color:var(--muted)">Chroma</span>
+        <select class="inp" id="chromaSel" style="width:auto">
+          <option value="">Off (transparent)</option><option value="#00b140">Green</option><option value="#0047ff">Blue</option><option value="#ff00ff">Magenta</option><option value="#000000">Black (luma key)</option>
+        </select>
+      </div>
+      <p class="mini" style="color:var(--muted2);margin-top:6px">Feeding a hardware switcher? This board has key + fill too — add <code>?key=fill</code> and <code>?key=key</code> to the output link, one on each video output. Every output link is on the <a href="/links" style="color:var(--accent)">Browser source links</a> page.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Output for OBS / vMix / ATEM: <code id="outUrl2">http://THIS-PC-IP:PORT/game-output</code>
+    <span class="hint">— transparent; add as a Browser Source at 1920×1080.</span>
+  </footer>
+
+  <script src="/sg-live.js"></script>
+  <script src="/sg-links.js"></script>
+  <script src="/sg-autoreload.js"></script>
+  <script src="/game.js"></script>
+  <script src="/ver.js"></script>
+  <script src="/update.js"></script>
+  <script src="/sg-licensee.js"></script>
+</body>
+</html>

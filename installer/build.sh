@@ -117,7 +117,7 @@ done
 # doesn't stop the server booting — it 404s at the moment the operator needs it, on their
 # machine, mid-setup. This is the cheapest place to find that out.
 if [ -n "$SMOKE_OK" ]; then
-  for P in /control /output /scoreboard /scoreboard-output /baseball /baseball-output \
+  for P in /control /output /scoreboard /scoreboard-output /baseball /baseball-output /game /game-output \
            /lowerthird /lowerthird-output /shows /program-output /scorer /links /control-api \
            /prompter /prompter-output /prompter-remote /prompter-remote.js \
            /prompter.css /sg-prompter.js /sg-key.js; do

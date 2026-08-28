@@ -99,6 +99,7 @@
       { nm: 'Program (Show Library)', p: '/program-output',  note: 'every preset you switch on, composited' },
       { nm: 'Beach Volleyball',    p: '/scoreboard-output',  note: 'scoreboard' },
       { nm: 'Baseball / Softball', p: '/baseball-output',    note: 'scoreboard' },
+      { nm: 'Football / Basketball', p: '/game-output',       note: 'scoreboard with a game clock' },
       { nm: 'Teleprompter',        p: '/prompter-output',    note: 'the script — confidence monitor or browser source' },
       { nm: 'Teleprompter (mirrored)', p: '/prompter-output?mirror=1', note: 'the same script flipped, for beam-splitter glass' }
     ];
@@ -109,6 +110,7 @@
       { nm: "Presenter's Timer",   p: '/control' },
       { nm: 'Scoreboards',         p: '/scoreboards' },
       { nm: 'Scorer (big buttons)', p: '/scorer' },
+      { nm: 'Football / Basketball', p: '/game' },
       { nm: 'Prompter remote (phone / tablet)', p: '/prompter-remote' },
       { nm: 'Teleprompter',        p: '/prompter' },
       { nm: 'Stream Deck / Companion commands', p: '/control-api' }
@@ -124,7 +126,7 @@
        These are extra ROWS rather than a replacement — the plain browser-source link is still
        the one almost everyone wants, and burying it behind a checkbox would be a downgrade. */
     var KEYABLE = { '/output': 1, '/lowerthird-output': 1, '/program-output': 1,
-                    '/scoreboard-output': 1, '/baseball-output': 1 };
+                    '/scoreboard-output': 1, '/baseball-output': 1, '/game-output': 1 };
     var kfOn = false;
     try { kfOn = localStorage.getItem('sg_kf_links') === '1'; } catch (e) {}
 

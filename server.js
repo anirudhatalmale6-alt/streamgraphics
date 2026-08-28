@@ -248,6 +248,10 @@ function defaultState() {
     // Baseball / softball scoreboard — a clock-free sport, so it's the first of the
     // new sports. Innings are adjustable (softball/youth vary by age & level).
     baseball: defaultBaseball(),
+    // Football / basketball — the CLOCK sports. One board: a broadcast covers one game, and the
+    // volleyball board's multi-court array exists because a tournament runs five courts at once,
+    // which is not a thing that happens to a football game.
+    game: defaultGame(),
     // Teleprompter — its own module: a script, a server-anchored scroll position, and a look.
     prompter: defaultPrompter(),
     // License (free by default → watermark on, add-ons off).
@@ -292,6 +296,89 @@ function ensureBaseballShape(bb) {
   if (bb.inning < 1) bb.inning = 1;
 }
 function baseballRuns(t) { return (t.line || []).reduce(function (s, v) { return s + (v == null ? 0 : (parseInt(v, 10) || 0)); }, 0); }
+
+/* ------------------------------------------------------------------ *
+ *  FOOTBALL / BASKETBALL — the clock sports
+ *
+ *  One board, two sports. They share far more than they differ by: two teams with a score, a
+ *  period, a running clock, timeouts and possession. Football adds down/distance/ball-on;
+ *  basketball adds a shot clock, team fouls and the bonus. Building them as two boards would
+ *  have meant two clocks, and a clock is the one thing in here that must not be written twice.
+ *
+ *  🚨 The clock lives on the SERVER, exactly like the Presenter's Timer and the prompter's
+ *  scroll position — as an anchor plus a base, never as a number being counted down somewhere.
+ *  Every screen reads the same two values and works out its own display, so the board, the
+ *  operator's panel and a second machine in the truck cannot drift apart or disagree after a
+ *  refresh. Anything that counts locally is wrong within a minute.
+ */
+const GAME_SPORTS = ['football', 'basketball'];
+function defaultGameTeams() {
+  return [
+    { name: 'Away', abbr: 'AWY', color: '#1d4e86', logoUrl: '', score: 0, timeouts: 3, fouls: 0 },
+    { name: 'Home', abbr: 'HOM', color: '#8a1c1c', logoUrl: '', score: 0, timeouts: 3, fouls: 0 }
+  ];
+}
+function defaultGame() {
+  return {
+    visible: false,
+    sport: 'football',
+    period: 1,
+    periods: 4,                  // 4 quarters, or set 2 for halves
+    periodLabel: '',             // '' = worked out from the number ("1st", "OT")
+    // running/baseMs/anchorServer: while stopped, baseMs IS the time left; while running, the
+    // time left is baseMs minus however long it has been since anchorServer.
+    clock: { running: false, baseMs: 12 * 60000, lengthMs: 12 * 60000, anchorServer: 0 },
+    // The second clock: a shot clock in basketball, a play clock in football. Football's 40/25
+    // is the default because football is the sport this ships set to.
+    shot:  { running: false, baseMs: 40000, lengthMs: 40000, resetMs: 25000, anchorServer: 0 },
+    possession: -1,              // -1 nobody, 0 away, 1 home
+    down: 1, distance: 10, ballOn: '', flag: false,
+    teams: defaultGameTeams(),
+    style: {
+      position: 'bottom-center',
+      accent: '#f4a63c',
+      chroma: '',
+      animation: 'slide-up',
+      showPossession: true,
+      showTimeouts: true,
+      showShotClock: true,       // the shot clock / play clock
+      showFouls: true,           // basketball
+      showDown: true             // football
+    }
+  };
+}
+// Time left on a server-anchored clock, in ms. Never negative: a clock that has run out is at
+// 0:00, and letting it go past would show a minus sign on air.
+function clockLeft(c, now) {
+  if (!c) return 0;
+  const ms = c.running ? (c.baseMs - (now - (c.anchorServer || now))) : c.baseMs;
+  return Math.max(0, Math.round(ms));
+}
+// Freeze a running clock at wherever it is (before stopping it, changing it, or starting it).
+function clockFreeze(c, now) {
+  c.baseMs = clockLeft(c, now);
+  c.running = false;
+  c.anchorServer = 0;
+}
+function clockStart(c, now) {
+  if (c.running) return;
+  if (clockLeft(c, now) <= 0) return;    // starting an expired clock would look like a fault
+  c.baseMs = clockLeft(c, now);
+  c.anchorServer = now;
+  c.running = true;
+}
+const GAME_CLOCK_MAX = 99 * 60000;       // 99:00 — longer than any period, short of nonsense
+function clampClockMs(ms, max) {
+  const n = Math.round(Number(ms));
+  return isFinite(n) ? Math.max(0, Math.min(max || GAME_CLOCK_MAX, n)) : 0;
+}
+/* A clock that has run out must STOP, not sit there "running" at zero. Nothing on screen looks
+ * different either way — clockLeft() clamps — but a board that is quietly still running restarts
+ * the moment anyone adds a second to it, in the middle of a dead ball. Called on every read that
+ * matters rather than on a timer, so there is no interval to leak. */
+function gameSettleClocks(g, now) {
+  [g.clock, g.shot].forEach(c => { if (c && c.running && clockLeft(c, now) <= 0) clockFreeze(c, now); });
+}
 
 /* ------------------------------------------------------------------ *
  *  TELEPROMPTER
@@ -924,6 +1011,8 @@ function hasFeature(f) { return isLicensed() && (state.license.features || []).i
 // Program output only needs the payloads of presets that are ON; the Library list only
 // needs names + on/off. Full payloads are fetched on demand (GET /show-payload?id=).
 function wireState() {
+  // A clock that has run out must not be broadcast as "running" — see gameSettleClocks().
+  gameSettleClocks(state.game, Date.now());
   const shows = (state.shows || []).map(function (it) {
     // Reveal transport travels for every preset, on air or not, so the Show Library can offer
     // Next/Previous without pulling the whole payload down for presets that are off.
@@ -1261,6 +1350,163 @@ function applyAction(action) {
       break;
     }
     case 'bl_style': { Object.assign(state.baseball.style, styleIn(action.style)); break; }
+
+    /* -------- football / basketball scoreboard -------- */
+    case 'gm_show': state.game.visible = true;  break;
+    case 'gm_hide': state.game.visible = false; break;
+    case 'gm_sport': {
+      const g = state.game, s = String(action.sport || '');
+      if (GAME_SPORTS.indexOf(s) < 0 || s === g.sport) break;
+      g.sport = s;
+      /* Switching sport resets the clock LENGTH, not the game. A basketball quarter is not
+       * twelve minutes because football says so, and an operator who switches sport at 3:41
+       * left in a football quarter is setting up, not mid-play. */
+      clockFreeze(g.clock, now);
+      g.clock.lengthMs = (s === 'basketball') ? 10 * 60000 : 12 * 60000;
+      g.clock.baseMs = g.clock.lengthMs;
+      /* The second clock is a SHOT clock in basketball and a PLAY clock in football. Same
+         machinery, different lengths and a different word on the board — building a separate
+         play clock would have been a second copy of the thing that must not be copied. */
+      clockFreeze(g.shot, now);
+      g.shot.lengthMs = (s === 'basketball') ? 24000 : 40000;
+      g.shot.resetMs  = (s === 'basketball') ? 14000 : 25000;
+      g.shot.baseMs = g.shot.lengthMs;
+      break;
+    }
+    case 'gm_team': {   // team 0 = away, 1 = home
+      const t = state.game.teams[action.team]; if (!t) break;
+      if (action.name != null)    t.name    = String(action.name).slice(0, 40);
+      if (action.abbr != null)    t.abbr    = String(action.abbr).slice(0, 5).toUpperCase();
+      if (action.color != null)   t.color   = String(action.color).slice(0, 30);
+      if (action.logoUrl != null) t.logoUrl = String(action.logoUrl).slice(0, 400);
+      break;
+    }
+    case 'gm_score': {  // +/- (a touchdown is +6 then +1, so the delta is not always 1)
+      const t = state.game.teams[action.team]; if (!t) break;
+      const d = parseInt(action.delta, 10);
+      t.score = Math.max(0, Math.min(999, (t.score | 0) + (isNaN(d) ? 1 : d)));
+      break;
+    }
+    case 'gm_setScore': {
+      const t = state.game.teams[action.team]; if (!t) break;
+      const v = parseInt(action.value, 10);
+      t.score = isNaN(v) ? 0 : Math.max(0, Math.min(999, v));
+      break;
+    }
+    case 'gm_timeout': {
+      const t = state.game.teams[action.team]; if (!t) break;
+      const d = parseInt(action.delta, 10);
+      t.timeouts = Math.max(0, Math.min(9, (t.timeouts | 0) + (isNaN(d) ? -1 : d)));
+      break;
+    }
+    case 'gm_foul': {   // basketball team fouls (the bonus is worked out from these, not stored)
+      const t = state.game.teams[action.team]; if (!t) break;
+      const d = parseInt(action.delta, 10);
+      t.fouls = Math.max(0, Math.min(99, (t.fouls | 0) + (isNaN(d) ? 1 : d)));
+      break;
+    }
+    /* One action drives both clocks, because they are the same thing and a second copy of this
+     * is how a shot clock ends up behaving subtly differently from a game clock. */
+    case 'gm_clock': case 'gm_shot': {
+      const g = state.game;
+      const c = (action.type === 'gm_shot') ? g.shot : g.clock;
+      const max = (action.type === 'gm_shot') ? 99000 : GAME_CLOCK_MAX;
+      const cmd = String(action.cmd || '');
+      if (cmd === 'start') clockStart(c, now);
+      else if (cmd === 'stop') clockFreeze(c, now);
+      else if (cmd === 'toggle') { if (c.running) clockFreeze(c, now); else clockStart(c, now); }
+      else if (cmd === 'set') {
+        const running = c.running;
+        c.baseMs = clampClockMs(action.ms, max);
+        // Setting a time while the clock RUNS must keep it running from the new number — an
+        // operator correcting the clock mid-quarter is not asking for a stoppage.
+        c.anchorServer = now;
+        c.running = running && c.baseMs > 0;
+      } else if (cmd === 'adjust') {
+        const d = parseInt(action.ms, 10) || 0;
+        const running = c.running;
+        c.baseMs = clampClockMs(clockLeft(c, now) + d, max);
+        c.anchorServer = now;
+        c.running = running && c.baseMs > 0;
+      } else if (cmd === 'reset') {          // full period / full shot clock
+        clockFreeze(c, now); c.baseMs = clampClockMs(c.lengthMs, max);
+      } else if (cmd === 'reset2') {         // basketball: the short reset (offensive rebound)
+        clockFreeze(c, now); c.baseMs = clampClockMs(c.resetMs == null ? c.lengthMs : c.resetMs, max);
+      } else if (cmd === 'length') {         // how long a full period / shot clock is
+        c.lengthMs = clampClockMs(action.ms, max);
+        if (!c.running && cmd === 'length' && action.also !== false) c.baseMs = c.lengthMs;
+      } else if (cmd === 'reset2length') {
+        c.resetMs = clampClockMs(action.ms, max);
+      }
+      gameSettleClocks(g, now);
+      break;
+    }
+    case 'gm_period': {
+      const g = state.game;
+      const d = parseInt(action.delta, 10);
+      const n = (action.n != null) ? parseInt(action.n, 10) : (g.period + (isNaN(d) ? 1 : d));
+      // Overtime is period > periods, and it is deliberately allowed: a game does not stop
+      // existing at the end of the fourth.
+      g.period = Math.max(1, Math.min(20, isNaN(n) ? g.period : n));
+      break;
+    }
+    case 'gm_periods': {
+      const g = state.game;
+      const n = parseInt(action.n, 10);
+      g.periods = Math.max(1, Math.min(8, isNaN(n) ? 4 : n));
+      break;
+    }
+    case 'gm_periodLabel': state.game.periodLabel = String(action.label == null ? '' : action.label).slice(0, 20); break;
+    case 'gm_possession': {
+      const g = state.game;
+      if (action.cmd === 'toggle') g.possession = (g.possession === 0) ? 1 : (g.possession === 1 ? 0 : 0);
+      else if (action.cmd === 'none') g.possession = -1;
+      else { const t = parseInt(action.team, 10); g.possession = (t === 0 || t === 1) ? t : -1; }
+      break;
+    }
+    case 'gm_down': {
+      const g = state.game;
+      const d = parseInt(action.delta, 10);
+      let n = (action.n != null) ? parseInt(action.n, 10) : (g.down + (isNaN(d) ? 1 : d));
+      if (isNaN(n)) n = g.down;
+      // Wraps 4 -> 1 rather than stopping at 4: after fourth down it is first down, and the one
+      // thing an operator must not have to do is reach for a different control to get back.
+      g.down = ((n - 1 + 4 * 10) % 4) + 1;
+      break;
+    }
+    case 'gm_distance': {
+      const g = state.game;
+      if (action.text != null) { g.distance = String(action.text).slice(0, 8); break; }  // "Goal", "Inches"
+      const d = parseInt(action.delta, 10);
+      const cur = parseInt(g.distance, 10);
+      const base = isNaN(cur) ? 10 : cur;
+      const n = (action.n != null) ? parseInt(action.n, 10) : (base + (isNaN(d) ? 0 : d));
+      g.distance = Math.max(0, Math.min(99, isNaN(n) ? base : n));
+      break;
+    }
+    case 'gm_ballOn': state.game.ballOn = String(action.text == null ? '' : action.text).slice(0, 12); break;
+    case 'gm_flag': state.game.flag = (action.on == null) ? !state.game.flag : !!action.on; break;
+    case 'gm_newPeriod': {
+      /* Between periods: the clock goes back to full and stops, the shot clock resets, and
+       * basketball team fouls go back to nothing (they are per-period). Timeouts do NOT reset —
+       * that is a rule that varies by league, so it stays the operator's call. */
+      const g = state.game;
+      g.period = Math.max(1, Math.min(20, (g.period | 0) + 1));
+      clockFreeze(g.clock, now); g.clock.baseMs = g.clock.lengthMs;
+      clockFreeze(g.shot, now);  g.shot.baseMs = g.shot.lengthMs;
+      if (g.sport === 'basketball') g.teams.forEach(t => { t.fouls = 0; });
+      g.flag = false;
+      break;
+    }
+    case 'gm_restart': {   // a fresh game, keeping the teams' names, colours and logos
+      const g = state.game;
+      g.period = 1; g.possession = -1; g.down = 1; g.distance = 10; g.ballOn = ''; g.flag = false;
+      clockFreeze(g.clock, now); g.clock.baseMs = g.clock.lengthMs;
+      clockFreeze(g.shot, now);  g.shot.baseMs = g.shot.lengthMs;
+      g.teams.forEach(t => { t.score = 0; t.fouls = 0; t.timeouts = 3; });
+      break;
+    }
+    case 'gm_style': { Object.assign(state.game.style, styleIn(action.style)); break; }
 
     /* -------- team library (mail-merge) -------- */
     case 'lib_import': { // replace the library with an imported list of teams
@@ -2204,6 +2450,9 @@ const server = http.createServer((req, res) => {
         scoreboards: (state.scoreboards || []).map(b => ({ name: b.name, visible: !!b.visible })),
         timer: { visible: !!state.timer.visible, mode: state.timer.mode },
         baseball: { visible: !!state.baseball.visible },
+        game: { visible: !!state.game.visible, sport: state.game.sport, period: state.game.period,
+                clockMs: clockLeft(state.game.clock, Date.now()), running: !!state.game.clock.running,
+                score: state.game.teams.map(t => t.score) },
         prompter: { visible: !!state.prompter.visible, running: !!state.prompter.running, speed: state.prompter.speed, marks: (state.prompter.geom.marks || []).map(m => m.name) } });
     }
 
@@ -2287,6 +2536,35 @@ const server = http.createServer((req, res) => {
       return fail('unknown baseball command: "' + cmd + '" (use run/ball/strike/out/clearcount/advance/show/hide)');
     }
 
+    /* Football / basketball. Deliberately verb-per-button rather than one command with a mode:
+       a Stream Deck key is a single URL, and "clock" that sometimes starts and sometimes stops
+       is the kind of button an operator presses twice in a live quarter. */
+    if (group === 'game') {
+      const g = state.game;
+      const n = (k, d) => { const v = parseInt(q.get(k), 10); return isNaN(v) ? d : v; };
+      if (cmd === 'score')      { applyAction({ type: 'gm_score', team: teamIdx(), delta: n('delta', 1) }); return did({ sport: g.sport }); }
+      if (cmd === 'clockstart') { applyAction({ type: 'gm_clock', cmd: 'start' }); return did(); }
+      if (cmd === 'clockstop')  { applyAction({ type: 'gm_clock', cmd: 'stop' }); return did(); }
+      if (cmd === 'clocktoggle'){ applyAction({ type: 'gm_clock', cmd: 'toggle' }); return did(); }
+      if (cmd === 'clockset')   { applyAction({ type: 'gm_clock', cmd: 'set', ms: n('ms', 0) }); return did(); }
+      if (cmd === 'clockadjust'){ applyAction({ type: 'gm_clock', cmd: 'adjust', ms: n('ms', 1000) }); return did(); }
+      if (cmd === 'shotreset')  { applyAction({ type: 'gm_shot', cmd: 'reset' }); return did(); }
+      if (cmd === 'shotreset2') { applyAction({ type: 'gm_shot', cmd: 'reset2' }); return did(); }
+      if (cmd === 'shottoggle') { applyAction({ type: 'gm_shot', cmd: 'toggle' }); return did(); }
+      if (cmd === 'period')     { applyAction({ type: 'gm_period', delta: n('delta', 1) }); return did(); }
+      if (cmd === 'newperiod')  { applyAction({ type: 'gm_newPeriod' }); return did(); }
+      if (cmd === 'possession') { applyAction({ type: 'gm_possession', cmd: q.get('team') ? '' : 'toggle', team: teamIdx() }); return did(); }
+      if (cmd === 'down')       { applyAction({ type: 'gm_down', delta: n('delta', 1) }); return did(); }
+      if (cmd === 'distance')   { applyAction({ type: 'gm_distance', n: n('n', 10) }); return did(); }
+      if (cmd === 'flag')       { applyAction({ type: 'gm_flag' }); return did(); }
+      if (cmd === 'timeout')    { applyAction({ type: 'gm_timeout', team: teamIdx(), delta: n('delta', -1) }); return did(); }
+      if (cmd === 'foul')       { applyAction({ type: 'gm_foul', team: teamIdx(), delta: n('delta', 1) }); return did(); }
+      if (cmd === 'sport')      { applyAction({ type: 'gm_sport', sport: String(q.get('sport') || '') }); return did({ sport: state.game.sport }); }
+      if (cmd === 'show')       { applyAction({ type: 'gm_show' }); return did(); }
+      if (cmd === 'hide')       { applyAction({ type: 'gm_hide' }); return did(); }
+      return fail('unknown game command: "' + cmd + '" (use score/clockstart/clockstop/clocktoggle/clockset/clockadjust/shotreset/shotreset2/shottoggle/period/newperiod/possession/down/distance/flag/timeout/foul/sport/show/hide)');
+    }
+
     // Teleprompter — the buttons an operator actually wants under their fingers.
     if (group === 'prompter') {
       const p = state.prompter;
@@ -2336,7 +2614,7 @@ const server = http.createServer((req, res) => {
       return fail('unknown prompter command: "' + cmd + '" (use play/pause/toggle/faster/slower/speed/back/ahead/top/nextmark/prevmark/mark/script/scripts/air/off/status)');
     }
 
-    return fail('unknown api group: "' + group + '" (use preset/timer/scoreboard/baseball/prompter/list)', 404);
+    return fail('unknown api group: "' + group + '" (use preset/timer/scoreboard/baseball/game/prompter/list)', 404);
   }
 
   /* --- grab a still frame out of OBS, to use as the builder's reference image ---
@@ -2521,6 +2799,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     const covers = licCoversVersion(state.license);
     const lic = { active: !!state.license.active, name: state.license.name, email: state.license.email || '', tier: state.license.tier, features: state.license.features, upto: (state.license.upto != null ? state.license.upto : null), coversVersion: covers, revoked: !!state.license.revoked };
+    gameSettleClocks(state.game, Date.now());
     res.end(JSON.stringify({ serverTime: Date.now(), state: Object.assign({}, state, { templates: allTemplates(), media: mediaIndex, license: lic, licensed: !!state.license.active && covers, scripts: scriptList() }) }));
     return;
   }
@@ -2792,6 +3071,8 @@ const server = http.createServer((req, res) => {
           : pathname === '/scoreboards' ? '/scoreboards.html'
           : pathname === '/baseball' ? '/baseball.html'
           : pathname === '/baseball-output' ? '/baseball-output.html'
+          : pathname === '/game' ? '/game.html'
+          : pathname === '/game-output' ? '/game-output.html'
           : pathname === '/scoreboard' ? '/scoreboard.html'
           : pathname === '/scoreboard-output' ? '/scoreboard-output.html'
           : pathname === '/scorer' ? '/scorer.html'
