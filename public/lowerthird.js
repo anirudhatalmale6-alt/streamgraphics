@@ -983,6 +983,53 @@
     layers.push(bg); selId = bg.id; renderCanvas(); renderList(); syncProps(); push();
   };
 
+  /* ---- framing guides: title safe, action safe, centre, thirds, crop markings ----
+   * Which of them are drawn is one operator's preference, not part of the design, so it is kept
+   * in localStorage and never written into the layer array. That is the whole reason none of it
+   * can leak on air: the output page renders layers, and there is no guide layer. */
+  (function () {
+    var g = $('guides'), row = $('guideRow');
+    if (!g || !row) return;
+    var KEYS = ['title', 'action', 'center', 'thirds', 'crop'];
+    var on = { title: true, action: false, center: false, thirds: false, crop: false };
+    try {
+      var saved = JSON.parse(localStorage.getItem('lt_guides') || 'null');
+      if (saved) KEYS.forEach(function (k) { on[k] = !!saved[k]; });
+    } catch (e) {}
+    var hidden = null;              // what was showing before G hid it all
+
+    function apply(save) {
+      KEYS.forEach(function (k) {
+        g.classList.toggle('on-' + k, !!on[k]);
+        var b = row.querySelector('.gchip[data-g="' + k + '"]');
+        if (b) { b.classList.toggle('on', !!on[k]); b.setAttribute('aria-pressed', on[k] ? 'true' : 'false'); }
+      });
+      if (save !== false) { try { localStorage.setItem('lt_guides', JSON.stringify(on)); } catch (e) {} }
+    }
+
+    row.querySelectorAll('.gchip').forEach(function (b) {
+      b.setAttribute('type', 'button');
+      b.onclick = function () { on[b.dataset.g] = !on[b.dataset.g]; hidden = null; apply(); };
+    });
+
+    /* G clears the canvas to look at the design, and puts back exactly what was there. Ignored
+       while a field has focus, or the letter would disappear out of the middle of a caption. */
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'g' && e.key !== 'G') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      var t = document.activeElement, tag = (t && t.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+      if (typeof editing !== 'undefined' && editing) return;
+      e.preventDefault();
+      var showing = KEYS.filter(function (k) { return on[k]; });
+      if (showing.length) { hidden = showing; KEYS.forEach(function (k) { on[k] = false; }); }
+      else { (hidden && hidden.length ? hidden : ['title']).forEach(function (k) { on[k] = true; }); hidden = null; }
+      apply();
+    });
+
+    apply(false);
+  })();
+
   /* ---- reference image: a design aid shown only in the builder (never on air) ---- */
   var refimg = $('refimg');
   function loadRef() { try { var r = JSON.parse(localStorage.getItem('lt_ref') || '{}'); if (r.url) { refimg.src = r.url; refimg.style.display = 'block'; } refimg.style.opacity = (r.opacity == null ? 50 : r.opacity) / 100; $('refOpacity').value = r.opacity == null ? 50 : r.opacity; } catch (e) {} }

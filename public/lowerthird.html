@@ -15,7 +15,42 @@
   /* Fluid 16:9 canvas — the 1920x1080 stage inside is scaled to fit by fitStage() in lowerthird.js. */
   .canvas{position:relative;width:100%;max-width:860px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;
     background:repeating-conic-gradient(#0e131b 0% 25%,#10151f 0% 50%) 50%/28px 28px;margin:0 auto}
-  .safe{position:absolute;border:1px dashed rgba(255,255,255,.18);pointer-events:none;inset:5% 5%}
+  /* ---- Framing guides ----------------------------------------------------------------
+     A design aid and nothing else. This overlay exists only in the builder — /lowerthird-output
+     is a separate page and draws none of it — so no marking here can reach the air.
+     The insets are SMPTE RP 218: action safe is 93% of the frame (3.5% in from each edge),
+     title safe 90% (5%). The crop boxes are where a 16:9 frame gets cut when the same graphic
+     is re-framed for a phone, so a name that sits outside the 9:16 box will be sliced in half
+     on a vertical repost. drop-shadow, not a plain colour: a hairline guide over a white
+     graphic is invisible without a dark edge under it. */
+  .guides{position:absolute;inset:0;pointer-events:none;z-index:500;filter:drop-shadow(0 0 1px rgba(0,0,0,.9))}
+  .guides .g{position:absolute;display:none}
+  .guides .g i{position:absolute;font-style:normal;font-size:10px;line-height:1;letter-spacing:.04em;
+    padding:2px 4px;border-radius:3px;background:rgba(0,0,0,.55);white-space:nowrap}
+  .guides.on-title .g-title,.guides.on-action .g-action,.guides.on-center .g-center,
+  .guides.on-thirds .g-thirds,.guides.on-crop .g-crop{display:block}
+  .g-action{inset:3.5%;border:1px dashed rgba(255,255,255,.30)}
+  /* Each label lives in its own corner. Stacked in the same one they sit on top of each other
+     and on the neighbouring guide's border, which is exactly when you stop reading them. */
+  .g-action i{top:3px;right:4px;color:rgba(255,255,255,.62)}
+  .g-title{inset:5%;border:1px dashed rgba(255,255,255,.62)}
+  .g-title i{bottom:3px;right:4px;color:rgba(255,255,255,.9)}   /* bottom-LEFT is where lower thirds live */
+  .g-center{inset:0}
+  .g-center::before{content:'';position:absolute;left:50%;top:0;bottom:0;border-left:1px solid rgba(120,170,255,.6)}
+  .g-center::after{content:'';position:absolute;top:50%;left:0;right:0;border-top:1px solid rgba(120,170,255,.32)}
+  .g-thirds{inset:0}
+  .g-thirds .v{position:absolute;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.22)}
+  .g-thirds .h{position:absolute;left:0;right:0;border-top:1px solid rgba(255,255,255,.22)}
+  .g-crop{top:0;bottom:0;border-left:1px solid rgba(255,176,32,.6);border-right:1px solid rgba(255,176,32,.6)}
+  .g-crop i{top:3px;left:4px;color:#ffb020}   /* top-LEFT is free: action safe went right, title safe is bottom-left */
+  /* (4/3)/(16/9)=.75, 1/(16/9)=.5625, (9/16)/(16/9)=.31640625 — halved into a left/right inset. */
+  .c43{left:12.5%;right:12.5%}
+  .c11{left:21.875%;right:21.875%}
+  .c916{left:34.1796875%;right:34.1796875%}
+  .guiderow{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .gchip{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;white-space:nowrap}
+  .gchip:hover{border-color:var(--accent)}
+  .gchip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
   .cstage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform:scale(.375);transform-origin:top left}
   .ly{position:absolute;cursor:move;outline:2px solid transparent}
   .ly:hover{outline-color:rgba(120,170,255,.55)}
@@ -124,10 +159,29 @@
       <div class="stagewrap">
         <div class="canvas" id="canvas">
           <img id="refimg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.5;display:none;pointer-events:none">
-          <div class="safe"></div>
           <div class="cstage" id="cstage"></div>
+          <div class="guides" id="guides">
+            <div class="g g-action"><i>action safe 93%</i></div>
+            <div class="g g-title"><i>title safe 90%</i></div>
+            <div class="g g-thirds">
+              <span class="v" style="left:33.3333%"></span><span class="v" style="left:66.6667%"></span>
+              <span class="h" style="top:33.3333%"></span><span class="h" style="top:66.6667%"></span>
+            </div>
+            <div class="g g-center"></div>
+            <div class="g g-crop c43"><i>4:3</i></div>
+            <div class="g g-crop c11"><i>1:1</i></div>
+            <div class="g g-crop c916"><i>9:16</i></div>
+          </div>
         </div>
-        <p class="mini" style="text-align:center;color:var(--muted2);margin-top:10px">Drag a layer to move it. Click to select, then use the handles to resize/rotate. Delete key removes it. Dashed box is title-safe.</p>
+        <div class="guiderow" id="guideRow">
+          <span class="mini" style="color:var(--muted)">Guides</span>
+          <button class="gchip" data-g="title" title="SMPTE RP 218 title safe — 90% of the frame. Keep names and text inside this.">Title safe</button>
+          <button class="gchip" data-g="action" title="SMPTE RP 218 action safe — 93% of the frame. Anything outside this can be cut off by a viewer's screen.">Action safe</button>
+          <button class="gchip" data-g="center" title="Centre lines, vertical and horizontal.">Centre</button>
+          <button class="gchip" data-g="thirds" title="Rule-of-thirds grid.">Thirds</button>
+          <button class="gchip" data-g="crop" title="Vertical markings: what survives when this 16:9 graphic is re-cropped to 4:3, square or 9:16 for a phone.">Phone / 4:3 crops</button>
+        </div>
+        <p class="mini" style="text-align:center;color:var(--muted2);margin-top:8px">Drag a layer to move it. Click to select, then use the handles to resize/rotate. Delete key removes it. Guides are a design aid — they are never on the output. Press <b>G</b> to hide and bring back the lot.</p>
         <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px">
           <span class="mini" style="color:var(--muted)">Reference image (design aid — not on air):</span>
           <label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="image/*" id="refFile" style="display:none"></label>
