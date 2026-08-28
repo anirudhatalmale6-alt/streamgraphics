@@ -1521,4 +1521,41 @@
   })();
   // The address another computer can reach, not localhost — see sg-links.js.
   SGLinks.onbase(function () { $('outUrl').textContent = SGLinks.url('/lowerthird-output'); });
+
+  /* ---- key + fill panel ----
+   * Two more views of the SAME graphic for a hardware switcher (see sg-key.js). The URLs are
+   * built through SGLinks for the same reason every other link on this page is: the switcher PC
+   * is not this PC, and a localhost link copied onto it points that machine at itself. */
+  (function () {
+    var btn = $('keyfillBtn'), panel = $('keyfillPanel');
+    if (!btn || !panel) return;
+    var PATHS = { Fill: '/lowerthird-output?key=fill', Key: '/lowerthird-output?key=key' };
+
+    function paint() {
+      Object.keys(PATHS).forEach(function (k) {
+        var u = SGLinks.url(PATHS[k]);
+        $('kf' + k).textContent = u;
+        $('kf' + k + 'Open').href = u;
+      });
+    }
+    ['Fill', 'Key'].forEach(function (k) {
+      $('kf' + k + 'Copy').onclick = function () { SGLinks.copy($('kf' + k).textContent, this); };
+    });
+    SGLinks.onbase(paint);
+
+    var open = false;
+    try { open = localStorage.getItem('lt_keyfill_open') === '1'; } catch (e) {}
+    function apply() {
+      panel.style.display = open ? '' : 'none';
+      btn.classList.toggle('on', open);
+      if (open) paint();          // an address chosen on another panel may have moved on
+    }
+    btn.onclick = function () {
+      open = !open;
+      try { localStorage.setItem('lt_keyfill_open', open ? '1' : '0'); } catch (e) {}
+      apply();
+      if (open) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    apply();
+  })();
 })();

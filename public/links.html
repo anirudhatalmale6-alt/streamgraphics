@@ -49,6 +49,17 @@
         </span>
       </h3>
       <p class="mini" style="margin:-4px 0 12px">OBS: <b>Browser</b> source · vMix: <b>Web Browser</b> input · size <b>1920 × 1080</b>. Paste the link in — never type it.</p>
+      <label class="mini" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:-4px 0 12px">
+        <input type="checkbox" id="kfToggle" style="width:16px;height:16px;accent-color:var(--accent)">
+        <span>Also show <b>key + fill</b> links (feeding a hardware switcher over HDMI/SDI)</span>
+      </label>
+      <div class="warn" id="kfNote" style="display:none">
+        HDMI carries no transparency, so a hardware switcher has to be told what is see-through.
+        Send the <b>FILL</b> page out of one video output and the <b>KEY</b> page out of another, and wire
+        them to the switcher's fill and key inputs — on an ATEM, turn <b>pre-multiplied key</b> on.
+        Both pages follow the same graphic live, so they take and clear together.
+        With only one video output, use the Chroma key setting on the graphic instead (Black = a luma key).
+      </div>
       <div id="outs"></div>
     </section>
 
@@ -106,6 +117,36 @@
     var outputs = OUTPUTS.slice();
     var mailEdited = false;
 
+    /* ---- key + fill (see sg-key.js) ----
+       Every graphics output can also render as a FILL (the graphic on black) and a KEY (its
+       matte) for a switcher that has no alpha channel. The prompter pages are left out: they
+       are a confidence monitor, not something anyone keys over a programme feed.
+       These are extra ROWS rather than a replacement — the plain browser-source link is still
+       the one almost everyone wants, and burying it behind a checkbox would be a downgrade. */
+    var KEYABLE = { '/output': 1, '/lowerthird-output': 1, '/program-output': 1,
+                    '/scoreboard-output': 1, '/baseball-output': 1 };
+    var kfOn = false;
+    try { kfOn = localStorage.getItem('sg_kf_links') === '1'; } catch (e) {}
+
+    // A named scoreboard already carries ?board=…, so the separator has to be worked out, not assumed.
+    function addParam(p, kv) { return p + (p.indexOf('?') >= 0 ? '&' : '?') + kv; }
+
+    function expand(list) {
+      if (!kfOn) return list.slice();
+      var out = [];
+      list.forEach(function (o) {
+        out.push(o);
+        if (!KEYABLE[o.p.split('?')[0]]) return;
+        out.push({ nm: o.nm + ' — FILL', p: addParam(o.p, 'key=fill'), note: 'hardware switcher: the graphic on black' });
+        out.push({ nm: o.nm + ' — KEY',  p: addParam(o.p, 'key=key'),  note: 'hardware switcher: the matte' });
+      });
+      return out;
+    }
+
+    // What is actually on the page right now. paint() and the copy buttons must read THIS and
+    // not `outputs`, or the row ids stop lining up with the links the moment key+fill is on.
+    var shown = [];
+
     function rowHtml(item, id) {
       return '<div class="row">'
            + '<div class="nm">' + esc(item.nm) + (item.note ? '<div class="mini" style="font-weight:400">' + esc(item.note) + '</div>' : '') + '</div>'
@@ -116,15 +157,25 @@
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
 
     function render() {
-      $('outs').innerHTML = outputs.map(function (o, i) { return rowHtml(o, 'o' + i); }).join('');
+      shown = expand(outputs);
+      $('outs').innerHTML = shown.map(function (o, i) { return rowHtml(o, 'o' + i); }).join('');
       $('ctls').innerHTML = CONTROLS.map(function (c, i) { return rowHtml(c, 'c' + i); }).join('');
+      $('kfToggle').checked = kfOn;
+      $('kfNote').style.display = kfOn ? '' : 'none';
       paint();
     }
+
+    $('kfToggle').onchange = function () {
+      kfOn = this.checked;
+      try { localStorage.setItem('sg_kf_links', kfOn ? '1' : '0'); } catch (e) {}
+      mailEdited = false;        // the email listed the old set; it is no longer what is on screen
+      render();
+    };
 
     /* Re-runs whenever the chosen address changes, so switching adapters updates
        every link on the page at once. */
     function paint() {
-      outputs.forEach(function (o, i) { var el = $('o' + i); if (el) el.textContent = SGLinks.url(o.p); });
+      shown.forEach(function (o, i) { var el = $('o' + i); if (el) el.textContent = SGLinks.url(o.p); });
       CONTROLS.forEach(function (c, i) { var el = $('c' + i); if (el) el.textContent = SGLinks.url(c.p); });
       if (!mailEdited) $('mail').value = mailText();
     }
@@ -138,7 +189,7 @@
       L.push('');
       L.push('OUTPUTS — add as an OBS "Browser" source or a vMix "Web Browser" input, 1920 x 1080:');
       L.push('');
-      outputs.forEach(function (o) {
+      shown.forEach(function (o) {
         L.push('  ' + o.nm + (o.note ? '  (' + o.note + ')' : ''));
         L.push('  ' + SGLinks.url(o.p));
         L.push('');
@@ -209,7 +260,7 @@
       var el = $(b.getAttribute('data-copy'));
       if (el) SGLinks.copy(el.textContent, b);
     });
-    $('copyAll').onclick  = function () { SGLinks.copy(listText(outputs), this); };
+    $('copyAll').onclick  = function () { SGLinks.copy(listText(shown), this); };
     $('copyCtl').onclick  = function () { SGLinks.copy(listText(CONTROLS), this); };
     $('copyMail').onclick = function () { SGLinks.copy($('mail').value, this); };
     $('copyMail2').onclick = function () { SGLinks.copy($('mail').value, this); };

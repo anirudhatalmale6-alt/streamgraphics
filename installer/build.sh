@@ -120,7 +120,7 @@ if [ -n "$SMOKE_OK" ]; then
   for P in /control /output /scoreboard /scoreboard-output /baseball /baseball-output \
            /lowerthird /lowerthird-output /shows /program-output /scorer /links /control-api \
            /prompter /prompter-output /prompter-remote /prompter-remote.js \
-           /prompter.css /sg-prompter.js; do
+           /prompter.css /sg-prompter.js /sg-key.js; do
     if ! curl -fsS -o /dev/null "http://127.0.0.1:$SMOKE_PORT$P" 2>/dev/null; then
       echo "!! ABORT: the staged app does not serve $P"; SMOKE_OK=""; break
     fi

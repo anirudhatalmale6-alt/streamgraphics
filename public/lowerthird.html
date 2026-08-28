@@ -51,6 +51,10 @@
   .gchip{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;white-space:nowrap}
   .gchip:hover{border-color:var(--accent)}
   .gchip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  /* key + fill link rows — same shape as the ones on the Browser source links page */
+  .kfrow{display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px;flex-wrap:wrap}
+  .kfnm{font-weight:800;letter-spacing:.08em;min-width:150px;flex:0 0 auto}
+  .kflk{flex:1;min-width:220px;font-family:'Consolas','SF Mono',Menlo,monospace;font-size:12.5px;color:#cfe0f5;background:#0a0e14;border:1px solid var(--line);border-radius:7px;padding:7px 9px;overflow:auto;white-space:nowrap;user-select:all}
   .cstage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform:scale(.375);transform-origin:top left}
   .ly{position:absolute;cursor:move;outline:2px solid transparent}
   .ly:hover{outline-color:rgba(120,170,255,.55)}
@@ -141,6 +145,8 @@
       <span class="mini" style="color:var(--muted)">Output:</span>
       <code id="outUrl" style="background:#0a0e14;border:1px solid var(--line);padding:6px 10px;border-radius:7px;color:#cfe0f5;font-size:12px">…/lowerthird-output</code>
       <button id="copyBtn" style="background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 12px;cursor:pointer">Copy</button>
+      <!-- one group, so the label never ends a line with its own select on the next one -->
+      <span style="display:inline-flex;align-items:center;gap:10px">
       <span class="mini" style="color:var(--muted);font-weight:600">Chroma key</span>
       <select class="inp" id="chromaSel" style="width:auto" title="a solid background colour for hardware keyers — pick one that isn't in your graphic">
         <option value="">Off (transparent)</option>
@@ -148,12 +154,48 @@
         <option value="#0047ff">Blue</option>
         <option value="#ff00ff">Magenta</option>
         <option value="#ffffff">White</option>
-        <option value="#000000">Black</option>
+        <option value="#000000">Black (luma key)</option>
         <option value="#ff0000">Red</option>
         <option value="custom">Custom…</option>
       </select>
       <input type="color" id="chromaColor" value="#ff8800" style="display:none;width:36px;height:30px" title="custom chroma colour">
+      <button class="btn ghost" id="keyfillBtn" style="font-size:12px" title="two feeds for a hardware switcher — fill and key">Key + fill…</button>
+      </span>
     </div>
+
+    <!-- Key + fill. Off screen until asked for: it is the right answer for a hardware switcher
+         and irrelevant to everyone running OBS or vMix, which is most people most of the time. -->
+    <section class="panel" id="keyfillPanel" style="display:none;margin-bottom:16px">
+      <h3 style="margin-top:0">Key + fill — for a hardware switcher</h3>
+      <p class="mini" style="margin:-4px 0 12px;line-height:1.6">
+        OBS and vMix take this graphic with its transparency intact, so one link is all you need.
+        HDMI has no transparency in it, so a hardware switcher has to be told what is see-through.
+        A <b>luma key</b> guesses it from brightness — set Chroma key to <b>Black (luma key)</b> above
+        and that is all it takes, but anything dark in the graphic goes see-through with the background:
+        drop shadows, a dark brand bar, the shaded edge of a letter.<br>
+        <b>Key + fill</b> does not guess. Send these two pages out of two video outputs and wire them to
+        the switcher's fill and key inputs. Soft edges and see-through panels come out looking the way
+        they do in OBS. On an ATEM, turn <b>pre-multiplied key</b> on.
+      </p>
+      <div class="kfrow">
+        <div class="kfnm">FILL<div class="mini" style="font-weight:400">the graphic, on black</div></div>
+        <code class="kflk" id="kfFill">…</code>
+        <button class="btn ghost" id="kfFillCopy" style="font-size:12px">Copy</button>
+        <a class="btn ghost" id="kfFillOpen" style="font-size:12px;text-decoration:none" target="_blank" rel="noopener">Open ↗</a>
+      </div>
+      <div class="kfrow">
+        <div class="kfnm">KEY<div class="mini" style="font-weight:400">the matte — white where the graphic is</div></div>
+        <code class="kflk" id="kfKey">…</code>
+        <button class="btn ghost" id="kfKeyCopy" style="font-size:12px">Copy</button>
+        <a class="btn ghost" id="kfKeyOpen" style="font-size:12px;text-decoration:none" target="_blank" rel="noopener">Open ↗</a>
+      </div>
+      <p class="mini" style="margin:12px 0 0;line-height:1.6">
+        Both pages follow the same graphic live, so they take and clear together — there is nothing extra
+        to drive. They need <b>two video outputs</b> from this computer. With only one, stay on the luma or
+        chroma key; both still work exactly as before. Every other output has the same two links on the
+        <a href="/links" style="color:var(--accent)">Browser source links</a> page.
+      </p>
+    </section>
 
     <div class="builder">
       <div class="stagewrap">
