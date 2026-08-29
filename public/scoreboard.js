@@ -411,4 +411,14 @@
     key: 'sg.scoreboard.output',
     onChange: function (chroma) { send({ type: 'sb_style', style: { chroma: chroma } }); }
   }) : null;
+
+  /* Show the REAL logos folder rather than a hardcoded "public/logos". On a Mac that folder
+     lives in Application Support, not inside the app, so a fixed path in the page would send
+     the operator to a folder that does not exist. */
+  var logoDir = document.getElementById('logoDir');
+  if (logoDir) {
+    fetch('/api/folders').then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.logos) logoDir.textContent = j.logos;
+    }).catch(function () { logoDir.textContent = 'the logos folder next to the app'; });
+  }
 })();

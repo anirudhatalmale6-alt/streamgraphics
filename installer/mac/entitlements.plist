@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Notarising requires the "hardened runtime", and the hardened runtime blocks the two things
+    a JavaScript engine cannot live without: writing machine code at runtime and then executing
+    it. Node compiles JS to machine code as it runs, so without these two entitlements the app
+    signs and notarises perfectly and then dies the moment it starts, with a crash report about
+    an illegal instruction. Nothing in the log says "entitlement".
+  -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+</dict>
+</plist>

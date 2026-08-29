@@ -28,6 +28,59 @@ const vmixGrab = require('./vmix-grab');
 
 const PORT = process.env.PORT || 4000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+
+/* ===========================================================================
+ * WHERE THE APP KEEPS THE OPERATOR'S WORK
+ *
+ * Everything the operator creates - library, templates, saved shows, scripts, the licence,
+ * and the images they upload - used to be written straight into the app's own folder. That is
+ * fine on Windows: the installer puts the app in %LOCALAPPDATA%, which the user owns, so the
+ * app can write next to itself and does.
+ *
+ * 🚨 It is NOT fine on macOS, for two separate reasons, and both of them are silent:
+ *   1. A Mac app is a signed bundle. Writing a file inside it invalidates the signature, and
+ *      the next launch fails Gatekeeper. The app would work once and then be "damaged".
+ *   2. macOS runs a freshly-downloaded app from a randomised READ-ONLY mount (app
+ *      translocation), so __dirname is not even a stable location to write to.
+ * So on macOS the writable stuff moves to ~/Library/Application Support, which is the folder
+ * Apple provides for exactly this and which survives replacing the app with a new version.
+ *
+ * Windows and Linux keep the old location deliberately. Existing customers already have their
+ * library sitting next to the app; moving it would be a migration performed on machines I
+ * cannot see, to fix a problem those platforms do not have.
+ * ======================================================================== */
+const USER_DIR = (function () {
+  if (process.env.SG_DATA_DIR) return path.resolve(process.env.SG_DATA_DIR);
+  if (process.platform === 'darwin') {
+    return path.join(require('os').homedir(), 'Library', 'Application Support', 'StreamGraphics Pro');
+  }
+  return __dirname;
+})();
+const PORTABLE = (USER_DIR === __dirname);   // true on Windows/Linux: app folder is the data folder
+
+/* First run after the work moved out of the app folder: bring it along. This matters for
+   anyone who has been running the Mac build from a plain folder (the .command launcher) and
+   then installs the packaged app - without this their library, templates and saved shows
+   would still be on disk but the app would start up empty, which reads as "it lost my work".
+   Runs once: the moment USER_DIR exists it never fires again. Never allowed to throw. */
+if (!PORTABLE) {
+  try {
+    if (!fs.existsSync(USER_DIR)) {
+      const copyTree = function (from, to) {
+        if (!fs.existsSync(from)) return;
+        fs.mkdirSync(to, { recursive: true });
+        for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+          const a = path.join(from, e.name), b = path.join(to, e.name);
+          if (e.isDirectory()) copyTree(a, b);
+          else if (e.isFile()) fs.copyFileSync(a, b);
+        }
+      };
+      fs.mkdirSync(USER_DIR, { recursive: true });
+      copyTree(path.join(__dirname, 'data'), path.join(USER_DIR, 'data'));
+      for (const f of ['uploads', 'media', 'logos']) copyTree(path.join(PUBLIC_DIR, f), path.join(USER_DIR, f));
+    }
+  } catch (e) { /* a fresh install with nothing to bring across is the normal case */ }
+}
 let VERSION = '?'; try { VERSION = require('./package.json').version; } catch (e) {}
 /* 🚨 Every outbound request has to say who it is.
    Node's https.get sends NO User-Agent at all, and a request without one is exactly what a
@@ -47,6 +100,22 @@ const UPDATE_MANIFESTS = process.env.SG_UPDATE_URL
   ? [process.env.SG_UPDATE_URL]
   : ['https://streamgraphicspro.com/sgpro-version.json', 'https://streamgraphicspro.com/latest.json'];
 let _updCache = { at: 0, data: null };
+
+/* 🚨 Which download the "Update available" banner points at.
+   The manifest has always carried ONE url, which is the Windows installer — so the first Mac
+   customer to see that banner would have been handed a .exe. It is exactly the kind of thing
+   nobody reports: they assume they misread something and give up on updating.
+   The manifest may now carry `macUrl` alongside `url`. Old manifests, which have neither the
+   field nor any knowledge of macOS, still work: a Mac gets no link rather than the wrong one,
+   and the banner drops its Download button but still says an update exists. */
+function updateUrlFor(m) {
+  if (!m) return '';
+  if (process.platform === 'darwin') {
+    if (m.macUrl) return String(m.macUrl);
+    return /\.(exe|msi)(\?|$)/i.test(String(m.url || '')) ? '' : String(m.url || '');
+  }
+  return String(m.url || '');
+}
 function cmpVer(a, b) { const A = String(a).split('.').map(n => parseInt(n, 10) || 0), B = String(b).split('.').map(n => parseInt(n, 10) || 0); for (let i = 0; i < 3; i++) { if ((A[i] || 0) > (B[i] || 0)) return 1; if ((A[i] || 0) < (B[i] || 0)) return -1; } return 0; }
 // Fetch one manifest URL. Calls back with the parsed object, or null on any failure.
 /* Fetch and parse one small JSON file. Returns the parsed object, or null on any failure.
@@ -123,10 +192,32 @@ function licCoversVersion(lic) {
 }
 // "licensed" = key is valid AND it covers the running version.
 function isLicensed() { return !!state.license.active && licCoversVersion(state.license); }
-const UPLOAD_DIR = path.join(PUBLIC_DIR, 'uploads');
-const MEDIA_DIR = path.join(PUBLIC_DIR, 'media');   // CSV images live here, organised in per-show/event subfolders
+/* The three folders that hold the operator's own images. On Windows/Linux they sit inside
+   public/ exactly as they always have; on macOS they follow the rest of the writable data out
+   of the bundle. LOGOS is in here because the operator is told to DROP FILES INTO IT by hand -
+   which is impossible inside a Mac app bundle, and would break its signature if it weren't. */
+const MEDIA_ROOT = PORTABLE ? PUBLIC_DIR : USER_DIR;
+const UPLOAD_DIR = path.join(MEDIA_ROOT, 'uploads');
+const MEDIA_DIR = path.join(MEDIA_ROOT, 'media');   // CSV images live here, organised in per-show/event subfolders
+const LOGO_DIR = path.join(MEDIA_ROOT, 'logos');    // team logos named in a CSV ("ucla.png")
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(MEDIA_DIR, { recursive: true }); } catch (e) {}
+try { fs.mkdirSync(LOGO_DIR, { recursive: true }); } catch (e) {}
+
+/* 🚨 THE ONE PLACE that turns a /uploads/, /media/ or /logos/ URL into a file on disk.
+   There used to be two copies of this resolution, both of them joining onto PUBLIC_DIR: the
+   static file handler and the export inliner. Once these folders can live somewhere else, a
+   second copy is not a tidiness problem, it is a Mac that serves every page but none of the
+   operator's photos. `rel` must already be percent-decoded. Returns null if it escapes. */
+const URL_DIRS = { uploads: UPLOAD_DIR, media: MEDIA_DIR, logos: LOGO_DIR };
+function localMediaPath(rel) {
+  const clean = String(rel || '').replace(/\?.*$/, '');
+  const m = /^\/(uploads|media|logos)\//.exec(clean);
+  if (!m) return null;
+  const root = URL_DIRS[m[1]];
+  const full = path.join(root, path.normalize(clean.slice(m[0].length)).replace(/^(\.\.[/\\])+/, ''));
+  return full.startsWith(root + path.sep) ? full : null;
+}
 let uploadSeq = 0;
 
 const IMG_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -499,9 +590,11 @@ let state = defaultState();
  *  the client sent (data/teams.seed.json). Persisted on import so it survives
  *  restarts. This is the "mail-merge" list: pick a team to fill a match side.
  * ------------------------------------------------------------------ */
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = path.join(USER_DIR, 'data');
 const LIB_FILE = path.join(DATA_DIR, 'library.json');
-const SEED_FILE = path.join(DATA_DIR, 'teams.seed.json');
+/* The seed sheet SHIPS WITH THE APP - it is a starting point, not the operator's work - so it
+   is read from the app folder even when everything else has moved out of it. */
+const SEED_FILE = path.join(__dirname, 'data', 'teams.seed.json');
 try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
 
 function loadLibrary() {
@@ -1000,13 +1093,67 @@ function fetchRevoked(cb) {
 const SEEN_URL = process.env.SG_SEEN_URL || 'https://streamgraphicspro.com/sgpro-seen.php';
 
 
+/* 🚨 macOS ships network adapters whose MAC address CHANGES BY DESIGN.
+   awdl0 is AirDrop/AirPlay, llw0 its low-latency sibling, ap1 the built-in access point - all
+   of them re-randomise their address periodically for privacy. Hashed in, a Mac's id would
+   drift on its own while the machine sat still, which is the exact false alarm this whole
+   function was written to avoid: one machine reported as many, every activation burnt twice.
+   utun/ipsec/gif/stf are tunnels that come and go with a VPN.
+
+   Applied ONLY on macOS, and that restriction is load-bearing: none of these names exist on
+   Windows, but narrowing the filter by platform means an existing customer's id provably
+   cannot change under them. A fingerprint change on Windows would re-register every machine
+   already out there as a new one. */
+const MAC_SKIP_DARWIN = /^(awdl|llw|ap\d|bridge|utun|ipsec|gif|stf|anpi)/i;
+
+/* 🚨 And filtering the adapters is still not enough on a Mac, because of "Private Wi-Fi
+   Address": macOS presents a DIFFERENT MAC on en0 per network it joins, and rotates it. An
+   operator who works out of a studio one day and a venue the next would come back as a new
+   machine each time. Nobody would report that as a bug - it just quietly inflates his
+   activation count.
+   So on macOS the identity is Apple's own: IOPlatformUUID, the hardware id of the machine.
+   It survives a rename, a network change, and a wipe-and-restore. Adapters are the fallback
+   for the case where ioreg is unavailable. Cached because it is a subprocess. */
+let _hwId = null;
+function darwinHardwareId() {
+  if (_hwId !== null) return _hwId;
+  _hwId = '';
+  try {
+    const out = require('child_process').execFileSync(
+      '/usr/sbin/ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice'],
+      { encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] });
+    const m = /"IOPlatformUUID"\s*=\s*"([^"]+)"/.exec(out);
+    if (m && m[1]) _hwId = m[1];
+  } catch (e) { /* not a Mac, or ioreg missing — fall back to adapters */ }
+  return _hwId;
+}
+
 function machineId(salt) {
+  if (process.platform === 'darwin') {
+    const hw = darwinHardwareId();
+    /* Deliberately no hostname here. It is in the Windows recipe and has to stay there, but a
+       renamed Mac is a renamed Mac, not a new one, and this format has no installed base to
+       be compatible with. */
+    if (hw) return crypto.createHash('sha256').update(salt + '#hw:' + hw + '#darwin', 'utf8').digest('hex').slice(0, 16);
+  }
   const nets = require('os').networkInterfaces();
+  const skip = process.platform === 'darwin' ? MAC_SKIP_DARWIN : null;
   const macs = [];
   for (const name of Object.keys(nets)) {
+    if (skip && skip.test(name)) continue;
     for (const ni of nets[name] || []) {
       // Skip loopback and the all-zero MACs virtual adapters hand out.
       if (!ni.internal && ni.mac && ni.mac !== '00:00:00:00:00:00') macs.push(ni.mac);
+    }
+  }
+  /* If the filter left nothing to hash - a Mac on Wi-Fi only, with everything else transient -
+     fall back to the unfiltered list rather than hashing an empty string, which would give
+     every such machine the SAME id and silently merge them into one activation. */
+  if (!macs.length && skip) {
+    for (const name of Object.keys(nets)) {
+      for (const ni of nets[name] || []) {
+        if (!ni.internal && ni.mac && ni.mac !== '00:00:00:00:00:00') macs.push(ni.mac);
+      }
     }
   }
   /* Sorted, because the order interfaces come back in is not stable across reboots and an id
@@ -2450,10 +2597,8 @@ function serveFile(res, file) {
 const EXPORT_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
 function dataUriForLocal(rel) {
   try {
-    if (!/^\/(uploads|media)\//.test(rel)) return null;
-    const clean = decodeURIComponent(String(rel).replace(/\?.*$/, ''));
-    const full = path.join(PUBLIC_DIR, path.normalize(clean).replace(/^(\.\.[\/\\])+/, ''));
-    if (full.indexOf(PUBLIC_DIR) !== 0) return null;               // stay inside /public
+    const full = localMediaPath(decodeURIComponent(String(rel)));
+    if (!full) return null;                                        // not one of ours, or escaping
     const ext = (full.split('.').pop() || '').toLowerCase();
     const mime = EXPORT_MIME[ext];
     if (!mime) return null;                                        // inline images only (skip video etc.)
@@ -2465,7 +2610,7 @@ function dataUriForLocal(rel) {
 function inlineMedia(node) {
   if (Array.isArray(node)) return node.map(inlineMedia);
   if (node && typeof node === 'object') { const o = {}; for (const k in node) o[k] = inlineMedia(node[k]); return o; }
-  if (typeof node === 'string' && /^\/(uploads|media)\//.test(node)) { return dataUriForLocal(node) || node; }
+  if (typeof node === 'string' && /^\/(uploads|media|logos)\//.test(node)) { return dataUriForLocal(node) || node; }
   return node;
 }
 
@@ -2500,6 +2645,19 @@ const server = http.createServer((req, res) => {
       res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       res.end(JSON.stringify({ ok }));
     });
+    return;
+  }
+
+  /* Where the operator's own folders actually are. The scoreboard page used to tell people to
+     "drop your PNGs into public/logos", which stopped being true the moment those folders moved
+     out of the app bundle on macOS - and a wrong folder path in the manual costs a support email
+     every time. The page asks, so it is right on whichever machine it is running on.
+     🚨 Must sit ABOVE the /api/ block below: that block matches the whole prefix and answers
+     "unknown command" to anything it does not recognise, so a route added after it is dead. */
+  if (pathname === '/api/folders') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ ok: true, platform: process.platform, portable: PORTABLE,
+                             data: DATA_DIR, uploads: UPLOAD_DIR, media: MEDIA_DIR, logos: LOGO_DIR }));
     return;
   }
 
@@ -3083,7 +3241,7 @@ const server = http.createServer((req, res) => {
     checkUpdate(function (m) {
       const latest = m && m.version;
       res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-      res.end(JSON.stringify({ current: VERSION, latest: latest || null, url: (m && m.url) || '', notes: (m && m.notes) || '', updateAvailable: latest ? cmpVer(latest, VERSION) > 0 : false }));
+      res.end(JSON.stringify({ current: VERSION, latest: latest || null, url: updateUrlFor(m), notes: (m && m.notes) || '', updateAvailable: latest ? cmpVer(latest, VERSION) > 0 : false }));
     });
     return;
   }
@@ -3163,6 +3321,11 @@ const server = http.createServer((req, res) => {
           : pathname;
   // decode %20 etc. so files/folders with spaces (e.g. /media/Grad 2026/jane.jpg) resolve
   try { rel = decodeURIComponent(rel); } catch (e) {}
+  // The operator's own images may live outside public/ (see localMediaPath), so ask about
+  // those three folders first. Everything else is an app file and comes from public/.
+  const own = localMediaPath(rel);
+  if (own) { serveFile(res, own); return; }
+  if (/^\/(uploads|media|logos)\//.test(rel)) { res.writeHead(403); res.end('Forbidden'); return; }
   // prevent path traversal
   const file = path.join(PUBLIC_DIR, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
   if (!file.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end('Forbidden'); return; }

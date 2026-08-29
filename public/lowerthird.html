@@ -296,11 +296,16 @@
                 <option value="Helvetica, Arial, sans-serif">Helvetica</option>
                 <option value="'Arial Black', Impact, sans-serif">Arial Black</option>
                 <option value="Impact, Haettenschweiler, sans-serif">Impact</option>
-                <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Arial Narrow / Condensed</option>
-                <option value="'Segoe UI', Arial, sans-serif">Segoe UI</option>
+                <option value="'Arial Narrow', 'Helvetica Neue Condensed', 'Liberation Sans Narrow', Arial, sans-serif">Arial Narrow / Condensed</option>
+                <!-- 🚨 Segoe UI is Windows-only and Tahoma is not on a Mac. A stack that ends at
+                     plain Arial means a graphic designed here renders in a DIFFERENT face, at a
+                     different width, on the customer's Mac - text that fitted its panel stops
+                     fitting. Each one now names the nearest face that genuinely exists on macOS:
+                     Helvetica Neue for Segoe, Verdana for Tahoma (same designer, wider sibling). -->
+                <option value="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif">Segoe UI / Helvetica</option>
                 <option value="Verdana, Geneva, sans-serif">Verdana</option>
-                <option value="Tahoma, Geneva, sans-serif">Tahoma</option>
-                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                <option value="Tahoma, Verdana, Geneva, sans-serif">Tahoma / Verdana</option>
+                <option value="'Trebuchet MS', 'Lucida Grande', Arial, sans-serif">Trebuchet</option>
                 <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
                 <option value="'Times New Roman', Times, serif">Times</option>
                 <option value="'Courier New', ui-monospace, monospace">Courier (mono)</option>
@@ -464,7 +469,7 @@
             <div class="row only-timer"><label>Font</label>
               <select class="inp" id="pTmFont" style="width:auto">
                 <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Clean</option>
-                <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
+                <option value="'Arial Narrow', 'Helvetica Neue Condensed', 'Liberation Sans Narrow', Arial, sans-serif">Condensed</option>
                 <option value="Georgia, 'Times New Roman', serif">Serif</option>
                 <option value="'Courier New', ui-monospace, monospace">Mono</option>
                 <option value="Impact, Haettenschweiler, sans-serif">Impact</option>
@@ -505,7 +510,7 @@
             <div class="row only-slides"><label>Font</label>
               <select class="inp" id="pSlFont" style="width:auto">
                 <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Clean</option>
-                <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
+                <option value="'Arial Narrow', 'Helvetica Neue Condensed', 'Liberation Sans Narrow', Arial, sans-serif">Condensed</option>
                 <option value="Georgia, 'Times New Roman', serif">Serif</option>
                 <option value="'Courier New', ui-monospace, monospace">Mono</option>
                 <option value="Impact, Haettenschweiler, sans-serif">Impact</option>
@@ -576,7 +581,7 @@
             <div class="row only-bullets"><label>Font</label>
               <select class="inp" id="pBuFont" style="width:auto">
                 <option value="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">Clean</option>
-                <option value="'Arial Narrow', 'Barlow Condensed', sans-serif">Condensed</option>
+                <option value="'Arial Narrow', 'Helvetica Neue Condensed', 'Liberation Sans Narrow', Arial, sans-serif">Condensed</option>
                 <option value="Georgia, 'Times New Roman', serif">Serif</option>
                 <option value="'Courier New', ui-monospace, monospace">Mono</option>
                 <option value="Impact, Haettenschweiler, sans-serif">Impact</option>

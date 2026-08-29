@@ -1,0 +1,149 @@
+StreamGraphics Pro for Mac — signing and notarising, on a Mac
+=============================================================
+
+The build produced an UNSIGNED app. Ship it as-is and your customer sees
+"Apple could not verify StreamGraphics Pro is free of malware", with no obvious
+way past it. These steps fix that. They are the Mac equivalent of signing the
+Windows installer, and like that one they use YOUR identity, not mine.
+
+Everything below runs in Terminal on a Mac, in the folder that contains
+"StreamGraphics Pro.app". None of it can run on my machine.
+
+
+ONE-TIME SETUP
+--------------
+1. Join the Apple Developer Program — 99 US dollars a year, in the company name.
+     https://developer.apple.com/programs/
+
+2. Install Xcode from the App Store, then in Xcode:
+     Settings > Accounts > (your Apple ID) > Manage Certificates > + >
+     Developer ID Application
+   That is the certificate that signs apps distributed outside the App Store.
+
+3. Make an app-specific password at https://appleid.apple.com (Sign-In and
+   Security > App-Specific Passwords). Notarising will not accept your normal
+   Apple ID password.
+
+4. Store the notarising credentials once. Three values, all yours:
+     - your Apple ID email
+     - your Team ID, shown at https://developer.apple.com/account under Membership
+     - the app-specific password from step 3
+
+     xcrun notarytool store-credentials
+
+   Run it with no arguments and it asks for each one in turn, including what to
+   call the saved profile. Call the profile  sgpro  — the rest of this file
+   refers to it by that name.
+
+
+EVERY RELEASE
+-------------
+Step 0 — put your signing identity in a variable, so nothing below has a blank
+for you to fill in. First, see what you have:
+
+     security find-identity -v -p codesigning
+
+That prints one line per certificate, each with a quoted name that looks like
+  "Developer ID Application: Something (ABCDE12345)"
+
+Copy the quoted name of the Developer ID Application line, without the quotes,
+and put it in a variable — this is the only thing you type by hand:
+
+     IDENTITY="paste the name here"
+     echo "$IDENTITY"        # check it looks right before going on
+
+Everything from here uses $IDENTITY, so it is right or it fails loudly.
+
+
+1. Sign the engine FIRST, then the app.
+   Inside-out is not a style preference: signing the bundle does not sign a
+   nested executable, and notarising then rejects the whole submission for the
+   one binary that was missed.
+
+     codesign --force --timestamp --options runtime \
+       --entitlements entitlements.plist --sign "$IDENTITY" \
+       "StreamGraphics Pro.app/Contents/Resources/app/sgpro-engine"
+
+     codesign --force --timestamp --options runtime \
+       --entitlements entitlements.plist --sign "$IDENTITY" \
+       "StreamGraphics Pro.app"
+
+   entitlements.plist ships beside this file — keep the two together. Do not
+   drop it: the hardened runtime that notarising requires blocks the memory
+   tricks any JavaScript engine needs, and without those two entitlements the
+   app signs and notarises perfectly and then dies the instant it launches,
+   with nothing in the crash report naming an entitlement as the cause.
+
+2. Check the signature before sending anything to Apple:
+
+     codesign --verify --deep --strict --verbose=2 "StreamGraphics Pro.app"
+
+3. Zip and notarise. Apple takes anywhere from a minute to an hour.
+
+     ditto -c -k --keepParent "StreamGraphics Pro.app" upload.zip
+     xcrun notarytool submit upload.zip --keychain-profile "sgpro" --wait
+
+   --wait keeps the window open until Apple answers, and prints the submission
+   id either way. If it comes back "Invalid", that id is on your screen — paste
+   it in here and Apple will tell you exactly which file was the problem:
+
+     xcrun notarytool log THE-ID-IT-PRINTED --keychain-profile "sgpro"
+
+4. Staple the ticket, so the app also opens on a machine with no internet:
+
+     xcrun stapler staple "StreamGraphics Pro.app"
+
+5. Zip THAT — the stapled copy — and publish this one. Not upload.zip from
+   step 3: that copy was made before the ticket was attached.
+
+     ditto -c -k --keepParent "StreamGraphics Pro.app" "StreamGraphics-Pro-mac.zip"
+
+6. Worth doing once, ideally on a Mac that has never seen the app. This asks
+   Gatekeeper the same question your customer's machine will ask:
+
+     spctl -a -vvv "StreamGraphics Pro.app"
+
+   You want: "accepted ... source=Notarized Developer ID".
+   (-t install is for disk images and installers; for an .app, leave it off.)
+
+
+A .DMG INSTEAD OF A ZIP
+-----------------------
+A zip is fine, and is what notarytool wants for submission anyway. If you would
+rather hand out a disk image with a drag-to-Applications window, then on the
+Mac, after stapling the app:
+
+     hdiutil create -volname "StreamGraphics Pro" \
+       -srcfolder "StreamGraphics Pro.app" -ov -format UDZO "StreamGraphics Pro.dmg"
+     xcrun notarytool submit "StreamGraphics Pro.dmg" --keychain-profile "sgpro" --wait
+     xcrun stapler staple "StreamGraphics Pro.dmg"
+
+The disk image has to be notarised and stapled in its own right — the app's
+ticket does not travel inside it.
+
+
+WHICH BUILD DOES A CUSTOMER WANT
+--------------------------------
+arm64  — every Mac from late 2020 onwards (M1, M2, M3, M4). Nearly everyone.
+x64    — Intel Macs, 2020 and earlier.
+
+An arm64 app will not launch on an Intel Mac at all. An x64 app does run on
+Apple Silicon through Rosetta, but only if the customer has Rosetta installed,
+and it is slower. Publish both and label them plainly.
+
+
+AND ON THE WEBSITE
+------------------
+sgpro-version.json drives the in-app "Update available" banner. Add macUrl
+beside the existing url:
+
+     {
+       "version": "1.0.39",
+       "url":     "https://streamgraphicspro.com/download/StreamGraphicsProSetup.exe",
+       "macUrl":  "https://streamgraphicspro.com/download/StreamGraphics-Pro-mac.zip",
+       "notes":   "Mac version"
+     }
+
+url stays the Windows installer. Without macUrl a Mac is told an update exists
+but is given no download link — on purpose, because the alternative is handing
+a Mac customer a .exe.

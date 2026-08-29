@@ -21,3 +21,7 @@ installer/node-*.exe
 # by hand and then reused by every build (see installer/BUILD.md). Losing it would mean going
 # back to shipping an unsigned launcher, which is what caused the antivirus trouble.
 !installer/launcher-signed/*.exe
+
+# macOS build artifacts (large binaries - shipped via GitHub Releases)
+installer/build-mac/
+installer/node-*-darwin-*.tar.gz
