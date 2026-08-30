@@ -335,7 +335,9 @@
             <div class="row only-box"><label>Radius</label><input class="range" id="pRadius" type="range" min="0" max="120" value="12"><span id="pRadiusV" class="mono">12</span></div>
 
             <div class="row only-surface"><label>Fill style</label>
-              <select class="inp" id="pFillMode" style="width:auto"><option value="solid">Solid</option><option value="linear">Gradient</option><option value="radial">Gradient (radial)</option></select>
+              <!-- "Gradient" alone read as "the gradient", so next to "Gradient (radial)" it looked like the
+                   linear one was missing entirely. Both are spelled out. -->
+              <select class="inp" id="pFillMode" style="width:auto"><option value="solid">Solid</option><option value="linear">Gradient (linear)</option><option value="radial">Gradient (radial)</option></select>
               <span id="pGradWrap" style="display:none;align-items:center;gap:6px">
                 <span class="mini" style="color:var(--muted2)">to</span>
                 <input type="color" id="pFill2" value="#12b886">
@@ -407,7 +409,11 @@
             </div>
             <div class="only-image mini" id="pRecolorHint" style="color:var(--muted2);font-size:11px;margin:-4px 0 8px;display:none"></div>
 
-            <div class="row only-video"><label>Video</label><input class="inp" id="pVSrc" placeholder="URL or Browse (mp4/webm)"><label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="video/*" id="pVFile" style="display:none"></label></div>
+            <div class="row only-video"><label>Video</label><input class="inp" id="pVSrc" placeholder="Link to an .mp4 or .webm file — or Browse"><label class="browsebtn" style="display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--txt);font-weight:700;font-size:12px;cursor:pointer">Browse<input type="file" accept="video/*" id="pVFile" style="display:none"></label></div>
+            <!-- The box says "link", so people paste a YouTube page into it. Nothing rejects it and
+                 nothing explains it - the layer just stays black. Say so, in the box, at the moment
+                 it happens. -->
+            <div class="only-video mini" id="pVNote" style="font-size:11px;margin:-4px 0 8px;display:none"></div>
             <div class="row only-video" style="gap:14px;flex-wrap:wrap">
               <label style="width:auto"><input type="checkbox" id="pAutoplay" checked> Autoplay on air</label>
               <label style="width:auto"><input type="checkbox" id="pLoop"> Loop</label>

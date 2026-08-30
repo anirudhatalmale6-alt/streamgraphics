@@ -28,7 +28,21 @@ body{background:var(--bg);color:var(--txt);font:15px/1.4 'Segoe UI','Helvetica N
 .conn.off .cdot{background:var(--air)}
 main{max-width:1000px;margin:0 auto;padding:20px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px}
-.panel h3{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+/* Section headings. These used to be muted grey caps with nothing behind them. Measured, the
+ * contrast was fine (6.5:1, comfortably past the 4.5 threshold) - the problem was never
+ * legibility, it was hierarchy: at 13px, uppercase, wide-tracked and in the same grey as every
+ * field label, they read as captions rather than as the start of a section, so on a long panel
+ * the eye slid straight past them. Own bar, brighter text, accent rule down the left.
+ *
+ * Deliberately NOT setting margin-bottom here: several of these headings carry an inline
+ * margin-bottom, and an inline style wins. Padding does the spacing instead, so it applies
+ * whatever the element declares for itself. */
+.panel h3{
+  font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#cfdcec;
+  background:linear-gradient(90deg,rgba(59,130,246,.15),rgba(59,130,246,.04) 55%,transparent);
+  border-left:3px solid var(--accent);border-radius:8px;
+  padding:9px 12px 9px 13px;margin-bottom:14px;
+}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media(max-width:820px){.cols{grid-template-columns:1fr}}
 

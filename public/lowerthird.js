@@ -452,7 +452,7 @@
       $('pQrShadow').checked = !!l.shadow;
       qrInfo(l);
     }
-    if (l.type === 'video') { $('pVSrc').value = l.src || ''; $('pAutoplay').checked = l.autoplay !== false; $('pLoop').checked = !!l.loop; $('pMuted').checked = l.muted !== false; $('pVFit').value = l.fit || 'contain'; $('pWhenDone').value = l.whenDone || 'hold'; }
+    if (l.type === 'video') { $('pVSrc').value = l.src || ''; $('pAutoplay').checked = l.autoplay !== false; $('pLoop').checked = !!l.loop; $('pMuted').checked = l.muted !== false; $('pVFit').value = l.fit || 'contain'; $('pWhenDone').value = l.whenDone || 'hold'; videoNote(); }
     if (l.type === 'ticker') { $('pTkText').value = l.text || ''; $('pTkSpeed').value = l.speed == null ? 120 : l.speed; $('pTkSpeedV').textContent = l.speed == null ? 120 : l.speed; $('pTkDir').value = l.dir || 'left'; $('pTkColor').value = l.color || '#ffffff'; $('pTkSize').value = l.size || 28; $('pTkBold').checked = !!l.bold; $('pTkFill').value = l.fill || '#0b1f3a'; $('pTkOpacity').value = l.opacity == null ? 90 : l.opacity; $('pTkRadius').value = l.radius || 0; }
     if (l.type === 'timer') {
       var mode = l.mode || 'down';
@@ -598,7 +598,28 @@
   $('pFit').onchange = function () { mutate(function (l) { l.fit = $('pFit').value; }); };
   $('pImgShadow').onchange = function () { mutate(function (l) { l.shadow = $('pImgShadow').checked; }); };
   // video props
-  $('pVSrc').oninput = function () { mutate(function (l) { l.src = $('pVSrc').value; }); };
+  /* A video layer plays a FILE, through the browser's own video player. A YouTube or Vimeo
+   * address is a web page wrapped round a player, not a file, so pasting one leaves the layer
+   * black with nothing to say why. These are the hosts people actually try. Only a note - the
+   * value is still stored, because guessing wrong and refusing the paste is worse than
+   * explaining it. */
+  function videoNote() {
+    /* Kept inside the function: syncProps() can run before this block of wiring does, and a
+     * hoisted `var` would still be undefined at that point. */
+    var PAGE_HOSTS = /(^|\/\/|\.)(youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|twitch\.tv|facebook\.com|drive\.google\.com|dropbox\.com)\//i;
+    var el = $('pVNote'); if (!el) return;
+    var v = String($('pVSrc').value || '').trim();
+    if (v && PAGE_HOSTS.test(v)) {
+      el.style.display = '';
+      el.style.color = '#f4a63c';
+      el.innerHTML = 'That is a web page, not a video file, so this layer will stay empty. '
+        + 'Download the video as an <b>.mp4</b> and use <b>Browse</b> - it also means the clip '
+        + 'plays from your own computer, with no internet and no ads in the middle of your show.';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+  $('pVSrc').oninput = function () { mutate(function (l) { l.src = $('pVSrc').value; }); videoNote(); };
   $('pAutoplay').onchange = function () { mutate(function (l) { l.autoplay = $('pAutoplay').checked; }); };
   $('pLoop').onchange = function () { mutate(function (l) { l.loop = $('pLoop').checked; }); };
   $('pMuted').onchange = function () { mutate(function (l) { l.muted = $('pMuted').checked; }); };
