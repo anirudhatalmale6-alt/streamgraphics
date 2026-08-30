@@ -111,7 +111,20 @@ let _updCache = { at: 0, data: null };
 function updateUrlFor(m) {
   if (!m) return '';
   if (process.platform === 'darwin') {
-    if (m.macUrl) return String(m.macUrl);
+    /* There are TWO Mac builds and they are not interchangeable - an arm64 app does not
+     * start on an Intel Mac at all. Prefer a per-architecture url when the manifest has
+     * one. (Under Rosetta the Intel build reports arch 'x64', which is the answer we want:
+     * it should be offered the Intel update.) */
+    const perArch = process.arch === 'arm64' ? m.macArm64Url : m.macX64Url;
+    if (perArch) return String(perArch);
+    const generic = String(m.macUrl || '');
+    if (generic) {
+      /* Same rule as the .exe guard below: never hand someone a download that cannot run
+       * on the machine asking for it. A lone macUrl is in practice the Apple Silicon build,
+       * so an Intel Mac is given nothing rather than an app that dies on launch. */
+      if (process.arch !== 'arm64' && /(apple[-_ ]?silicon|arm64|aarch64)/i.test(generic)) return '';
+      return generic;
+    }
     return /\.(exe|msi)(\?|$)/i.test(String(m.url || '')) ? '' : String(m.url || '');
   }
   return String(m.url || '');

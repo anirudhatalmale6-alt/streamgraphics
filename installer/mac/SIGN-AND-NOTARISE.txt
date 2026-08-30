@@ -1,24 +1,59 @@
-StreamGraphics Pro for Mac — signing and notarising, on a Mac
-=============================================================
+StreamGraphics Pro for Mac — signing, notarising, and publishing
+================================================================
 
-The build produced an UNSIGNED app. Ship it as-is and your customer sees
-"Apple could not verify StreamGraphics Pro is free of malware", with no obvious
-way past it. These steps fix that. They are the Mac equivalent of signing the
-Windows installer, and like that one they use YOUR identity, not mine.
+WHO DOES WHAT — read this bit even if you skip the rest
+------------------------------------------------------
+Apple never hosts your app and never hands it to your customers. You host it,
+on your own site, exactly the way you already host the Windows .exe. There is
+no App Store here, no review queue, no human deciding whether to allow it.
 
-Everything below runs in Terminal on a Mac, in the folder that contains
-"StreamGraphics Pro.app". None of it can run on my machine.
+All Apple does is NOTARISE: you send them the app, an automated scanner checks
+it for malware, and they hand back a "ticket" saying it is clean. Minutes,
+usually. Then you attach that ticket to the app and publish it yourself.
+
+So the whole path is:
+
+    download the zip I built
+      -> unzip it on a Mac
+        -> sign the app          (your certificate)
+          -> send it to Apple    (notarise — automated, minutes)
+            -> attach the ticket (staple)
+              -> zip it up AGAIN
+                -> upload THAT zip to streamgraphicspro.com
+
+The zip I built is not the zip you publish. It is the raw material. What you
+upload is a new zip you make at the end, after the app has been signed and
+stapled. Signing changes the app, so a zip made before signing is worthless.
+
+
+AND YOU DO IT TWICE
+-------------------
+There are two Mac apps, not one. Apple Silicon and Intel are different machine
+code — an Apple Silicon app will not launch on an Intel Mac at all. Two zips
+came from the build:
+
+    StreamGraphics-Pro-1.0.39-AppleSilicon.zip     M1, M2, M3, M4 — nearly everyone
+    StreamGraphics-Pro-1.0.39-Intel.zip            Intel Macs, 2020 and earlier
+
+Every step below happens once for each, in its own folder, and produces its own
+published zip. Do them one at a time and finish one before starting the other —
+both unzip to a folder with the same name, "StreamGraphics Pro.app", and mixing
+them up is the easiest mistake to make here.
+
+You can sign both on the same Mac. An Apple Silicon Mac signs the Intel build
+perfectly well and vice versa — signing does not care what chip the app is for.
 
 
 ONE-TIME SETUP
 --------------
-1. Join the Apple Developer Program — 99 US dollars a year, in the company name.
-     https://developer.apple.com/programs/
+1. Apple Developer Program — done, you have paid.
 
 2. Install Xcode from the App Store, then in Xcode:
      Settings > Accounts > (your Apple ID) > Manage Certificates > + >
      Developer ID Application
    That is the certificate that signs apps distributed outside the App Store.
+   It is included in the membership you have already paid for — there is
+   nothing more to buy.
 
 3. Make an app-specific password at https://appleid.apple.com (Sign-In and
    Security > App-Specific Passwords). Notarising will not accept your normal
@@ -34,6 +69,38 @@ ONE-TIME SETUP
    Run it with no arguments and it asks for each one in turn, including what to
    call the saved profile. Call the profile  sgpro  — the rest of this file
    refers to it by that name.
+
+Steps 2-4 are done once, ever. Not once per release, and not once per build.
+
+
+SETTING UP THE FOLDER — do this for ONE architecture at a time
+--------------------------------------------------------------
+Make a folder, put three things in it, and work there:
+
+    StreamGraphics Pro.app        <- from unzipping ONE of the two zips
+    entitlements.plist            <- from the same release page, download it separately
+    (this file, for reference)
+
+entitlements.plist is a separate download — it is not inside the app zip. Get it
+from the same release page you got the zips from.
+
+In Terminal, get into that folder. The easiest way, with no typing:
+
+    cd            (type "cd" and a space, do not press return yet)
+
+then drag the folder from Finder onto the Terminal window — it fills in the
+path for you — and press return. Then:
+
+    ls
+
+You should see "StreamGraphics Pro.app" and "entitlements.plist" listed. If you
+do not, you are in the wrong folder and nothing below will work.
+
+Now clear the download flags off the app. macOS marks anything that came from
+the internet, and those marks make codesign fail with a confusing complaint
+about "resource fork, Finder information, or similar detritus":
+
+    xattr -cr "StreamGraphics Pro.app"
 
 
 EVERY RELEASE
@@ -53,6 +120,8 @@ and put it in a variable — this is the only thing you type by hand:
      echo "$IDENTITY"        # check it looks right before going on
 
 Everything from here uses $IDENTITY, so it is right or it fails loudly.
+(If you close the Terminal window, you have to set IDENTITY again. It does not
+survive.)
 
 
 1. Sign the engine FIRST, then the app.
@@ -68,11 +137,11 @@ Everything from here uses $IDENTITY, so it is right or it fails loudly.
        --entitlements entitlements.plist --sign "$IDENTITY" \
        "StreamGraphics Pro.app"
 
-   entitlements.plist ships beside this file — keep the two together. Do not
-   drop it: the hardened runtime that notarising requires blocks the memory
-   tricks any JavaScript engine needs, and without those two entitlements the
-   app signs and notarises perfectly and then dies the instant it launches,
-   with nothing in the crash report naming an entitlement as the cause.
+   Do not drop the entitlements: the hardened runtime that notarising requires
+   blocks the memory tricks any JavaScript engine needs, and without those two
+   entitlements the app signs and notarises perfectly and then dies the instant
+   it launches, with nothing in the crash report naming an entitlement as the
+   cause.
 
 2. Check the signature before sending anything to Apple:
 
@@ -89,14 +158,25 @@ Everything from here uses $IDENTITY, so it is right or it fails loudly.
 
      xcrun notarytool log THE-ID-IT-PRINTED --keychain-profile "sgpro"
 
+   upload.zip is scratch. You are not publishing it. Delete it afterwards if
+   you like — its only job is to carry the app to Apple.
+
 4. Staple the ticket, so the app also opens on a machine with no internet:
 
      xcrun stapler staple "StreamGraphics Pro.app"
 
-5. Zip THAT — the stapled copy — and publish this one. Not upload.zip from
-   step 3: that copy was made before the ticket was attached.
+5. Now zip the stapled app — THIS is the file you publish. Give it the name
+   that matches the download block on the website. For the Apple Silicon build:
 
-     ditto -c -k --keepParent "StreamGraphics Pro.app" "StreamGraphics-Pro-mac.zip"
+     ditto -c -k --keepParent "StreamGraphics Pro.app" "StreamGraphics-Pro-mac-AppleSilicon.zip"
+
+   and for the Intel build:
+
+     ditto -c -k --keepParent "StreamGraphics Pro.app" "StreamGraphics-Pro-mac-Intel.zip"
+
+   Those two names are what the download buttons on the site point at. Use
+   different names if you prefer — just change the two matching lines at the top
+   of the download block so they agree.
 
 6. Worth doing once, ideally on a Mac that has never seen the app. This asks
    Gatekeeper the same question your customer's machine will ask:
@@ -105,6 +185,36 @@ Everything from here uses $IDENTITY, so it is right or it fails loudly.
 
    You want: "accepted ... source=Notarized Developer ID".
    (-t install is for disk images and installers; for an .app, leave it off.)
+
+7. Upload the zip from step 5 to your site, the same place the .exe lives:
+
+     https://streamgraphicspro.com/download/StreamGraphics-Pro-mac-AppleSilicon.zip
+     https://streamgraphicspro.com/download/StreamGraphics-Pro-mac-Intel.zip
+
+Then go back to "SETTING UP THE FOLDER" and do the whole thing again for the
+other architecture.
+
+
+WHAT THE CUSTOMER DOES
+----------------------
+Downloads the zip, double-clicks it — macOS unzips it straight to Downloads —
+and drags "StreamGraphics Pro" into Applications. That is the whole install.
+There is nothing to run, no installer, no admin password. Once it is notarised
+they get no warning at all.
+
+
+TESTING IT YOURSELF BEFORE ANY OF THIS
+--------------------------------------
+You do not need a signature to run the app on your own Mac. Unzip it, put it in
+Applications, then in Terminal:
+
+     xattr -dr com.apple.quarantine "/Applications/StreamGraphics Pro.app"
+
+and open it normally. That removes the "downloaded from the internet" flag on
+your own copy. Signing is about what happens on a stranger's machine.
+
+Do not use Control-click > Open — Apple removed that in macOS Sequoia and it now
+just fails, silently.
 
 
 A .DMG INSTEAD OF A ZIP
@@ -122,28 +232,27 @@ The disk image has to be notarised and stapled in its own right — the app's
 ticket does not travel inside it.
 
 
-WHICH BUILD DOES A CUSTOMER WANT
---------------------------------
-arm64  — every Mac from late 2020 onwards (M1, M2, M3, M4). Nearly everyone.
-x64    — Intel Macs, 2020 and earlier.
-
-An arm64 app will not launch on an Intel Mac at all. An x64 app does run on
-Apple Silicon through Rosetta, but only if the customer has Rosetta installed,
-and it is slower. Publish both and label them plainly.
-
-
 AND ON THE WEBSITE
 ------------------
 sgpro-version.json drives the in-app "Update available" banner. Add macUrl
 beside the existing url:
 
      {
-       "version": "1.0.39",
-       "url":     "https://streamgraphicspro.com/download/StreamGraphicsProSetup.exe",
-       "macUrl":  "https://streamgraphicspro.com/download/StreamGraphics-Pro-mac.zip",
-       "notes":   "Mac version"
+       "version":     "1.0.39",
+       "url":         "https://streamgraphicspro.com/download/StreamGraphicsProSetup.exe",
+       "macUrl":      "https://streamgraphicspro.com/download/StreamGraphics-Pro-mac-AppleSilicon.zip",
+       "macArm64Url": "https://streamgraphicspro.com/download/StreamGraphics-Pro-mac-AppleSilicon.zip",
+       "macX64Url":   "https://streamgraphicspro.com/download/StreamGraphics-Pro-mac-Intel.zip",
+       "notes":       "Mac version"
      }
 
 url stays the Windows installer. Without macUrl a Mac is told an update exists
 but is given no download link — on purpose, because the alternative is handing
 a Mac customer a .exe.
+
+Why three Mac lines. 1.0.39 only understands macUrl, so that one has to be the
+Apple Silicon build — nearly every Mac sold since late 2020. From the next build
+onwards the app also reads macArm64Url and macX64Url and works out for itself
+which Mac it is running on, so an Intel customer gets the Intel download instead
+of one that will not start. Put all three in now: 1.0.39 ignores the two it does
+not recognise, and nothing has to change on the site again later.
