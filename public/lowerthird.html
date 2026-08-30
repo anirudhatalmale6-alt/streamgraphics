@@ -390,11 +390,14 @@
               <label style="width:auto;margin-left:6px" title="drop shadow to help a PNG pop over video"><input type="checkbox" id="pImgShadow"> Shadow</label>
             </div>
 
-            <!-- Recolour. Two modes because neither covers both jobs — see sg-img.js. -->
+            <!-- Recolour. Three modes because none of them covers all three jobs — see sg-img.js.
+                 "Colour wash" is listed FIRST of the colour ones because it is the one people
+                 reach for: it is what you want for a photo, and Tint is the specialist. -->
             <div class="row only-image"><label>Recolour</label>
               <select class="inp" id="pRecolor" style="width:auto">
                 <option value="none">Off</option>
-                <option value="tint">Tint to a colour</option>
+                <option value="wash">Colour wash — keeps the picture</option>
+                <option value="tint">Tint to a colour — solid shape</option>
                 <option value="hue">Shift the hue</option>
               </select>
               <span id="pTintWrap" style="display:none;align-items:center;gap:6px">
@@ -616,6 +619,14 @@
               <input class="inp" id="pX" type="number" title="X"><input class="inp" id="pY" type="number" title="Y">
               <input class="inp" id="pW" type="number" title="Width"><input class="inp" id="pH" type="number" title="Height">
               <div class="cap">X</div><div class="cap">Y</div><div class="cap">W</div><div class="cap">H</div>
+            </div>
+            <!-- Rotation has always been draggable from the handle above the selection. Typing it
+                 is a different job: a pack of angled panels only looks deliberate if every one is
+                 on the SAME angle, and dragging four layers to -12 by eye never gets there. -->
+            <div class="row single-only"><label>Rotate</label>
+              <input class="range" id="pRot" type="range" min="-180" max="180" step="1" value="0">
+              <input class="inp s" id="pRotN" type="number" min="-180" max="180" step="1" value="0" title="angle in degrees">°
+              <button class="btn ghost" id="pRot0" title="back to straight" style="font-size:12px;padding:6px 9px">Reset</button>
             </div>
             <div class="cap" style="text-align:left;color:var(--muted);font-size:11px;margin:10px 0 4px">Animate ON &nbsp;·&nbsp; type / delay / duration (ms)</div>
             <div class="row">

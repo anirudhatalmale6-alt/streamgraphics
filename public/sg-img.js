@@ -49,6 +49,44 @@
         : '<div class="' + cls + '" style="width:100%;height:100%"></div>';
     }
 
+    if (l.recolor === 'wash' && src && isHex(l.tint)) {
+      /* COLOUR WASH — the one for PHOTOS.
+       *
+       * Tint below paints a flat colour through the artwork's shape, which is right for a
+       * swoosh or a panel and useless for a headshot: a photo is opaque everywhere, so the
+       * whole rectangle fills and you get a coloured block. That is correct behaviour and it
+       * still looks like a fault the first time you meet it.
+       *
+       * This keeps the picture. `mix-blend-mode:color` takes hue and saturation from the
+       * overlay and LUMINANCE from what is underneath, so every highlight, shadow and edge in
+       * the photograph survives and only its colour is replaced. The duotone look every sports
+       * broadcast uses for a head-to-head.
+       *
+       * Two details that matter:
+       *   - `isolation:isolate` pins the blend inside this layer, so it can only ever mix with
+       *     this layer's own picture and never with the layers or the video behind it.
+       *     Belt and braces: the wrapper the renderers put round every layer already carries a
+       *     z-index, which is itself a stacking context, so today the blend is contained with
+       *     or without this line - I could not construct a case where removing it leaked.
+       *     It stays because that containment is then a property of THIS code rather than an
+       *     inherited accident, and a future change to the wrapper cannot quietly turn a
+       *     recoloured headshot into a red cast over the whole programme feed.
+       *   - the overlay carries the SAME mask and geometry as the picture, so with `contain`
+       *     the letterboxed edges stay empty instead of filling with a solid bar.
+       */
+      var wsize = (l.fit === 'cover') ? 'cover' : 'contain';
+      var geom = 'background-image:url(' + esc(src) + ');background-size:' + wsize + ';'
+        + 'background-repeat:no-repeat;background-position:center;';
+      var wmask = 'mask-image:url(' + esc(src) + ');-webkit-mask-image:url(' + esc(src) + ');'
+        + 'mask-size:' + wsize + ';-webkit-mask-size:' + wsize + ';'
+        + 'mask-repeat:no-repeat;-webkit-mask-repeat:no-repeat;'
+        + 'mask-position:center;-webkit-mask-position:center;';
+      var wwrap = 'position:relative;width:100%;height:100%;isolation:isolate;' + geom + radius(l) + shadow(l);
+      var wov = 'position:absolute;inset:0;background-color:' + esc(l.tint) + ';mix-blend-mode:color;'
+        + 'pointer-events:none;' + wmask;
+      return '<div class="' + cls + '" style="' + wwrap + '"><span style="' + wov + '"></span></div>';
+    }
+
     if (l.recolor === 'tint' && src && isHex(l.tint)) {
       /* Mask, not a filter. A filter chain that lands on an exact colour does not exist for
          arbitrary artwork; a mask does the thing the designer actually means — "this shape, in

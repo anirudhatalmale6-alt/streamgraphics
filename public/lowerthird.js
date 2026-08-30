@@ -503,6 +503,7 @@
       updateBulletIdxLabel();
     }
     $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h;
+    $('pRot').value = l.rot || 0; $('pRotN').value = l.rot || 0;
     $('pInAnim').value = l.inAnim || 'fade'; $('pInDelay').value = l.inDelay || 0; $('pInDur').value = l.inDur == null ? 500 : l.inDur;
     $('pOutAnim').value = l.outAnim || 'fade'; $('pOutDelay').value = l.outDelay || 0; $('pOutDur').value = l.outDur == null ? 350 : l.outDur;
   }
@@ -527,21 +528,27 @@
   $('pFieldColor').oninput = function () { mutate(function (l) { var v = $('pFieldColor').value.trim(); if (v) l.fieldColor = v; else delete l.fieldColor; }); };
 
   /* ---- recolouring an image ----
-   * Tint paints a colour THROUGH the artwork's shape (a mask); hue rotates the colours it
-   * already has. They are separate modes rather than one clever control because a hue angle
-   * cannot land on a chosen colour and a mask cannot preserve a photograph — offering one and
-   * quietly doing the other is how a design looks right here and wrong on air. */
+   * Three modes, because none of them does the other two's job:
+   *   WASH  keeps the photograph and replaces only its colour (blend). For headshots.
+   *   TINT  paints a flat colour THROUGH the artwork's shape (a mask). For panels and swooshes.
+   *   HUE   rotates the colours it already has. Cannot land on a chosen colour.
+   * Separate rather than one clever control, because guessing wrong is how a design looks right
+   * in the builder and wrong on air. */
+  var RECOLOR_HINTS = {
+    wash: 'Keeps the picture and changes only its colour — highlights, shadows and detail all survive. This is the one for photos and headshots. The colour can come from a field, so one design carries each team\u2019s colour.',
+    tint: 'Fills the SHAPE of the artwork with a flat colour, ignoring what is inside it. Right for a panel, bar or swoosh drawn as a transparent PNG. A photo is solid all over, so it comes out as a solid block \u2014 that is this mode working, not a fault. For a photo use Colour wash.',
+    hue:  'Rotates the colours the image already has. Good for a quick variation on a multi-coloured graphic; it cannot land on one specific colour \u2014 Colour wash or Tint do that.'
+  };
   function paintRecolor() {
     var m = $('pRecolor').value;
-    $('pTintWrap').style.display = (m === 'tint') ? 'inline-flex' : 'none';
+    var usesColour = (m === 'tint' || m === 'wash');
+    $('pTintWrap').style.display = usesColour ? 'inline-flex' : 'none';
     $('pHueWrap').style.display = (m === 'hue') ? 'inline-flex' : 'none';
-    $('pTintFieldRow').style.display = (m === 'tint') ? 'flex' : 'none';
+    $('pTintFieldRow').style.display = usesColour ? 'flex' : 'none';
     $('pHueV').textContent = $('pHue').value + '\u00b0';
     var h = $('pRecolorHint');
     h.style.display = (m === 'none') ? 'none' : '';
-    h.textContent = (m === 'tint')
-      ? 'Uses the shape of the artwork and fills it with the colour — draw the panel once in white, then any team colour fills it. A picture on a solid background will come out as a solid rectangle; use Shift the hue for photos.'
-      : 'Rotates the colours the image already has. Good for a photo or a multi-coloured graphic; it cannot land on one specific colour — that is what Tint is for.';
+    h.textContent = RECOLOR_HINTS[m] || '';
   }
   $('pRecolor').onchange = function () {
     paintRecolor();
@@ -740,6 +747,20 @@
   $('pBuRadius').oninput = function () { mutate(function (l) { l.radius = +$('pBuRadius').value; }); };
   $('pBuReset').onchange = function () { mutate(function (l) { l.resetOnAir = $('pBuReset').checked; }); };
   ['pX', 'pY', 'pW', 'pH'].forEach(function (id) { $(id).oninput = function () { mutate(function (l) { l[id.slice(1).toLowerCase()] = Math.round(+$(id).value); }); }; });
+
+  /* Rotation, typed. The slider and the number box drive each other and both write the same
+   * value the drag handle writes, so the three can never disagree. Stored as l.rot, which the
+   * canvas and every output already read. */
+  function setRot(v) {
+    var d = Math.round(+v);
+    if (!isFinite(d)) d = 0;
+    d = Math.max(-180, Math.min(180, d));
+    $('pRot').value = d; $('pRotN').value = d;
+    mutate(function (l) { if (d) l.rot = d; else delete l.rot; });
+  }
+  $('pRot').oninput  = function () { setRot(this.value); };
+  $('pRotN').oninput = function () { setRot(this.value); };
+  $('pRot0').onclick = function () { setRot(0); };
   $('pInAnim').onchange = function () { mutateSel(function (l) { l.inAnim = $('pInAnim').value; }); };
   $('pInDelay').oninput = function () { mutateSel(function (l) { l.inDelay = +$('pInDelay').value; }); };
   $('pInDur').oninput = function () { mutateSel(function (l) { l.inDur = +$('pInDur').value; }); };
@@ -1476,7 +1497,7 @@
     syncNum(l); renderHandles();
   });
   document.addEventListener('mouseup', function () { if (hop) { var wasResize = hop.kind === 'resize'; hop = null; push(); if (wasResize) syncProps(); } });
-  function syncNum(l) { if (selId === l.id) { $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h; } }
+  function syncNum(l) { if (selId === l.id) { $('pX').value = l.x; $('pY').value = l.y; $('pW').value = l.w; $('pH').value = l.h; $('pRot').value = l.rot || 0; $('pRotN').value = l.rot || 0; } }
 
   // Delete removes the selected layer; arrow keys nudge it (Shift = 10px). Not while typing.
   document.addEventListener('keydown', function (e) {
