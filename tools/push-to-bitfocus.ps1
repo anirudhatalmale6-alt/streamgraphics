@@ -9,7 +9,17 @@
 #
 # Run it as many times as you like - a re-run just copies whatever is newest.
 
-$ErrorActionPreference = 'Stop'
+# 🚨 NOT 'Stop'. git, gh and winget all write ordinary progress to stderr and report failure
+# through an exit code. With ErrorActionPreference = Stop, Windows PowerShell turns both of
+# those into TERMINATING errors - so a command that is SUPPOSED to fail, like asking gh whether
+# we are signed in yet, kills the script before its exit code can be read. That is exactly what
+# happened on the first version of this script: it died on "gh auth status" with a
+# NativeCommandError instead of going on to sign in. Every external command below is checked by
+# its exit code, which is the thing that actually means failure.
+$ErrorActionPreference = 'Continue'
+# PowerShell 7.3+ has its own switch for the same trap. Absent on Windows PowerShell 5.1, where
+# assigning to it is harmless.
+$PSNativeCommandUseErrorActionPreference = $false
 
 $Source = 'https://github.com/moishe64/companion-module-streamgraphics-pro.git'
 $Target = 'https://github.com/bitfocus/companion-module-manhattanbeachstudios-streamgraphicspro.git'
@@ -49,17 +59,27 @@ Require-Tool gh  'GitHub.cli'   'the GitHub CLI' 'https://cli.github.com'
 # The GitHub CLI signs in through your browser, so there is no password or token to
 # create or paste anywhere. It also becomes what git uses to prove who you are, which
 # is why the push below needs nothing else.
+# Being signed in to github.com in your BROWSER is not the same thing as the GitHub CLI being
+# signed in - they are separate. This is the step that connects the two, and the first run has
+# to do it. Non-zero here just means "not signed in yet", which is why the script must not
+# treat it as a crash.
 Step "Signing in to GitHub"
-gh auth status 2>$null | Out-Null
+gh auth status *> $null
 if ($LASTEXITCODE -ne 0) {
-    Warn "A browser window will open. Sign in as moishe64 and come back here."
+    Warn "The GitHub CLI hasn't been signed in on this computer yet."
+    Warn "A browser window will open. Sign in as moishe64, then come back to this window."
     gh auth login --hostname github.com --git-protocol https --web
-    if ($LASTEXITCODE -ne 0) { Fail "Sign-in didn't complete." }
+    if ($LASTEXITCODE -ne 0) { Fail "Sign-in didn't complete. Run the script again to have another go." }
 }
 gh auth setup-git --hostname github.com
+if ($LASTEXITCODE -ne 0) { Fail "Signed in, but the GitHub CLI couldn't hand its sign-in over to git." }
 $who = (gh api user --jq '.login' 2>$null)
 if (-not $who) { Fail "Signed in, but GitHub won't say who you are. Run 'gh auth login' on its own and try again." }
 Done "Signed in as $who."
+if ($who -ne 'moishe64') {
+    Warn "That isn't the moishe64 account. If the push is refused further down, that is why -"
+    Warn "run 'gh auth logout' and then this script again to sign in as moishe64."
+}
 
 # --- working folder ---------------------------------------------------------
 # Only ever remove a folder this script made, and only after checking it is that folder.
@@ -73,7 +93,8 @@ if (Test-Path $Work) {
     if (-not $isOurs) {
         Fail "There is already a folder at`n  $Work`nand it isn't one this script made. Have a look at it, move or delete it yourself, then run this again."
     }
-    Remove-Item -Recurse -Force $Work
+    try { Remove-Item -Recurse -Force $Work -ErrorAction Stop }
+    catch { Fail "Couldn't clear the old working folder at`n  $Work`nClose anything that has it open, or delete it yourself, then run this again." }
 }
 Done $Work
 
