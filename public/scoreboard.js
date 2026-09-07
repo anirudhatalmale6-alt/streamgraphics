@@ -4,7 +4,45 @@
   var $ = function (id) { return document.getElementById(id); };
   var sb = null, editing = null; // id of a field being edited (don't clobber it)
   var BOARD = new URLSearchParams(location.search).get('board') || '';   // which scoreboard this panel drives
-  function pickBoard(state) { var list = (state && state.scoreboards) || []; return (BOARD && list.filter(function (b) { return b.id === BOARD; })[0]) || list[0] || null; }
+  /* Board selection lives in sg-board.js — read the note there. The short version: an id that
+     matches nothing must NOT silently become the first court. Here, unlike the output and the
+     Scorer, falling back is reasonable ONCE it is said out loud: this panel is where an operator
+     goes to fix things, and it has the court list right at the top. In scorer mode it is not
+     reasonable at all — see missingBoard(). */
+  var boardWarned = false;
+  function missingBoard(state, wanted) {
+    if (SCORER_MODE) {
+      // The scorer's own link is stale. Editing here changes TEAMS, so landing them on somebody
+      // else's court would have them rename another match's players. Stop.
+      SGBoard.notice('This link is for a court that no longer exists', [
+        'It asks for <b>' + SGBoard.esc(wanted) + '</b>, and there is no such court.',
+        'Courts open right now: ' + (SGBoard.nameList(state) || 'none') + '.',
+        'Nothing can be changed from here, so no other court can be altered by mistake. Ask the ' +
+        'technical director for the Scorer link for your court.'
+      ]);
+      return null;
+    }
+    if (!boardWarned) {
+      boardWarned = true;
+      var bar = document.querySelector('.boardbar');
+      if (bar) {
+        var w = document.createElement('div');
+        w.setAttribute('style', 'flex-basis:100%;margin-top:8px;padding:10px 12px;border-radius:9px;' +
+          'background:#3a2a12;border:1px solid #7a5a20;color:#ffd8a1;font-size:13px;line-height:1.5');
+        w.innerHTML = 'The link you opened asks for scoreboard <b>' + SGBoard.esc(wanted) +
+          '</b>, which no longer exists — a court gets a new link if it is deleted and remade. ' +
+          'Showing <b>' + SGBoard.esc(((state.scoreboards || [])[0] || {}).name || '') +
+          '</b> instead; pick the one you want above, and copy its output link again for OBS.';
+        bar.appendChild(w);
+      }
+    }
+    return (state.scoreboards || [])[0] || null;
+  }
+  function pickBoard(state) {
+    var got = SGBoard.pick(state, BOARD);
+    if (got.board) return got.board;
+    return got.missing ? missingBoard(state, got.wanted) : null;
+  }
 
   /* ---- scorer mode (?scorer=1) ----
    * 🚨 The Scorer used to link here as a bare "/scoreboard" with no board on it. That is not a

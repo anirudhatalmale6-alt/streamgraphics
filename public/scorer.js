@@ -6,8 +6,17 @@
   var sb = null;
 
   var BOARD = new URLSearchParams(location.search).get('board') || '';
-  function pickBoard(state) { var list = (state && state.scoreboards) || []; return (BOARD && list.filter(function (b) { return b.id === BOARD; })[0]) || list[0] || null; }
-  function post(a) { if (a && String(a.type || '').indexOf('sb_') === 0) a.board = (sb && sb.id) || BOARD; return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {}); }
+  /* 🚨 The worst version of the missing-court bug lived here. A tablet bookmarked to a court that
+     no longer exists used to fall through to the FIRST court — and this page does not merely show
+     a score, it CHANGES one. So the scorer tapped +1 POINT believing they were on court 3 and put
+     the point on court 1, and the heading agreed with them because it named whatever board it had
+     landed on. Now: no court, no scoring. `dead` latches and every post is refused. */
+  var dead = false;
+  function post(a) {
+    if (dead) return Promise.resolve();
+    if (a && String(a.type || '').indexOf('sb_') === 0) a.board = (sb && sb.id) || BOARD;
+    return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {});
+  }
   function contrast(hex) { hex = String(hex || '#1f7a8c').replace('#', ''); if (hex.length === 3) hex = hex.replace(/(.)/g, '$1$1'); var r = parseInt(hex.slice(0, 2), 16) || 0, g = parseInt(hex.slice(2, 4), 16) || 0, b = parseInt(hex.slice(4, 6), 16) || 0; var L = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; return L > 0.6 ? '#111' : '#fff'; }
 
   function scoreOf(t, g) { var v = sb.teams[t].games[g]; return (v == null) ? '--' : v; }
@@ -51,18 +60,43 @@
     $('airState').classList.toggle('live', !!sb.visible);
   }
 
-  $('plusA').onclick = function () { post({ type: 'sb_score', team: 0, game: sb.activeGame | 0, delta: 1 }); };
-  $('plusB').onclick = function () { post({ type: 'sb_score', team: 1, game: sb.activeGame | 0, delta: 1 }); };
-  $('minusA').onclick = function () { post({ type: 'sb_score', team: 0, game: sb.activeGame | 0, delta: -1 }); };
-  $('minusB').onclick = function () { post({ type: 'sb_score', team: 1, game: sb.activeGame | 0, delta: -1 }); };
-  $('startNext').onclick = function () { if (!sb) return; var g = Math.min((sb.gamesCount || 3) - 1, (sb.activeGame | 0) + 1); post({ type: 'sb_startGame', game: g }); };
-  $('backGame').onclick = function () { post({ type: 'sb_backGame' }); };
-  $('restart').onclick = function () { if (confirm('Restart the whole match? All scores reset.')) post({ type: 'sb_restart' }); };
+  /* 🚨 Every one of these guards on `live()`, not on nothing.
+     Before, `sb.activeGame` was read straight out of the handler — so with no court the button
+     did "refuse", but only by throwing a TypeError on a null. That is not a refusal, it is an
+     accident that happened to have the right effect, and it would have stopped being one the
+     moment a court was deleted while a Scorer was open on it: `sb` is non-null then, stale, and
+     the tap would have gone through to whatever board it named. A test that only clicks the
+     button cannot tell those two apart, because a notice sits over the button either way. */
+  function live() { return !!sb && !dead; }
+  $('plusA').onclick   = function () { if (!live()) return; post({ type: 'sb_score', team: 0, game: sb.activeGame | 0, delta: 1 }); };
+  $('plusB').onclick   = function () { if (!live()) return; post({ type: 'sb_score', team: 1, game: sb.activeGame | 0, delta: 1 }); };
+  $('minusA').onclick  = function () { if (!live()) return; post({ type: 'sb_score', team: 0, game: sb.activeGame | 0, delta: -1 }); };
+  $('minusB').onclick  = function () { if (!live()) return; post({ type: 'sb_score', team: 1, game: sb.activeGame | 0, delta: -1 }); };
+  $('startNext').onclick = function () { if (!live()) return; var g = Math.min((sb.gamesCount || 3) - 1, (sb.activeGame | 0) + 1); post({ type: 'sb_startGame', game: g }); };
+  $('backGame').onclick  = function () { if (!live()) return; post({ type: 'sb_backGame' }); };
+  $('restart').onclick   = function () { if (!live()) return; if (confirm('Restart the whole match? All scores reset.')) post({ type: 'sb_restart' }); };
 
   function connect() {
     var es = SGLive('/events');
     es.onopen = function () { $('conn').className = 'conn ok'; $('connTxt').textContent = 'live'; };
-    es.onmessage = function (e) { try { var m = JSON.parse(e.data); var bd = m.state && pickBoard(m.state); if (bd) { sb = bd; render(); } } catch (x) {} };
+    es.onmessage = function (e) {
+      try {
+        var m = JSON.parse(e.data);
+        if (!m.state) return;
+        var got = SGBoard.pick(m.state, BOARD);
+        if (got.board) { dead = false; SGBoard.clearNotice(); sb = got.board; render(); return; }
+        // The court named in this tablet's link is gone. Stop, loudly, rather than scoring
+        // somebody else's match — see the note on post().
+        dead = true;
+        SGBoard.notice('This tablet is set to a court that no longer exists', [
+          'The link on this device asks for <b>' + SGBoard.esc(got.wanted) + '</b>, and there is no such court.',
+          'Courts open right now: ' + (SGBoard.nameList(m.state) || 'none') + '.',
+          'Scoring is switched off here so it cannot go onto the wrong court. Ask for the Scorer ' +
+          'link for your court again — the technical director can send it, or show the QR code on ' +
+          'the scoreboard panel.'
+        ]);
+      } catch (x) {}
+    };
     es.onerror = function () { $('conn').className = 'conn off'; $('connTxt').textContent = 'reconnecting…'; };
   }
   connect();

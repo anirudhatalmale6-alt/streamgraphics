@@ -203,11 +203,30 @@
 
   function connect() {
     var BOARD = new URLSearchParams(location.search).get('board') || '';
-    function pickBoard(st) { var list = (st && st.scoreboards) || []; return (BOARD && list.filter(function (b) { return b.id === BOARD; })[0]) || list[0] || null; }
     var es = SGLive('/events');
     es.onmessage = function (e) {
-      try { var msg = JSON.parse(e.data); var bd = msg.state && pickBoard(msg.state); if (bd) render(bd); }
-      catch (err) {}
+      try {
+        var msg = JSON.parse(e.data);
+        if (!msg.state) return;
+        var got = SGBoard.pick(msg.state, BOARD);
+        if (got.board) { SGBoard.clearNotice(); render(got.board); return; }
+        /* 🚨 The court this output was pointed at is gone. It used to fall back to the FIRST
+           court — which meant a browser source in a live scene quietly put ANOTHER court's score
+           on air, and stopped responding to the one the operator was actually scoring. That is
+           how this was found. Draw nothing instead: an empty source is safe, a confidently wrong
+           scoreboard is not. The card is hidden first, so nothing lingers on air, and only then
+           is the reason put on screen — by that point there is no legitimate graphic left to
+           protect, and an operator staring at a blank source deserves to be told why. */
+        card.classList.add('is-hidden');
+        document.body.classList.remove('chroma');
+        document.title = 'Scoreboard not found — StreamGraphics Pro';
+        SGBoard.notice('This output is pointed at a scoreboard that no longer exists', [
+          'The link this browser source is using asks for <b>' + SGBoard.esc(got.wanted) + '</b>.',
+          'Courts open right now: ' + (SGBoard.nameList(msg.state) || 'none') + '.',
+          'Open the scoreboard control, pick the court you want, and copy its output link again — ' +
+          'a court gets a new link if it is deleted and remade.'
+        ]);
+      } catch (err) {}
     };
   }
   connect();
