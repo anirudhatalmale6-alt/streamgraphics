@@ -272,17 +272,33 @@
     SGLinks.onbase(function () { if ($('outs').innerHTML) paint(); });
 
     render();
+
     SGLinks.load(function () {
       paintPicker();
       paint();
-      // A second court / field is its own browser source with its own ?board= link.
+      /* A second court / field is its own browser source with its own ?board= link — and its own
+         SCORER, which was the half missing here. The output rows have listed each court for a
+         while; the Scorer row stayed a bare /scorer, so the one link on this page for handing to
+         a tablet went to whichever court happened to be first. On a four-court meet that is three
+         tablets scoring the wrong match, which is precisely the fault that cost a day this week.
+         Both lists are rebuilt from the pristine originals, so this is safe to run again. */
       fetch('/state').then(function (r) { return r.json(); }).then(function (s) {
         var boards = (s && s.state && s.state.scoreboards) || [];
-        if (boards.length < 2) return;
-        var extra = boards.map(function (b) {
-          return { nm: 'Beach Volleyball — ' + b.name, p: '/scoreboard-output?board=' + encodeURIComponent(b.id), note: 'scoreboard' };
-        });
-        outputs = OUTPUTS.filter(function (o) { return o.p !== '/scoreboard-output'; }).concat(extra);
+        if (boards.length < 2) return;          // one court: a bare link is unambiguous
+        outputs = OUTPUTS.filter(function (o) { return o.p !== '/scoreboard-output'; })
+          .concat(boards.map(function (b) {
+            return { nm: 'Beach Volleyball — ' + b.name, note: 'this court only',
+                     p: '/scoreboard-output?board=' + encodeURIComponent(b.id) };
+          }));
+        var ci = -1;
+        CONTROLS.forEach(function (c, i) { if (c.p === '/scorer') ci = i; });
+        if (ci >= 0) {
+          CONTROLS.splice.apply(CONTROLS, [ci, 1].concat(boards.map(function (b) {
+            return { nm: 'Scorer (big buttons) — ' + b.name,
+                     p: '/scorer?board=' + encodeURIComponent(b.id) };
+          })));
+        }
+        mailEdited = false;      // the email listed the old set, which is no longer what is shown
         render();
       }).catch(function () {});
     });
