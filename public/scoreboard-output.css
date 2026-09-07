@@ -43,7 +43,10 @@ body.chroma { background: var(--chroma) !important; }  /* solid key colour for h
   font-weight: 900; font-size: 15px; z-index: 2; }
 .brandtxt .pres { font-size: 10px; color: #222; font-weight: 700; letter-spacing: .04em; }
 .brandtxt .pres b { color: #0d3a6b; font-size: 14px; letter-spacing: -.3px; }
-.brandtxt .ttl { font-size: 13px; color: #111; font-weight: 800; margin-top: 2px; }
+.brandtxt { min-width: 0; }
+/* font-size is set inline by scoreboard-output.js from the board's titleSize — this is only
+   what shows before the first state arrives. line-height keeps a wrapped long title tight. */
+.brandtxt .ttl { font-size: 20px; color: #111; font-weight: 800; margin-top: 2px; line-height: 1.12; }
 .games { display: flex; flex-direction: column; justify-content: center; width: 132px; flex: none;
   border-left: 1px solid #ececec; padding: 7px 0 5px; }
 .games .gh { text-align: center; font-size: 10px; font-weight: 800; color: #111; letter-spacing: .12em; }

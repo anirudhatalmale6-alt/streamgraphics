@@ -72,6 +72,7 @@
         <select class="inp" id="boardSel" style="width:auto"></select>
         <button class="btn ghost" id="boardRename" style="font-size:12px">Rename</button>
         <button class="btn ghost" id="boardNew" style="font-size:12px">＋ New board</button>
+        <button class="btn ghost" id="boardCopy" style="font-size:12px" title="a new court with this one's colours, logos, backdrop, position and match info — scores start fresh">⧉ Copy this court</button>
         <button class="btn ghost" id="boardDelete" style="font-size:12px;color:#e06">Delete</button>
       </span>
       <!-- …replaced in scorer mode by the name of the one court they are allowed to touch. -->
@@ -175,6 +176,8 @@
         <h3>Match info</h3>
         <div class="row"><label>Presenter</label><input class="inp" id="mPresenter" placeholder="WEDBUSH"></div>
         <div class="row"><label>Title</label><input class="inp" id="mTitle" placeholder="HERMOSA BEACH OPEN 2025"></div>
+        <div class="row"><label>Title size</label><input class="range" id="mTitleSize" type="range" min="10" max="34" value="20"><span id="mTitleSizeV" class="mono">20</span></div>
+        <div class="row"><label></label><span class="hint">How big the event name reads on the board. 13 was the old fixed size.</span></div>
         <div class="row"><label>Round/label</label><input class="inp" id="mBracket" placeholder="MEN'S CONTENDER'S BRACKET"></div>
         <div class="row"><label>Event logo</label><input class="inp" id="mEventLogo" placeholder="paste a URL, or Browse ▸"><label class="browsebtn">Browse<input type="file" accept="image/*" data-browse-meta="eventLogoUrl"></label></div>
         <div class="row"><label>Logo place</label>

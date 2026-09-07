@@ -62,6 +62,11 @@
     // meta
     $('presenter').textContent = sb.presenter || '';
     $('title').textContent = sb.title || '';
+    /* Operator-set, because "prominent enough" depends on the event's name, the stream's
+       resolution and how far away the audience is sitting. The card is a fixed 620px wide, so a
+       long title at a large size WRAPS rather than being cut — a truncated event name on air
+       would be worse than a taller board. */
+    $('title').style.fontSize = Math.max(10, Math.min(34, Number(sb.titleSize) || 20)) + 'px';
     $('bracket').textContent = sb.bracketLabel || '';
     $('bracket').style.background = (sb.style && sb.style.bracketColor) || '#7a1420';
 

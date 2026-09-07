@@ -114,6 +114,14 @@
   $('mLogoSize').addEventListener('focus', function () { editing = 'mLogoSize'; });
   $('mLogoSize').addEventListener('blur', function () { editing = null; });
   $('mLogoSize').oninput = function () { $('mLogoSizeV').textContent = $('mLogoSize').value; send({ type: 'sb_meta', eventLogoSize: +$('mLogoSize').value }); };
+
+  /* How big the event name reads on the board. It used to be fixed at 13px — smaller than the
+     team names and smaller than the sponsor credit above it — which is what Mark's people meant
+     by "the title isn't prominent enough". Dragged, not typed, because the right answer depends
+     on the length of the name and how far away the audience is sitting. */
+  $('mTitleSize').addEventListener('focus', function () { editing = 'mTitleSize'; });
+  $('mTitleSize').addEventListener('blur', function () { editing = null; });
+  $('mTitleSize').oninput = function () { $('mTitleSizeV').textContent = this.value; send({ type: 'sb_meta', titleSize: +this.value }); };
   $('btnOnAir').onclick = function () { send({ type: 'sb_show' }); };
   $('btnOffAir').onclick = function () { send({ type: 'sb_hide' }); };
 
@@ -345,6 +353,7 @@
     if (editing !== 'mEventLogo') $('mEventLogo').value = s.eventLogoUrl || '';
     if (editing !== 'mLogoPlace') $('mLogoPlace').value = s.eventLogoPlacement || 'inline';
     if (editing !== 'mLogoSize') { $('mLogoSize').value = s.eventLogoSize || 150; $('mLogoSizeV').textContent = s.eventLogoSize || 150; }
+    if (editing !== 'mTitleSize') { var ts = s.titleSize || 20; $('mTitleSize').value = ts; $('mTitleSizeV').textContent = ts; }
     if (s.style) {
       if (editing !== 'stAccent') $('stAccent').value = s.style.accent || '#1e64d2';
       if (editing !== 'stBracket') $('stBracket').value = s.style.bracketColor || '#7a1420';
@@ -427,6 +436,21 @@
     if (!confirm('Delete this scoreboard? Its scores are lost.')) return;
     var delId = (sb && sb.id) || BOARD;
     send({ type: 'sb_board_delete', board: delId }).then(function () { fetch('/state').then(function (r) { return r.json(); }).then(function (s) { var b = (s.state.scoreboards || [])[0]; if (b) goBoard(b.id); }); });
+  };
+  /* 🚨 Copy, not "new". Styling a court is a dozen colours, a logo, a backdrop, a position and a
+     nudge; doing that five times for five courts of one event is work nobody should be asked to
+     repeat, and it was the thing Mark actually hit. Lands you ON the new court, because the next
+     thing anyone does after copying is change the players. */
+  $('boardCopy').onclick = function () {
+    if (!sb) return;
+    var n = prompt('Name for the copy of "' + sb.name + '":', sb.name + ' copy');
+    if (n == null) return;
+    send({ type: 'sb_board_copy', board: sb.id, name: n.trim() || (sb.name + ' copy') }).then(function () {
+      fetch('/state').then(function (r) { return r.json(); }).then(function (st) {
+        var list = st.state.scoreboards || [], b = list[list.length - 1];
+        if (b) goBoard(b.id);
+      });
+    });
   };
   $('boardNew').onclick = function () {
     var n = prompt('New scoreboard name:', 'Court ' + Date.now().toString().slice(-3)); if (n == null) return;

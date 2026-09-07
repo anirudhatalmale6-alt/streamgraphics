@@ -275,6 +275,11 @@ function defaultScoreboard(name) {
     presenter: 'WEDBUSH',
     bracketLabel: "MEN'S CONTENDER'S BRACKET",
     eventLogoUrl: '', eventLogoPlacement: 'inline', eventLogoSize: 150,
+    /* The event title used to be fixed at 13px — smaller than the team names, and smaller
+       than the SPONSOR credit sitting right above it, which is backwards: the sponsor is a
+       credit, the event is the event. Now an adjustable size, defaulting to something that
+       actually reads on a stream. See .brandtxt .ttl in scoreboard-output.css. */
+    titleSize: 20,
     gamesCount: 3,
     activeGame: 0,
     teams: [
@@ -722,6 +727,101 @@ function saveLowerThird() {
     return { layers: state.lowerthird.layers, fields: state.lowerthird.fields || [] };
   });
 }
+
+/* ---- THE SCOREBOARDS -------------------------------------------------------------------
+ *
+ * 🚨🚨 THESE WERE NEVER SAVED. Not on update — on ANY restart. The courts, their names, the
+ * team names and seeds, every colour, every logo, the event title, the position on screen, the
+ * backdrop: all of it lived in memory only and went the moment the app closed. Mark hit it the
+ * obvious way — styled a court, installed a new version, and found the courts gone — but a power
+ * cut or a crash between two matches would have done exactly the same thing, mid-tournament.
+ *
+ * It is the whole family, not just the volleyball courts: football/basketball (state.game) and
+ * baseball (state.baseball) had no save either. Everything else the operator builds — the team
+ * library, the lower thirds, the prompter, the shows, the templates — has been saved since it
+ * was written. These three were simply missed.
+ *
+ * WHAT IS RESTORED AND WHAT IS NOT:
+ *  - Restored: boards, teams, scores, the active game, match info, and every style. A crash at
+ *    18-21 must not cost the score.
+ *  - NOT restored: `visible`. Starting the app must never push a graphic to the switcher on its
+ *    own — the operator decides what goes on air, always.
+ *  - NOT restored: a RUNNING game clock. It is frozen at the time left before writing, so a
+ *    restart brings back 4:12 on the clock, stopped, rather than a clock that appears to have
+ *    run all night. See clockFreeze().
+ *
+ * 🚨 Loading is per-board, and one unreadable board is skipped rather than costing the rest —
+ * a single bad record must never empty the whole list. Each is merged ONTO a fresh default, so
+ * a file written by an older version is missing nothing a newer one expects. */
+const BOARDS_FILE = path.join(DATA_DIR, 'scoreboards.json');
+const GAME_FILE = path.join(DATA_DIR, 'game.json');
+const BASEBALL_FILE = path.join(DATA_DIR, 'baseball.json');
+
+function readJsonFile(file) {
+  try {
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {}
+  return null;
+}
+// Merge a saved object onto a fresh default, one level deep for the nested bags.
+function reviveOnto(def, saved) {
+  if (!saved || typeof saved !== 'object') return def;
+  const out = Object.assign({}, def, saved);
+  ['style', 'clock', 'shot'].forEach(function (k) {
+    if (def[k] && typeof def[k] === 'object') out[k] = Object.assign({}, def[k], saved[k] || {});
+  });
+  out.visible = false;                       // never come back on air by itself
+  return out;
+}
+
+(function loadScoreboards() {
+  const j = readJsonFile(BOARDS_FILE);
+  if (!j || !Array.isArray(j.boards)) return;
+  const list = [];
+  j.boards.forEach(function (b) {
+    try {
+      if (!b || typeof b !== 'object' || !b.id) return;      // skip it, keep the others
+      const board = reviveOnto(defaultScoreboard(b.name || 'Court'), b);
+      board.id = String(b.id);
+      if (!Array.isArray(board.teams) || board.teams.length !== 2) return;
+      list.push(board);
+    } catch (e) {}
+  });
+  if (list.length) state.scoreboards = list.slice(0, 24);
+})();
+function saveScoreboards() {
+  writeJson(BOARDS_FILE, function () { return { boards: state.scoreboards || [] }; });
+}
+
+(function loadGame() {
+  const j = readJsonFile(GAME_FILE);
+  if (!j || !j.game) return;
+  const g = reviveOnto(defaultGame(), j.game);
+  if (!Array.isArray(g.teams) || g.teams.length !== 2) g.teams = defaultGameTeams();
+  // Whatever was on the clock is the time LEFT, and it is not running any more.
+  ['clock', 'shot'].forEach(function (k) { g[k].running = false; g[k].anchorServer = 0; });
+  state.game = g;
+})();
+function saveGame() {
+  writeJson(GAME_FILE, function () {
+    // Freeze a copy, never the live object — writing must not stop a clock that is on air.
+    const now = Date.now(), g = state.game;
+    const out = Object.assign({}, g);
+    ['clock', 'shot'].forEach(function (k) {
+      out[k] = Object.assign({}, g[k], { baseMs: clockLeft(g[k], now), running: false, anchorServer: 0 });
+    });
+    return { game: out };
+  });
+}
+
+(function loadBaseball() {
+  const j = readJsonFile(BASEBALL_FILE);
+  if (!j || !j.baseball) return;
+  const bb = reviveOnto(defaultBaseball(), j.baseball);
+  ensureBaseballShape(bb);                   // innings arrays must match the innings count
+  state.baseball = bb;
+})();
+function saveBaseball() { writeJson(BASEBALL_FILE, function () { return { baseball: state.baseball }; }); }
 
 // The TELEPROMPTER script + look. The live scroll position is deliberately NOT saved — a
 // restart should hand you the script back at the top, not halfway down last night's read.
@@ -1507,12 +1607,32 @@ function applyAction(action) {
         if (ok.indexOf(action.eventLogoPlacement) >= 0) sb.eventLogoPlacement = action.eventLogoPlacement;
       }
       if (action.eventLogoSize != null) sb.eventLogoSize = Math.max(40, Math.min(600, parseInt(action.eventLogoSize, 10) || 150));
+      if (action.titleSize != null) sb.titleSize = Math.max(10, Math.min(34, parseInt(action.titleSize, 10) || 20));
     } break; }
 
     case 'sb_style': { const sb = boardOf(action.board); if (sb) Object.assign(sb.style, styleIn(action.style)); break; }
 
     /* ---- board management (create / rename / delete scoreboards) ---- */
     case 'sb_board_add': { if ((state.scoreboards || []).length < 24) state.scoreboards.push(defaultScoreboard(String(action.name || ('Court ' + (state.scoreboards.length + 1))).slice(0, 60))); break; }
+    /* Copy a court. Styling a board is a dozen colours, a logo, a backdrop, a position and a
+     * nudge, and doing that five times for five courts of the same event is the kind of work
+     * nobody should be asked to repeat. So: take everything, then put back the two things a copy
+     * must NOT inherit — the scores, which belong to a match that is not this one, and being on
+     * air, which is the operator's decision every single time.
+     * Deliberately a full copy including the players: this is "duplicate", and a name that is
+     * wrong is one field to fix, while a colour scheme that is missing is ten. */
+    case 'sb_board_copy': {
+      const src = boardOf(action.board);
+      if (!src || (state.scoreboards || []).length >= 24) return false;
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.id = 'brd' + (Date.now().toString(36)) + (boardSeq++);
+      copy.name = String(action.name || (src.name + ' copy')).slice(0, 60);
+      copy.visible = false;
+      copy.activeGame = 0;
+      copy.teams.forEach(t => { t.games = t.games.map((v, i) => (i === 0 ? 0 : null)); });
+      state.scoreboards.push(copy);
+      break;
+    }
     case 'sb_board_rename': { const sb = boardOf(action.board); if (sb && action.name != null) sb.name = String(action.name).slice(0, 60); break; }
     case 'sb_board_delete': { if ((state.scoreboards || []).length > 1) state.scoreboards = state.scoreboards.filter(b => b.id !== action.board); break; }
 
@@ -2285,6 +2405,19 @@ function applyAction(action) {
     default:
       return false;
   }
+
+  /* 🚨 Saved HERE, once, rather than at the end of each of the forty-odd sb_/gm_/bl_ cases.
+   * Every other part of the app saves inside the case that changed something, which is exactly
+   * how the scoreboards came to have no save at all — there is no single place to forget, so a
+   * whole family was missed and nobody noticed until a court vanished. One line per family, run
+   * on every action that actually changed something (the `return false` paths above skip it),
+   * and a case added tomorrow is covered without anyone remembering to do anything.
+   * writeJson debounces 300ms and flushWrites() catches whatever is pending on the way out, so
+   * scoring a point does not touch the disk forty times a rally. */
+  const kind = String(action.type || '').slice(0, 3);
+  if (kind === 'sb_') saveScoreboards();
+  else if (kind === 'gm_') saveGame();
+  else if (kind === 'bl_') saveBaseball();
   return true;
 }
 
