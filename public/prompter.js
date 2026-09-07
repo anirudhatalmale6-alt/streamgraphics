@@ -846,27 +846,52 @@
 
   /* ---- look ---- */
   function style(o) { send({ type: 'pr_style', style: o }); }
+
+  /* 🚨 DRAGGING a slider fires `input` on every pixel of travel — sixty or more a second. Sent
+     straight through, each one is a POST, a state broadcast to every open page, and on each
+     output page a FULL re-layout of the script and a geometry report back. Size, line height,
+     paragraph gap and column width all move line breaks, so they are the expensive ones; and a
+     browser that busy is also a browser whose sense of the server clock goes to pieces, which is
+     the other half of the jerky-prompter bug. Coalesced to one send per ~80ms, last value wins,
+     with a guaranteed final send so the number the operator let go of is always the one stored.
+     The readout beside the slider is updated by the caller and stays instant either way. */
+  var stylePending = null, styleTimer = 0, styleLastSent = 0;
+  function styleFlush() {
+    if (styleTimer) { clearTimeout(styleTimer); styleTimer = 0; }
+    if (!stylePending) return;
+    var o = stylePending; stylePending = null; styleLastSent = Date.now();
+    style(o);
+  }
+  function styleLive(o) {
+    stylePending = Object.assign(stylePending || {}, o);
+    var wait = Math.max(0, 80 - (Date.now() - styleLastSent));
+    if (!styleTimer) styleTimer = setTimeout(styleFlush, wait);
+  }
+  // Letting go of the control sends immediately — never leave the last value sitting in a timer.
+  ['stSize', 'stLH', 'stGap', 'stW', 'stCuePos', 'stColor', 'stCueColor', 'stMarkColor', 'stBg']
+    .forEach(function (id) { var el = $(id); if (el) el.addEventListener('change', styleFlush); });
+
   $('stFont').onchange   = function () { style({ font: this.value }); };
-  $('stSize').oninput    = function () { $('szV').textContent = this.value; style({ size: +this.value }); };
-  $('stLH').oninput      = function () { $('lhV').textContent = (+this.value).toFixed(2); style({ lineHeight: +this.value }); };
+  $('stSize').oninput    = function () { $('szV').textContent = this.value; styleLive({ size: +this.value }); };
+  $('stLH').oninput      = function () { $('lhV').textContent = (+this.value).toFixed(2); styleLive({ lineHeight: +this.value }); };
   /* Paragraph gap: how tall a blank line in the script is, as a % of one line. The talent
      complains about this before anything else — text with no air between thoughts is hard to
      read aloud — and until now the only answer was "add more blank lines". */
-  $('stGap').oninput     = function () { $('gapV').textContent = this.value + '%'; style({ paraGap: +this.value }); };
-  $('stW').oninput       = function () { $('wV').textContent = this.value; style({ width: +this.value }); };
+  $('stGap').oninput     = function () { $('gapV').textContent = this.value + '%'; styleLive({ paraGap: +this.value }); };
+  $('stW').oninput       = function () { $('wV').textContent = this.value; styleLive({ width: +this.value }); };
   $('stAlign').onchange  = function () { style({ align: this.value }); };
   $('stBold').onchange   = function () { style({ bold: this.checked }); };
-  $('stColor').oninput   = function () { style({ color: this.value }); };
+  $('stColor').oninput   = function () { styleLive({ color: this.value }); };
   $('stCue').onchange    = function () { style({ cue: this.value }); };
-  $('stCueColor').oninput = function () { style({ cueColor: this.value }); };
-  $('stCuePos').oninput  = function () { $('cpV').textContent = this.value; style({ cuePos: +this.value }); };
+  $('stCueColor').oninput = function () { styleLive({ cueColor: this.value }); };
+  $('stCuePos').oninput  = function () { $('cpV').textContent = this.value; styleLive({ cuePos: +this.value }); };
   $('stMarks').onchange  = function () { style({ showMarks: this.checked }); };
-  $('stMarkColor').oninput = function () { style({ markColor: this.value }); };
+  $('stMarkColor').oninput = function () { styleLive({ markColor: this.value }); };
   $('stFade').onchange   = function () { style({ fade: this.checked }); };
   $('stChroma').onchange = function () { style({ chroma: this.value }); };
   // Transparent and the background colour are one control in two parts: unticking Transparent
   // has to put a colour BACK, or the picker would look live while doing nothing.
-  $('stBg').oninput      = function () { $('stTransparent').checked = false; style({ bg: this.value }); };
+  $('stBg').oninput      = function () { $('stTransparent').checked = false; styleLive({ bg: this.value }); };
   $('stTransparent').onchange = function () { style({ bg: this.checked ? '' : ($('stBg').value || '#0a0a0a') }); };
   $('stJump').onchange   = function () { send({ type: 'pr_jumpsize', px: parseInt(this.value, 10) || 220 }); };
 
