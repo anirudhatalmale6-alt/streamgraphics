@@ -12,7 +12,6 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var P = null;
-  var clockOffset = 0;
 
   function send(a) {
     return fetch('/action', {
@@ -180,7 +179,9 @@
      Runs continuously, not only on state pushes — see the note at the top of the file. */
   function frame() {
     if (P) {
-      var now = Date.now() + clockOffset;
+      // Server time via sg-clock.js: asked for and round-trip corrected, not inferred from
+      // when a state message turned up. A phone on venue wifi is exactly where that mattered.
+      var now = SGClock.now();
       var px = livePx(P, now);
       var max = (P.geom && P.geom.sig) ? Math.max(0, P.geom.total) : -1;
 
@@ -247,8 +248,7 @@
     es.onmessage = function (e) {
       try {
         var m = JSON.parse(e.data);
-        var measured = m.serverTime - Date.now();
-        clockOffset = clockOffset === 0 ? measured : Math.round(clockOffset * 0.7 + measured * 0.3);
+        SGClock.passive(m.serverTime);   // fallback only — ignored once /clock has answered once
         if (m.state && m.state.prompter) render(m.state.prompter);
       } catch (x) {}
     };

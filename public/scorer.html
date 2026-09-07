@@ -36,7 +36,12 @@
   <header class="top">
     <div style="display:flex;align-items:center">
       <div class="brand"><span class="dot"></span> StreamGraphics Pro <small>Scorer</small></div>
-      <nav class="topnav"><a href="/">☰ All graphics</a><a href="/scoreboard">Full scoreboard controls</a><a href="/scoreboard-output" target="_blank">Output ↗</a></nav>
+      <!-- 🚨 Every link here is rewritten in scorer.js to carry ?board=. They MUST NOT be
+           followed as written: a bare /scoreboard or /scoreboard-output lands on the first
+           court in the list, not this one, which is how a scorer on court 3 used to end up
+           holding court 1's full control panel. "All graphics" is deliberately gone — this
+           page is handed to someone whose whole job is the court in front of them. -->
+      <nav class="topnav"><a href="/scoreboard" id="navSetup">⚙ Teams &amp; match setup</a><a href="/scoreboard-output" id="navOut" target="_blank">Output ↗</a></nav>
     </div>
     <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
   </header>
@@ -44,6 +49,8 @@
   <main class="scorer">
     <div class="sbar">
       <span class="ttl" id="matchTitle"></span>
+      <!-- Which court this tablet is scoring. Worth the space when five of them are running. -->
+      <span class="gtag" id="btag" style="display:none"></span>
       <span class="gtag" id="gtag">Game 1</span>
       <div class="air">
         <span class="airstate" id="airState" title="controlled by the technical director, not the scorer">OFF AIR</span>

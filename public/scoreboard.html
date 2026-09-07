@@ -56,7 +56,9 @@
   <header class="top">
     <div style="display:flex;align-items:center">
       <div class="brand"><span class="dot"></span> StreamGraphics Pro <small>Beach Volleyball Scoreboard</small></div>
-      <nav class="topnav"><a href="/">☰ All graphics</a><a href="/scoreboard-output" target="_blank">Open output ↗</a><a href="/scorer" target="_blank">🏐 Scorer (big buttons) ↗</a><a href="/control">Presenter's Timer</a><a href="/lowerthird">Graphics builder</a></nav>
+      <nav class="topnav" id="tdNav"><a href="/">☰ All graphics</a><a href="/scoreboard-output" target="_blank">Open output ↗</a><a href="/scorer" target="_blank">🏐 Scorer (big buttons) ↗</a><a href="/control">Presenter's Timer</a><a href="/lowerthird">Graphics builder</a></nav>
+      <!-- Scorer mode only: the one way out, and it goes back to THIS court's Scorer. -->
+      <nav class="topnav" id="scorerNav" style="display:none"><a href="/scorer" id="backToScorer">◂ Back to the Scorer</a></nav>
     </div>
     <div class="conn" id="conn"><span class="cdot"></span><span id="connTxt">connecting…</span></div>
   </header>
@@ -64,16 +66,24 @@
   <main>
     <div class="boardbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px">
       <span class="mini" style="color:var(--muted);font-weight:700">Scoreboard:</span>
-      <select class="inp" id="boardSel" style="width:auto"></select>
-      <button class="btn ghost" id="boardRename" style="font-size:12px">Rename</button>
-      <button class="btn ghost" id="boardNew" style="font-size:12px">＋ New board</button>
-      <button class="btn ghost" id="boardDelete" style="font-size:12px;color:#e06">Delete</button>
+      <!-- Everything in here reaches OTHER courts, so it is the technical director's, not the
+           scorer's. Hidden — not merely disabled — in scorer mode. See lockDown() below. -->
+      <span id="boardAdmin" style="display:contents">
+        <select class="inp" id="boardSel" style="width:auto"></select>
+        <button class="btn ghost" id="boardRename" style="font-size:12px">Rename</button>
+        <button class="btn ghost" id="boardNew" style="font-size:12px">＋ New board</button>
+        <button class="btn ghost" id="boardDelete" style="font-size:12px;color:#e06">Delete</button>
+      </span>
+      <!-- …replaced in scorer mode by the name of the one court they are allowed to touch. -->
+      <b id="boardFixed" style="display:none;font-size:16px"></b>
       <span style="flex:1"></span>
-      <span class="mini" style="color:var(--muted)">Big-button scorer:</span><a id="scorerLink" href="/scorer" target="_blank" style="color:#7c9cff;font-weight:700">open ↗</a>
-      <code id="scorerUrl" style="font-size:12px;color:var(--muted)">…/scorer</code>
-      <button class="btn ghost" id="scorerCopy" style="font-size:12px">Copy</button>
-      <button class="btn ghost" id="scorerQr" style="font-size:12px" title="show a code the phone's camera can read">▦ QR</button>
-      <div id="scorerQrBox" style="display:none;flex-basis:100%;margin-top:4px;padding-top:12px;border-top:1px solid var(--line)"></div>
+      <span id="scorerHandoff" style="display:contents">
+        <span class="mini" style="color:var(--muted)">Big-button scorer:</span><a id="scorerLink" href="/scorer" target="_blank" style="color:#7c9cff;font-weight:700">open ↗</a>
+        <code id="scorerUrl" style="font-size:12px;color:var(--muted)">…/scorer</code>
+        <button class="btn ghost" id="scorerCopy" style="font-size:12px">Copy</button>
+        <button class="btn ghost" id="scorerQr" style="font-size:12px" title="show a code the phone's camera can read">▦ QR</button>
+        <div id="scorerQrBox" style="display:none;flex-basis:100%;margin-top:4px;padding-top:12px;border-top:1px solid var(--line)"></div>
+      </span>
     </div>
     <section class="panel hero">
       <div class="preview" style="align-items:flex-start;justify-content:center">
@@ -84,6 +94,9 @@
       <div class="onair">
         <button class="btn big airbtn" id="btnOnAir">On Air</button>
         <button class="btn big airbtn" id="btnOffAir">Off Air</button>
+        <!-- Scorer mode: what is on air is the director's call, so the scorer gets the read-out
+             and not the switch. Same rule the Scorer page itself has always followed. -->
+        <div class="airstate" id="airRO" style="display:none" title="the technical director decides what goes on air">OFF AIR</div>
       </div>
     </section>
 
@@ -145,7 +158,9 @@
     <section class="panel">
       <h3>Team Library <span id="libCount" class="mini" style="text-transform:none;letter-spacing:0"></span></h3>
       <p class="mini" style="margin-bottom:10px">Your saved teams (names, colours, logo, roster). Pick one in a team card above to fill that side, then choose the two players. To update the list, export your spreadsheet as CSV and import it here. Columns are flexible: TeamName and a rank column are both OPTIONAL — add a <code>Seed</code> (or Rank) column for ranked events, omit it for unranked (no "(n)" shows). No sponsor column? Just leave TeamName out and it labels by the players.</p>
-      <div class="matchbtns">
+      <!-- The library is shared by every court, so importing or clearing it from one court's
+           panel changes what all the others can pick. Director's, not the scorer's. -->
+      <div class="matchbtns" id="libAdmin">
         <button class="btn ghost" id="libSample">⬇ Download sample CSV</button>
         <label class="browsebtn">Import CSV<input type="file" accept=".csv,text/csv" id="libImport"></label>
         <button class="btn ghost" id="libExport">Export current</button>
@@ -207,13 +222,13 @@
     </div>
 
     <!-- ONE control for "what am I feeding, and what do I paste into it" — see sg-output.js. -->
-    <section class="panel" style="margin-bottom:14px">
+    <section class="panel" style="margin-bottom:14px" id="outputSection">
       <h3 style="margin-bottom:8px">Choose your output</h3>
       <div id="outputBox"></div>
     </section>
   </main>
 
-  <footer class="foot">
+  <footer class="foot" id="footBar">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span>Output for OBS / vMix / browser:</span>
       <code id="outUrl">…/scoreboard-output</code>

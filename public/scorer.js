@@ -12,8 +12,23 @@
 
   function scoreOf(t, g) { var v = sb.teams[t].games[g]; return (v == null) ? '--' : v; }
 
+  /* 🚨 Point every link on this page at the court this page is actually scoring.
+   * They are written in the HTML without a board and MUST be rewritten here. Left as written,
+   * "Teams & match setup" opened /scoreboard with no ?board= — which falls back to the FIRST
+   * court — so a scorer on court 3 was handed court 1's full panel, complete with the court
+   * switcher, Rename, Delete and the on-air buttons, and with no way back to their own board.
+   * &scorer=1 asks that panel to show only this court's match; see lockDown() in scoreboard.js. */
+  function relink(id) {
+    var setup = $('navSetup'), out = $('navOut');
+    if (setup) setup.href = '/scoreboard?board=' + encodeURIComponent(id) + '&scorer=1';
+    if (out) out.href = '/scoreboard-output?board=' + encodeURIComponent(id);
+  }
+  if (BOARD) relink(BOARD);   // before the first state arrives, the URL is all we know
+
   function render() {
     if (!sb) return;
+    relink(sb.id);
+    if (sb.name) { $('btag').textContent = sb.name; $('btag').style.display = ''; }
     var g = sb.activeGame | 0;
     $('matchTitle').textContent = sb.title || 'Match';
     $('gtag').textContent = 'Game ' + (g + 1);

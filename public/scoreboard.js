@@ -6,6 +6,35 @@
   var BOARD = new URLSearchParams(location.search).get('board') || '';   // which scoreboard this panel drives
   function pickBoard(state) { var list = (state && state.scoreboards) || []; return (BOARD && list.filter(function (b) { return b.id === BOARD; })[0]) || list[0] || null; }
 
+  /* ---- scorer mode (?scorer=1) ----
+   * 🚨 The Scorer used to link here as a bare "/scoreboard" with no board on it. That is not a
+   * small omission: with no ?board= this panel falls back to the FIRST court in the list, so the
+   * scorer on court 3, wanting nothing more than to change the teams for the next match, landed
+   * on court 1's full panel — free to rename it, delete it, take it off air — and had no route
+   * back, because the Scorer link on that page pointed at court 1's scorer as well.
+   *
+   * Scorer mode is the same panel with everything that reaches PAST this one court taken out:
+   * the court switcher and its Rename/New/Delete, the on-air switch (the director's call, which
+   * is why the Scorer page itself has never had one), the team library's import/clear (one
+   * library, shared by every court), the output wiring, and every link to the rest of the app.
+   * What is left is this court's teams, match info and look — which is what they were sent for.
+   *
+   * Guard rails, not a login. Anyone who can type a URL can still reach the full panel; the
+   * point is that a scorer with a tablet and a job to do cannot arrive somewhere they can break
+   * another court by accident. If this ever needs to be a real restriction it wants a password
+   * on the panel, which is a different piece of work. */
+  var SCORER_MODE = new URLSearchParams(location.search).get('scorer') === '1';
+  function lockDown() {
+    if (!SCORER_MODE) return;
+    document.body.classList.add('scorer-mode');
+    ['boardAdmin', 'scorerHandoff', 'tdNav', 'libAdmin', 'outputSection', 'footBar',
+     'btnOnAir', 'btnOffAir'].forEach(function (id) { var el = $(id); if (el) el.style.display = 'none'; });
+    ['boardFixed', 'scorerNav', 'airRO'].forEach(function (id) { var el = $(id); if (el) el.style.display = ''; });
+    var brand = document.querySelector('.brand small');
+    if (brand) brand.textContent = 'Match setup';
+  }
+  lockDown();
+
   function send(a) {
     if (a && a.board === undefined && String(a.type || '').indexOf('sb_') === 0) a.board = (sb && sb.id) || BOARD;   // target this board
     return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {});
@@ -285,6 +314,7 @@
     sb = s;
     var live = !!s.visible;
     $('btnOnAir').classList.toggle('live', live); $('btnOffAir').classList.toggle('standby', !live);
+    if (SCORER_MODE) { $('airRO').textContent = live ? 'ON AIR' : 'OFF AIR'; $('airRO').classList.toggle('live', live); }
 
     s.teams.forEach(function (tm, ti) {
       var card = document.querySelector('.teamcard[data-team="' + ti + '"]');
@@ -378,6 +408,12 @@
     var cur = (sb && sb.id) || BOARD || (boards[0] && boards[0].id) || '';
     selEl.innerHTML = boards.map(function (b) { return '<option value="' + b.id + '"' + (b.id === cur ? ' selected' : '') + '>' + escH(b.name) + '</option>'; }).join('');
     $('boardDelete').disabled = boards.length <= 1;
+    /* Scorer mode: name the court instead of offering the list, and make the way out lead back
+       to THIS court's Scorer. A bare /scorer would drop them on the first board in the list —
+       the same bug in the other direction. */
+    var me = boards.filter(function (b) { return b.id === cur; })[0];
+    if ($('boardFixed')) $('boardFixed').textContent = (me && me.name) || 'Scoreboard';
+    if ($('backToScorer')) $('backToScorer').href = '/scorer?board=' + encodeURIComponent(cur);
     scorerPath = '/scorer?board=' + encodeURIComponent(cur);
     scorerLink.refresh();          // href, the visible address AND an open QR all follow the board
     if (outputCtl) outputCtl.refresh();   // and so does the link the output control hands over

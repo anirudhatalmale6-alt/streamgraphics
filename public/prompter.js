@@ -6,13 +6,14 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var P = null;
-  var clockOffset = 0;
-  var typing = false;      // the script box has focus — don't clobber it, don't steal its keys
+  var typing = false;     // the script box has focus — don't clobber it, don't steal its keys
 
   function send(a) {
     return fetch('/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(a) }).catch(function () {});
   }
-  function serverNow() { return Date.now() + clockOffset; }
+  /* 🚨 Server time comes from sg-clock.js, which ASKS and times the round trip. It is not
+     inferred from when a state message happened to arrive — see the note in that file. */
+  function serverNow() { return SGClock.now(); }
   function livePx(p, now) {
     var px = p.basePx + ((p.running && p.speed > 0) ? (now - p.anchorServer) * p.speed / 1000 : 0);
     var max = (p.geom && p.geom.sig) ? Math.max(0, p.geom.total) : -1;
@@ -984,8 +985,7 @@
   es.onmessage = function (e) {
     try {
       var msg = JSON.parse(e.data);
-      var measured = msg.serverTime - Date.now();
-      clockOffset = clockOffset === 0 ? measured : Math.round(clockOffset * 0.7 + measured * 0.3);
+      SGClock.passive(msg.serverTime);   // fallback only — ignored once /clock has answered once
       if (msg.state && msg.state.prompter) { P = msg.state.prompter; render(P); }
       if (msg.state && msg.state.scripts) renderLib(msg.state.scripts, msg.state.prompter);
     } catch (err) {}

@@ -29,12 +29,16 @@
   if (Q.get('flip') === '1') stage.classList.add('mirror-v');
 
   var P = null;            // latest prompter state from the server
-  var clockOffset = 0;     // serverTime - clientTime
   var pad = 0;             // lead-in height of the current layout
   var ownTotal = 0;        // how far THIS page can scroll (its own metrics)
   var lastLayout = null;   // what this page last DREW (see layoutKey)
 
-  function serverNow() { return Date.now() + clockOffset; }
+  /* 🚨 The clock is NOT worked out from the arrival time of state messages. That measurement
+     carries the message's own delay, it can only ever read low, and the first sample — taken
+     while the page is still loading — is the worst of the lot. Correcting it message by message
+     is what made the script skip about under the reader whenever the operator was working.
+     sg-clock.js asks the server directly, times the round trip, and slews. */
+  function serverNow() { return SGClock.now(); }
 
   /* Same arithmetic as the server's livePromptPx. Kept here so the frame is computed
      locally at 60fps instead of waiting on a network message per frame. */
@@ -118,8 +122,7 @@
   }
 
   function onState(msg) {
-    var measured = msg.serverTime - Date.now();
-    clockOffset = clockOffset === 0 ? measured : Math.round(clockOffset * 0.7 + measured * 0.3);
+    SGClock.passive(msg.serverTime);   // fallback only — ignored once /clock has answered once
     var p = msg.state && msg.state.prompter;
     if (!p) return;
     P = p;

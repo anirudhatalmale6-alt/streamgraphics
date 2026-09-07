@@ -3259,6 +3259,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  /* --- the server's clock ---
+   * The teleprompter's position is (anchor time, speed), so every screen drawing it has to know
+   * how far its own clock is from this one. Timed at BOTH ends by the caller, the round trip is
+   * known and can be taken out of the answer — which is the whole point, and why this must stay
+   * a trivial, uncached, no-work response. See public/sg-clock.js. */
+  if (pathname === '/clock') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ t: Date.now() }));
+    return;
+  }
+
   // --- app version (shown in the UI so you know if you're on the latest) ---
   if (pathname === '/version') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
