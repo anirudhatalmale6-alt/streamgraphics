@@ -275,6 +275,12 @@ function defaultScoreboard(name) {
     presenter: 'WEDBUSH',
     bracketLabel: "MEN'S CONTENDER'S BRACKET",
     eventLogoUrl: '', eventLogoPlacement: 'inline', eventLogoSize: 150,
+    /* The round mark INSIDE the board, beside the presenter's name. It used to be nothing but
+       hand-drawn CSS — a copy of the Hermosa Beach logo baked into the page with no control
+       anywhere, so the only way to change it was to spend the single event-logo slot on it
+       and give up the free-floating overlay. Its own field now, and it can be switched off:
+       'builtin' | 'custom' (cornerLogoUrl) | 'none'. */
+    cornerLogo: 'builtin', cornerLogoUrl: '',
     /* The event title used to be fixed at 13px — smaller than the team names, and smaller
        than the SPONSOR credit sitting right above it, which is backwards: the sponsor is a
        credit, the event is the event. Now an adjustable size, defaulting to something that
@@ -289,6 +295,23 @@ function defaultScoreboard(name) {
     style: { position: 'bottom-left', animation: 'slide-up', accent: '#1e64d2', bracketColor: '#7a1420', backdropUrl: '', chroma: '' }
   };
 }
+/* An address for an image, or nothing.
+ * 🚨 These used to be `String(x).slice(0, 500)`. A pasted address longer than the cap was not
+ * refused, it was CUT — and a cut URL is a broken image with no message anywhere. I hit it
+ * myself putting a small inlined picture into a board logo: the field accepted it, the board
+ * showed a blank space, and nothing said why. A signed S3 or CDN link with a query string goes
+ * past 500 characters routinely, so this was waiting for a real customer too.
+ * Refusing to store an over-long value leaves the previous one intact — the operator sees the
+ * old logo rather than a broken one, which is the failure that can be reasoned about.
+ * The ceiling stays modest on purpose: every board is broadcast to every open page on every
+ * action, so a big inlined image here would be sent again on every point scored. */
+const IMG_URL_MAX = 2000;
+function imgUrl(v, current) {
+  const s = String(v == null ? '' : v).trim();
+  if (s.length > IMG_URL_MAX) return current;      // too long to be a real address: keep what we had
+  return s;
+}
+
 // Resolve a board by id (from an action / URL) — falls back to the first board.
 function boardOf(id) {
   const list = state.scoreboards || [];
@@ -1594,20 +1617,31 @@ function applyAction(action) {
 
     case 'sb_team': { const sb = boardOf(action.board); if (sb) { // edit a team's name/seed/colour/logo
       const tm = sb.teams[action.team === 1 ? 1 : 0];
-      ['p1', 'p2', 'seed', 'color', 'rowColor', 'textColor', 'logoUrl'].forEach(function (k) { if (action[k] != null) tm[k] = String(action[k]).slice(0, 300); });
+      ['p1', 'p2', 'seed', 'color', 'rowColor', 'textColor'].forEach(function (k) { if (action[k] != null) tm[k] = String(action[k]).slice(0, 300); });
+      if (action.logoUrl != null) tm.logoUrl = imgUrl(action.logoUrl, tm.logoUrl);
     } break; }
 
     case 'sb_meta': { const sb = boardOf(action.board); if (sb) { // title / presenter / bracket / event logo
       if (action.title != null)     sb.title = String(action.title).slice(0, 80);
       if (action.presenter != null) sb.presenter = String(action.presenter).slice(0, 40);
       if (action.bracketLabel != null) sb.bracketLabel = String(action.bracketLabel).slice(0, 80);
-      if (action.eventLogoUrl != null) sb.eventLogoUrl = String(action.eventLogoUrl).slice(0, 500);
+      if (action.eventLogoUrl != null) sb.eventLogoUrl = imgUrl(action.eventLogoUrl, sb.eventLogoUrl);
       if (action.eventLogoPlacement != null) {
         const ok = ['inline','top-left','top-center','top-right','mid-left','mid-center','mid-right','bottom-left','bottom-center','bottom-right'];
         if (ok.indexOf(action.eventLogoPlacement) >= 0) sb.eventLogoPlacement = action.eventLogoPlacement;
       }
       if (action.eventLogoSize != null) sb.eventLogoSize = Math.max(40, Math.min(600, parseInt(action.eventLogoSize, 10) || 150));
       if (action.titleSize != null) sb.titleSize = Math.max(10, Math.min(34, parseInt(action.titleSize, 10) || 20));
+      if (action.cornerLogo != null && ['builtin','custom','none'].indexOf(action.cornerLogo) >= 0) sb.cornerLogo = action.cornerLogo;
+      if (action.cornerLogoUrl != null) {
+        sb.cornerLogoUrl = imgUrl(action.cornerLogoUrl, sb.cornerLogoUrl);
+        /* 🚨 Giving this board an image MEANS use it. Browse and paste both send only the address,
+         * so without this the operator picks a file, watches it upload, and nothing changes —
+         * which is the same "I did something and nothing happened" that this whole control was
+         * added to end. Only an explicit cornerLogo in the SAME action can override it, which is
+         * how the dropdown puts the built-in mark back. */
+        if (sb.cornerLogoUrl && action.cornerLogo == null) sb.cornerLogo = 'custom';
+      }
     } break; }
 
     case 'sb_style': { const sb = boardOf(action.board); if (sb) Object.assign(sb.style, styleIn(action.style)); break; }

@@ -175,6 +175,17 @@
       <section class="panel">
         <h3>Match info</h3>
         <div class="row"><label>Presenter</label><input class="inp" id="mPresenter" placeholder="WEDBUSH"></div>
+        <!-- The round mark beside the presenter's name. Its own slot, separate from the event
+             logo overlay below — see the note in scoreboard-output.js. -->
+        <div class="row"><label>Board logo</label>
+          <select class="inp" id="mCornerLogo">
+            <option value="builtin">Built-in Hermosa Beach mark</option>
+            <option value="custom">My own image…</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+        <div class="row" id="mCornerRow"><label></label><input class="inp" id="mCornerUrl" placeholder="paste a URL, or Browse ▸"><label class="browsebtn">Browse<input type="file" accept="image/*" data-browse-meta="cornerLogoUrl"></label></div>
+        <div class="row"><label></label><span class="hint">This is the small round logo next to the presenter's name, inside the board. The event logo below is the separate one you can float anywhere over the screen.</span></div>
         <div class="row"><label>Title</label><input class="inp" id="mTitle" placeholder="HERMOSA BEACH OPEN 2025"></div>
         <div class="row"><label>Title size</label><input class="range" id="mTitleSize" type="range" min="10" max="34" value="20"><span id="mTitleSizeV" class="mono">20</span></div>
         <div class="row"><label></label><span class="hint">How big the event name reads on the board. 13 was the old fixed size.</span></div>

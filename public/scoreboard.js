@@ -145,6 +145,27 @@
   };
   $('btnBackGame').onclick = function () { send({ type: 'sb_backGame' }); };
 
+  /* ---- the logo INSIDE the board, beside the presenter's name ----
+     Its own control because it is its own slot now. Before this it shared the event-logo field,
+     so choosing the floating overlay silently put the built-in mark back and left no way to
+     change it — which is exactly what Mark ran into. See the note in scoreboard-output.js. */
+  /* 🚨 The image row is ALWAYS visible, never revealed by the dropdown. The whole reason this
+     control exists is that Mark went looking for a way to change that logo and could not find
+     one; hiding half of it behind a menu choice would have been the same mistake in a new place.
+     Pasting an address flips the dropdown to "my own image" by itself, so nothing an operator
+     does here is a silent nothing. */
+  $('mCornerLogo').addEventListener('focus', function () { editing = 'mCornerLogo'; });
+  $('mCornerLogo').addEventListener('blur', function () { editing = null; });
+  $('mCornerLogo').onchange = function () { send({ type: 'sb_meta', cornerLogo: this.value }); };
+  $('mCornerUrl').addEventListener('focus', function () { editing = 'mCornerUrl'; });
+  $('mCornerUrl').addEventListener('blur', function () { editing = null; });
+  // Giving it an address means use it; the server turns the mode on. Deliberately NOT done here
+  // as well, or Browse (which posts the address on its own, from the shared uploader) would need
+  // the same rule in a second place and one of the two would eventually drift.
+  $('mCornerUrl').addEventListener('input', function () {
+    send({ type: 'sb_meta', cornerLogoUrl: this.value });
+  });
+
   // event-logo placement + size
   $('mLogoPlace').addEventListener('focus', function () { editing = 'mLogoPlace'; });
   $('mLogoPlace').addEventListener('blur', function () { editing = null; });
@@ -392,6 +413,8 @@
     if (editing !== 'mLogoPlace') $('mLogoPlace').value = s.eventLogoPlacement || 'inline';
     if (editing !== 'mLogoSize') { $('mLogoSize').value = s.eventLogoSize || 150; $('mLogoSizeV').textContent = s.eventLogoSize || 150; }
     if (editing !== 'mTitleSize') { var ts = s.titleSize || 20; $('mTitleSize').value = ts; $('mTitleSizeV').textContent = ts; }
+    if (editing !== 'mCornerLogo') $('mCornerLogo').value = s.cornerLogo || 'builtin';
+    if (editing !== 'mCornerUrl') $('mCornerUrl').value = s.cornerLogoUrl || '';
     if (s.style) {
       if (editing !== 'stAccent') $('stAccent').value = s.style.accent || '#1e64d2';
       if (editing !== 'stBracket') $('stBracket').value = s.style.bracketColor || '#7a1420';

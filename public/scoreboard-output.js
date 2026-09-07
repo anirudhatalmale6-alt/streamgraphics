@@ -70,25 +70,55 @@
     $('bracket').textContent = sb.bracketLabel || '';
     $('bracket').style.background = (sb.style && sb.style.bracketColor) || '#7a1420';
 
-    // Event logo: either INLINE in the brand cell, or a FREE OVERLAY you position anywhere.
+    /* ---- the two logo slots ----
+     *
+     * 🚨 These used to be ONE. `eventLogoUrl` was either drawn in the brand cell (placement
+     * "inline") or floated over the frame at one of nine anchors — and choosing the overlay put
+     * the built-in Hermosa Beach mark back in the corner, where nothing could touch it. So an
+     * operator using the overlay had no way at all to change the mark beside the presenter's
+     * name. Mark's words: "I can't change the logo next to wedbush. I must be missing it but I
+     * can't find it." He was not missing it; it did not exist.
+     *
+     * Now the corner is its own slot, and it can be emptied — that mark is another club's logo
+     * hand-drawn in CSS, which is fine on the board it was designed for and wrong on everybody
+     * else's. Order below is a priority list, and rule 3 is what keeps every existing setup
+     * looking exactly as it did. */
     var hb = document.querySelector('.hb'), evImg = $('eventLogo'), floatLogo = $('floatLogo');
+    function cornerImg() {
+      if (!evImg) {
+        evImg = document.createElement('img'); evImg.id = 'eventLogo';
+        evImg.className = 'eventlogo'; hb.parentNode.insertBefore(evImg, hb);
+      }
+      return evImg;
+    }
     var placement = sb.eventLogoPlacement || 'inline';
     var hasLogo = !!sb.eventLogoUrl;
-    if (hasLogo && placement === 'inline') {
-      if (!evImg) { evImg = document.createElement('img'); evImg.id = 'eventLogo'; evImg.className = 'eventlogo'; hb.parentNode.insertBefore(evImg, hb); }
-      evImg.src = sb.eventLogoUrl; evImg.style.display = 'block'; hb.style.display = 'none';
-      floatLogo.style.display = 'none';
-    } else if (hasLogo) { // free overlay at one of the 9 anchors
+    var corner = sb.cornerLogo || 'builtin';
+
+    if (corner === 'none') {                                   // 1. deliberately empty
+      if (evImg) evImg.style.display = 'none';
+      hb.style.display = 'none';
+    } else if (corner === 'custom' && sb.cornerLogoUrl) {       // 2. the operator's own mark
+      var ci = cornerImg();
+      ci.src = sb.cornerLogoUrl; ci.style.display = 'block';
+      hb.style.display = 'none';
+    } else if (hasLogo && placement === 'inline') {             // 3. as it always worked
+      var ei = cornerImg();
+      ei.src = sb.eventLogoUrl; ei.style.display = 'block';
+      hb.style.display = 'none';
+    } else {                                                    // 4. the built-in mark
       if (evImg) evImg.style.display = 'none';
       hb.style.display = '';
+    }
+
+    // The free-floating overlay is now independent of all of that.
+    if (hasLogo && placement !== 'inline') {
       floatLogo.src = sb.eventLogoUrl;
       floatLogo.style.height = (sb.eventLogoSize || 150) + 'px';
       POSITIONS.forEach(function (p) { floatLogo.classList.remove('pos-' + p); });
       floatLogo.classList.add('pos-' + placement);
       floatLogo.style.display = 'block';
     } else {
-      if (evImg) evImg.style.display = 'none';
-      hb.style.display = '';
       floatLogo.style.display = 'none';
     }
 
