@@ -107,20 +107,85 @@ if (-not $tag) { Fail "The module has no version tag, so there is nothing for Bi
 Done "Got the module, newest version tag is $tag."
 
 # --- copy it into the Bitfocus repository -----------------------------------
+#
+# 🚨 BUILD ON TOP OF WHAT BITFOCUS ALREADY HAS. The first version of this pushed our branch
+# straight over theirs, which worked exactly once - while the two repositories still had
+# identical history. Bitfocus's own bot then added issue templates to their copy, the histories
+# diverged, and the push was refused as a non-fast-forward:
+#
+#     ! [rejected]  main -> main (fetch first)
+#
+# ⛔ And the message this script printed for that was WRONG. It blamed missing write access,
+#    which is a completely different failure (403 / "permission denied"), so it sent Mark off
+#    checking GitHub invitations for a problem that had nothing to do with permissions.
+#
+# ⛔ Force-pushing would "fix" it by deleting the maintainers' own commits. Not acceptable on
+#    somebody else's repository.
+#
+# So: fetch their branch, start from THEIR commit, lay our released files over the top, and push
+# that as an ordinary fast-forward. Their files survive, ours win where the two overlap, and
+# nothing is merged - so there is no merge commit and no chance of a conflict stopping the run.
 Step "Copying it into the Bitfocus repository"
 git -C $Work remote add bitfocus $Target
-git -C $Work push bitfocus main
+git -C $Work fetch --quiet bitfocus main
+if ($LASTEXITCODE -ne 0) {
+    Fail @"
+Couldn't read the Bitfocus repository at
+  $Target
+Check you are signed in to GitHub as the right account, then run this again.
+"@
+}
+
+git -C $Work checkout --quiet -B sgp-publish bitfocus/main
+if ($LASTEXITCODE -ne 0) { Fail "Couldn't start from the Bitfocus branch." }
+
+# Our released files win wherever both sides have the same path.
+git -C $Work checkout --quiet $tag -- .
+if ($LASTEXITCODE -ne 0) { Fail "Couldn't take the files out of $tag." }
+
+# Anything THEY have that we don't: keep it if it is under .github (that is where their bot
+# works - issue templates and the like), otherwise it is a file the module used to ship and
+# no longer does, so it goes.
+$ours   = @(git -C $Work ls-tree -r --name-only $tag)
+$theirs = @(git -C $Work ls-tree -r --name-only bitfocus/main)
+foreach ($p in $theirs) {
+    if (($ours -notcontains $p) -and ($p -notlike '.github/*')) {
+        git -C $Work rm -q -- $p 2>$null
+    }
+}
+git -C $Work add -A
+
+$pending = (git -C $Work status --porcelain)
+if ($pending) {
+    git -C $Work -c user.name='StreamGraphics Pro' -c user.email='mark@streamgraphicspro.com' `
+        commit --quiet -m "$tag"
+    if ($LASTEXITCODE -ne 0) { Fail "Couldn't record the new version." }
+    Done "Prepared $tag on top of what Bitfocus already had."
+} else {
+    Done "Bitfocus already has exactly these files - nothing to change."
+}
+
+# The tag has to point at the commit that is actually IN their repository, not at the one in
+# yours, because their build reads the tag from their own copy.
+git -C $Work tag -f $tag 2>$null | Out-Null
+
+git -C $Work push bitfocus sgp-publish:main
 if ($LASTEXITCODE -ne 0) {
     Fail @"
 The push was refused.
 
-The usual reason is that your GitHub account hasn't been given write access to
-  bitfocus/companion-module-manhattanbeachstudios-streamgraphicspro
-yet. Bitfocus normally send an invitation - check github.com/notifications and your
-GitHub e-mail for an invite to join the repository, accept it, then run this again.
+Two things cause this, and they look different:
+
+  - "permission denied" or "403" means your GitHub account hasn't been given write
+    access to the repository yet. Bitfocus send an invitation - check
+    github.com/notifications and your GitHub e-mail, accept it, then run this again.
+
+  - "fetch first" or "non-fast-forward" means somebody pushed to the Bitfocus
+    repository in the last few seconds. Just run this again; it starts from
+    whatever is there at the time.
 "@
 }
-git -C $Work push bitfocus $tag
+git -C $Work push --force bitfocus $tag
 if ($LASTEXITCODE -ne 0) { Fail "The code went across but the version tag $tag did not. Run the script again." }
 Done "Code and tag $tag are now in the Bitfocus repository."
 
